@@ -1,32 +1,5 @@
-import { parseArgs } from '@std/cli/parse-args';
-import { log_error } from './errors.ts';
-import type { lightning } from './lightning.ts';
-import type { message } from './types.ts';
-import { create_message } from './messages.ts';
-
-/** setup commands on an instance of lightning */
-export function setup_commands(l: lightning) {
-	const prefix = l.config.cmd_prefix || 'l!';
-
-	l.on('create_nonbridged_message', (m) => {
-		if (!m.content?.startsWith(prefix)) return;
-
-		const {
-			_: [cmd, subcmd],
-			...opts
-		} = parseArgs(m.content.replace(prefix, '').split(' '));
-
-		run_command({
-			lightning: l,
-			cmd: cmd as string,
-			subcmd: subcmd as string,
-			opts,
-			...m,
-		});
-	});
-
-	l.on('run_command', (i) => run_command({ lightning: l, ...i }));
-}
+import type { lightning } from '../lightning.ts';
+import type { message } from '../messages.ts';
 
 /** arguments passed to a command */
 export interface command_arguments {
@@ -38,6 +11,8 @@ export interface command_arguments {
 	channel: string;
 	/** the plugin its being run on */
 	plugin: string;
+	/** the id of the associated event */
+	id: string;
 	/** timestamp given */
 	timestamp: Temporal.Instant;
 	/** options passed by the user */
@@ -49,6 +24,7 @@ export interface command_arguments {
 }
 
 /** options when parsing a command */
+// TODO(jersey): make the options more flexible
 export interface command_options {
 	/** this will be the key passed to options.opts in the execute function */
 	argument_name?: string;
@@ -70,26 +46,35 @@ export interface command {
 	execute: (options: command_arguments) => Promise<string> | string;
 }
 
-async function run_command(args: command_arguments) {
-	let reply;
-
-	try {
-		const cmd = args.lightning.commands.get(args.cmd) ||
-			args.lightning.commands.get('help')!;
-
-		const exec = cmd.options?.subcommands?.find((i) =>
-			i.name === args.subcmd
-		)?.execute ||
-			cmd.execute;
-
-		reply = create_message(await exec(args));
-	} catch (e) {
-		reply = (await log_error(e, { ...args, reply: undefined })).message;
-	}
-
-	try {
-		await args.reply(reply, false);
-	} catch (e) {
-		await log_error(e, { ...args, reply: undefined });
-	}
-}
+export const default_commands = [
+	[
+		'help',
+		{
+			name: 'help',
+			description: 'get help',
+			execute: () =>
+				'check out [the docs](https://williamhorning.eu.org/bolt/) for help.',
+		},
+	],
+	[
+		'version',
+		{
+			name: 'version',
+			description: 'get the bots version',
+			execute: () => 'hello from v0.7.4!',
+		},
+	],
+	[
+		'ping',
+		{
+			name: 'ping',
+			description: 'pong',
+			execute: ({ timestamp }) =>
+				`Pong! 🏓 ${
+					Temporal.Now.instant()
+						.since(timestamp)
+						.total('milliseconds')
+				}ms`,
+		},
+	],
+] as [string, command][];

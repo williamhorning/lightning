@@ -1,14 +1,13 @@
-import { create_message } from './messages.ts';
-import type { message } from './types.ts';
+import { create_message, type message } from './messages.ts';
 
 /** the error returned from log_error */
 export interface err {
+	/** id of the error */
+	id: string;
 	/** the original error */
-	e: Error;
+	cause: Error;
 	/** extra information about the error */
 	extra: Record<string, unknown>;
-	/** the uuid associated with the error */
-	uuid: string;
 	/** the message associated with the error */
 	message: message;
 }
@@ -19,59 +18,55 @@ export interface err {
  * @param extra any extra data to log
  */
 export async function log_error(
-	e: Error,
+	e: unknown,
 	extra: Record<string, unknown> = {},
 ): Promise<err> {
-	const uuid = crypto.randomUUID();
-	const error_hook = Deno.env.get('LIGHTNING_ERROR_HOOK');
+	const id = crypto.randomUUID();
+	const webhook = Deno.env.get('LIGHTNING_ERROR_HOOK');
+	const cause = e instanceof Error
+		? e
+		: e instanceof Object
+		? new Error(JSON.stringify(e))
+		: new Error(String(e));
+	const user_facing_text =
+		`Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\`\`\`\n${cause.message}\n${id}\n\`\`\``;
 
-	if ('lightning' in extra) delete extra.lightning;
+	for (const key in extra) {
+		if (key === 'lightning') {
+			delete extra[key];
+		}
 
-	if (
-		'opts' in extra &&
-		'lightning' in (extra.opts as Record<string, unknown>)
-	) delete (extra.opts as Record<string, unknown>).lightning;
+		if (typeof extra[key] === 'object' && extra[key] !== null) {
+			if ('lightning' in extra[key]) {
+				delete extra[key].lightning;
+			}
+		}
+	}
 
-	if (error_hook && error_hook.length > 0) {
-		const resp = await fetch(error_hook, {
+	// TODO(jersey): this is a really bad way of error handling-especially given it doesn't do a lot of stuff that would help debug errors-but it'll be replaced
+
+	console.error(`%clightning error ${id}`, 'color: red');
+	console.error(cause, extra);
+
+	if (webhook && webhook.length > 0) {
+		let json_str = `\`\`\`json\n${JSON.stringify(extra, null, 2)}\n\`\`\``;
+
+		if (json_str.length > 2000) json_str = '*see console*';
+
+		await fetch(webhook, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				content: `# ${e.message}\n*${uuid}*`,
+				content: `# ${cause.message}\n*${id}*`,
 				embeds: [
 					{
 						title: 'extra',
-						description: `\`\`\`json\n${
-							JSON.stringify(extra, null, 2)
-						}\n\`\`\``,
+						description: json_str,
 					},
 				],
 			}),
 		});
-
-		if (!resp.ok) {
-			await fetch(error_hook, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					content: `# ${e.message}\n*${uuid}*`,
-					embeds: [
-						{
-							title: 'extra',
-							description: '*see console*',
-						},
-					],
-				}),
-			});
-		}
 	}
 
-	console.error(`%clightning error ${uuid}`, 'color: red');
-	console.error(e, extra);
-
-	const message = create_message(
-		`Something went wrong! [Look here](https://williamhorning.eu.org/bolt) for help.\n\`\`\`\n${e.message}\n${uuid}\n\`\`\``,
-	);
-
-	return { e, uuid, extra, message };
+	return { id, cause, extra, message: create_message(user_facing_text) };
 }

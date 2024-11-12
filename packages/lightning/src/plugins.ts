@@ -1,12 +1,12 @@
 import { EventEmitter } from '@denosaurs/event';
-import type { command_arguments } from './commands.ts';
+import type { command_arguments } from './commands/mod.ts';
 import type { lightning } from './lightning.ts';
 import type {
 	deleted_message,
 	message,
 	message_options,
 	process_result,
-} from './types.ts';
+} from './messages.ts';
 
 /** the way to make a plugin */
 export interface create_plugin<
@@ -24,8 +24,6 @@ export interface create_plugin<
 export type plugin_events = {
 	/** when a message is created */
 	create_message: [message];
-	/** when a message isn't already bridged (don't emit outside of core) */
-	create_nonbridged_message: [message];
 	/** when a message is edited */
 	edit_message: [message];
 	/** when a message is deleted */

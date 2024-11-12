@@ -1,11 +1,11 @@
-ARG DENO_VERSION=1.45.5
-
-FROM docker.io/denoland/deno:${DENO_VERSION}
+FROM docker.io/denoland/deno:2.0.3
 
 # add lightning to the image
-RUN deno install -A --unstable-temporal jsr:@jersey/lightning@0.7.4/cli
+RUN deno install -g -A --unstable-temporal jsr:@jersey/lightning@0.8.0-alpha.0/cli
 RUN mkdir -p /app/data
+WORKDIR /app/data
 
 # set lightning as the entrypoint and use the run command by default
 ENTRYPOINT [ "lightning" ]
+# TODO(jersey): do i need to do this?
 CMD [ "run", "--config", "file:///app/data/config.ts"]
