@@ -115,7 +115,9 @@ async function get_base_msg(
 		},
 		channel: msg.chat.id.toString(),
 		id: msg.message_id.toString(),
-		timestamp: Temporal.Instant.fromEpochMilliseconds((msg.edit_date || msg.date) * 1000),
+		timestamp: Temporal.Instant.fromEpochMilliseconds(
+			(msg.edit_date || msg.date) * 1000,
+		),
 		plugin: 'bolt-telegram',
 		reply: async (lmsg) => {
 			for (const m of from_lightning(lmsg)) {

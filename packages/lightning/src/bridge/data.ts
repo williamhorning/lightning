@@ -35,7 +35,7 @@ export interface bridged_message {
 export class bridge_data {
 	private pg: Client;
 
-	static async create(pg_options: ClientOptions) {
+	static async create(pg_options: ClientOptions): Promise<bridge_data> {
 		const pg = new Client(pg_options);
 		await pg.connect();
 

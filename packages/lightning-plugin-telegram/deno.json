@@ -1,9 +1,9 @@
 {
 	"name": "@jersey/lightning-plugin-telegram",
-	"version": "0.7.4",
+	"version": "0.8.0",
 	"exports": "./src/mod.ts",
 	"imports": {
-		"@jersey/lightning": "jsr:@jersey/lightning@^0.7.3",
+		"@jersey/lightning": "jsr:@jersey/lightning@^0.8.0",
 		"telegramify-markdown": "npm:telegramify-markdown@^1.2.2",
 		"grammy": "npm:grammy@^1.28.0",
 		"grammy/types": "npm:grammy@^1.28.0/types"

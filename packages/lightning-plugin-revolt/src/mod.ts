@@ -88,11 +88,16 @@ export class revolt_plugin extends plugin<revolt_config> {
 						id: [resp._id],
 					};
 				} catch (e) {
-					if (e.cause.status === 403 || e.cause.status === 404) {
+					if (
+						(e as { cause: { status: number } }).cause.status ===
+							403 ||
+						(e as { cause: { status: number } }).cause.status ===
+							404
+					) {
 						return {
 							channel: opts.channel,
 							disable: true,
-							error: e,
+							error: e as Error,
 						};
 					} else {
 						throw e;
@@ -128,7 +133,7 @@ export class revolt_plugin extends plugin<revolt_config> {
 			return {
 				channel: opts.channel,
 				disable: false,
-				error: e,
+				error: e as Error,
 			};
 		}
 	}

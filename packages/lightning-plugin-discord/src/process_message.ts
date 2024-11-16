@@ -46,10 +46,13 @@ export async function process_message(api: API, opts: message_options) {
 					channel: opts.channel,
 				};
 			} catch (e) {
-				if (e.status === 404 && opts.action !== 'edit') {
+				if (
+					(e as { status: number }).status === 404 &&
+					opts.action !== 'edit'
+				) {
 					return {
 						channel: opts.channel,
-						error: e,
+						error: e as Error,
 						disable: true,
 					};
 				} else {
@@ -71,7 +74,7 @@ export async function process_message(api: API, opts: message_options) {
 	} catch (e) {
 		return {
 			channel: opts.channel,
-			error: e,
+			error: e as Error,
 			disable: false,
 		};
 	}

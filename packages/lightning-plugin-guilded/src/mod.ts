@@ -73,13 +73,19 @@ export class guilded_plugin extends plugin<guilded_config> {
 						channel: opts.channel,
 					};
 				} catch (e) {
-					if (e.response.status === 404) {
+					if (
+						(e as { response: { status: number } }).response
+							.status === 404
+					) {
 						return {
 							channel: opts.channel,
 							disable: true,
 							error: new Error('webhook not found!'),
 						};
-					} else if (e.response.status === 403) {
+					} else if (
+						(e as { response: { status: number } }).response
+							.status === 403
+					) {
 						return {
 							channel: opts.channel,
 							disable: true,
@@ -111,7 +117,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 			// TODO(@williamhorning): improve error handling
 			return {
 				channel: opts.channel,
-				error: e,
+				error: e as Error,
 				disable: false,
 			};
 		}

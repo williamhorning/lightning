@@ -195,6 +195,7 @@ export interface unprocessed_message {
 	/** whether the channel should be disabled */
 	disable: boolean;
 	/** the error causing this */
+	// TODO(jersey): make this unknown ideally
 	error: Error;
 }
 

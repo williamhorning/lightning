@@ -118,9 +118,9 @@ export class telegram_plugin extends plugin<telegram_config> {
 		} catch (e) {
 			// TODO(@williamhorning): improve error handling logic
 			return {
-				error: e,
-				id: [opts.message.id],
+				error: e as Error,
 				channel: opts.channel,
+				disable: false,
 			};
 		}
 	}

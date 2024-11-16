@@ -1,9 +1,9 @@
 {
 	"name": "@jersey/lightning-plugin-discord",
-	"version": "0.7.4",
+	"version": "0.8.0",
 	"exports": "./src/mod.ts",
 	"imports": {
-		"@jersey/lightning": "jsr:@jersey/lightning@^0.7.3",
+		"@jersey/lightning": "jsr:@jersey/lightning@^0.8.0",
 		"@discordjs/core": "npm:@discordjs/core@^1.2.0",
 		"@discordjs/rest": "npm:@discordjs/rest@^2.3.0",
 		"@discordjs/ws": "npm:@discordjs/ws@^1.1.1",

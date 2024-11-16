@@ -87,7 +87,7 @@ export class lightning {
 	}
 
 	/** create a new instance of lightning */
-	static async create(config: config) {
+	static async create(config: config): Promise<lightning> {
 		const data = await bridge_data.create(config.postgres_options);
 
 		return new lightning(data, config);
