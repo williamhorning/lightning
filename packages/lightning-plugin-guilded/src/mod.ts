@@ -118,7 +118,6 @@ export class guilded_plugin extends plugin<guilded_config> {
 			return {
 				channel: opts.channel,
 				error: e as Error,
-				disable: false,
 			};
 		}
 	}

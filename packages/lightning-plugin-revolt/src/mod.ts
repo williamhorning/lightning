@@ -132,7 +132,6 @@ export class revolt_plugin extends plugin<revolt_config> {
 		} catch (e) {
 			return {
 				channel: opts.channel,
-				disable: false,
 				error: e as Error,
 			};
 		}

@@ -75,7 +75,6 @@ export async function process_message(api: API, opts: message_options) {
 		return {
 			channel: opts.channel,
 			error: e as Error,
-			disable: false,
 		};
 	}
 }

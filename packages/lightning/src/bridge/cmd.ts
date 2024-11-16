@@ -3,22 +3,19 @@ import { log_error } from '../errors.ts';
 
 export const bridge_command = {
 	name: 'bridge',
-	description: 'bridge commands',
-	execute: () => 'take a look at the docs for help with bridges',
+	description: 'Bridge commands',
+	execute: () => 'Take a look at the docs for help with bridges',
 	options: {
 		subcommands: [
-			// TODO(jersey): eventually reimplement reset command?
 			{
 				name: 'join',
-				description: 'join a bridge',
+				description: 'Join a bridge',
 				options: { argument_name: 'name', argument_required: true },
 				execute: async ({ lightning, channel, opts, plugin }) => {
 					const current_bridge = await lightning.data
 						.get_bridge_by_channel(
 							channel,
 						);
-
-					// live laugh love validation
 
 					if (current_bridge) {
 						return `You are already in a bridge called ${current_bridge.name}`;
@@ -103,7 +100,7 @@ export const bridge_command = {
 			},
 			{
 				name: 'leave',
-				description: 'leave a bridge',
+				description: 'Leave a bridge',
 				execute: async ({ lightning, channel }) => {
 					const bridge = await lightning.data.get_bridge_by_channel(
 						channel,
@@ -132,7 +129,7 @@ export const bridge_command = {
 			},
 			{
 				name: 'toggle',
-				description: 'toggle a setting on a bridge',
+				description: 'Toggle a setting on a bridge',
 				options: { argument_name: 'setting', argument_required: true },
 				execute: async ({ opts, lightning, channel }) => {
 					const bridge = await lightning.data.get_bridge_by_channel(
@@ -145,7 +142,7 @@ export const bridge_command = {
 						!['allow_editing', 'allow_everyone', 'use_rawname']
 							.includes(opts.setting)
 					) {
-						return `that setting does not exist`;
+						return `That setting does not exist`;
 					}
 
 					const key = opts.setting as keyof typeof bridge.settings;
@@ -170,7 +167,7 @@ export const bridge_command = {
 			},
 			{
 				name: 'status',
-				description: 'see what bridges you are in',
+				description: 'See what bridges you are in',
 				execute: async ({ lightning, channel }) => {
 					const existing_bridge = await lightning.data
 						.get_bridge_by_channel(

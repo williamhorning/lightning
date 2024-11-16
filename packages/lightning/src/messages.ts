@@ -193,7 +193,7 @@ export interface unprocessed_message {
 	/** the channel the message was to be sent to */
 	channel: bridge_channel;
 	/** whether the channel should be disabled */
-	disable: boolean;
+	disable?: boolean;
 	/** the error causing this */
 	// TODO(jersey): make this unknown ideally
 	error: Error;

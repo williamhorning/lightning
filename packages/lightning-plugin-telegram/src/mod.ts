@@ -120,7 +120,6 @@ export class telegram_plugin extends plugin<telegram_config> {
 			return {
 				error: e as Error,
 				channel: opts.channel,
-				disable: false,
 			};
 		}
 	}
