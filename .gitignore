@@ -2,3 +2,4 @@
 /config
 /config.ts
 packages/lightning-old
+packages/postgres

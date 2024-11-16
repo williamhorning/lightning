@@ -11,8 +11,6 @@ export const bridge_command = {
 			{
 				name: 'join',
 				description: 'join a bridge',
-				// TODO(jersey): update this to support multiple options
-				// TODO(jersey): make command options more flexible
 				options: { argument_name: 'name', argument_required: true },
 				execute: async ({ lightning, channel, opts, plugin }) => {
 					const current_bridge = await lightning.data

@@ -3,13 +3,13 @@
 	"version": "0.8.0-alpha.0",
 	"exports": {
 		".": "./src/mod.ts",
-		// TODO(jersey): add the cli back in along with migrations, except make migrations not suck as much?
 		"./cli": "./src/cli/mod.ts"
 	},
 	"imports": {
-		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",
 		"@db/postgres": "jsr:@db/postgres@^0.19.4",
-		"@std/ulid": "jsr:@std/ulid@^1.0.0",
-		"@std/cli/parse-args": "jsr:@std/cli@^1.0.3/parse-args"
+		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",
+		"@std/cli/parse-args": "jsr:@std/cli@^1.0.3/parse-args",
+		"@std/path": "jsr:@std/path@^1.0.0",
+		"@std/ulid": "jsr:@std/ulid@^1.0.0"
 	}
 }

@@ -22,7 +22,7 @@ export async function log_error(
 	extra: Record<string, unknown> = {},
 ): Promise<err> {
 	const id = crypto.randomUUID();
-	const webhook = Deno.env.get('LIGHTNING_ERROR_HOOK');
+	const webhook = Deno.env.get('LIGHTNING_ERROR_WEBHOOK');
 	const cause = e instanceof Error
 		? e
 		: e instanceof Object
