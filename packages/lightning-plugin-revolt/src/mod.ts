@@ -69,70 +69,63 @@ export class revolt_plugin extends plugin<revolt_config> {
 
 	/** process a message */
 	async process_message(opts: message_options): Promise<process_result> {
-		try {
-			if (opts.action === 'create') {
-				try {
-					const msg = await torvapi(this.bot, {
-						...opts.message,
-						reply_id: opts.reply_id,
-					});
+		if (opts.action === 'create') {
+			try {
+				const msg = await torvapi(this.bot, {
+					...opts.message,
+					reply_id: opts.reply_id,
+				});
 
-					const resp = (await this.bot.request(
-						'post',
-						`/channels/${opts.channel.id}/messages`,
-						msg,
-					)) as Message;
+				const resp = (await this.bot.request(
+					'post',
+					`/channels/${opts.channel.id}/messages`,
+					msg,
+				)) as Message;
 
+				return {
+					channel: opts.channel,
+					id: [resp._id],
+				};
+			} catch (e) {
+				if (
+					(e as { cause: { status: number } }).cause.status ===
+						403 ||
+					(e as { cause: { status: number } }).cause.status ===
+						404
+				) {
 					return {
 						channel: opts.channel,
-						id: [resp._id],
+						disable: true,
+						error: e as Error,
 					};
-				} catch (e) {
-					if (
-						(e as { cause: { status: number } }).cause.status ===
-							403 ||
-						(e as { cause: { status: number } }).cause.status ===
-							404
-					) {
-						return {
-							channel: opts.channel,
-							disable: true,
-							error: e as Error,
-						};
-					} else {
-						throw e;
-					}
+				} else {
+					throw e;
 				}
-			} else if (opts.action === 'edit') {
-				await this.bot.request(
-					'patch',
-					`/channels/${opts.channel.id}/messages/${opts.edit_id[0]}`,
-					await torvapi(this.bot, {
-						...opts.message,
-						reply_id: opts.reply_id,
-					}),
-				);
-
-				return {
-					channel: opts.channel,
-					id: opts.edit_id,
-				};
-			} else {
-				await this.bot.request(
-					'delete',
-					`/channels/${opts.channel.id}/messages/${opts.edit_id[0]}`,
-					undefined,
-				);
-
-				return {
-					channel: opts.channel,
-					id: opts.edit_id,
-				};
 			}
-		} catch (e) {
+		} else if (opts.action === 'edit') {
+			await this.bot.request(
+				'patch',
+				`/channels/${opts.channel.id}/messages/${opts.edit_id[0]}`,
+				await torvapi(this.bot, {
+					...opts.message,
+					reply_id: opts.reply_id,
+				}),
+			);
+
 			return {
 				channel: opts.channel,
-				error: e as Error,
+				id: opts.edit_id,
+			};
+		} else {
+			await this.bot.request(
+				'delete',
+				`/channels/${opts.channel.id}/messages/${opts.edit_id[0]}`,
+				undefined,
+			);
+
+			return {
+				channel: opts.channel,
+				id: opts.edit_id,
 			};
 		}
 	}

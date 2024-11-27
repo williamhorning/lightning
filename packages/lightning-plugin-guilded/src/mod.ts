@@ -59,65 +59,57 @@ export class guilded_plugin extends plugin<guilded_config> {
 	}
 
 	async process_message(opts: message_options): Promise<process_result> {
-		try {
-			if (opts.action === 'create') {
-				try {
-					const { id } = await new WebhookClient(
-						opts.channel.data as { token: string; id: string },
-					).send(
-						await convert_msg(opts.message, opts.channel.id, this),
-					);
-
-					return {
-						id: [id],
-						channel: opts.channel,
-					};
-				} catch (e) {
-					if (
-						(e as { response: { status: number } }).response
-							.status === 404
-					) {
-						return {
-							channel: opts.channel,
-							disable: true,
-							error: new Error('webhook not found!'),
-						};
-					} else if (
-						(e as { response: { status: number } }).response
-							.status === 403
-					) {
-						return {
-							channel: opts.channel,
-							disable: true,
-							error: new Error('no permission to send messages!'),
-						};
-					} else {
-						throw e;
-					}
-				}
-			} else if (opts.action === 'delete') {
-				const msg = await this.bot.messages.fetch(
-					opts.channel.id,
-					opts.edit_id[0],
+		if (opts.action === 'create') {
+			try {
+				const { id } = await new WebhookClient(
+					opts.channel.data as { token: string; id: string },
+				).send(
+					await convert_msg(opts.message, opts.channel.id, this),
 				);
 
-				await msg.delete();
-
 				return {
+					id: [id],
 					channel: opts.channel,
-					id: opts.edit_id,
 				};
-			} else {
-				return {
-					channel: opts.channel,
-					id: opts.edit_id,
-				};
+			} catch (e) {
+				if (
+					(e as { response: { status: number } }).response
+						.status === 404
+				) {
+					return {
+						channel: opts.channel,
+						disable: true,
+						error: new Error('webhook not found!'),
+					};
+				} else if (
+					(e as { response: { status: number } }).response
+						.status === 403
+				) {
+					return {
+						channel: opts.channel,
+						disable: true,
+						error: new Error('no permission to send messages!'),
+					};
+				} else {
+					throw e;
+				}
 			}
-		} catch (e) {
-			// TODO(@williamhorning): improve error handling
+		} else if (opts.action === 'delete') {
+			const msg = await this.bot.messages.fetch(
+				opts.channel.id,
+				opts.edit_id[0],
+			);
+
+			await msg.delete();
+
 			return {
 				channel: opts.channel,
-				error: e as Error,
+				id: opts.edit_id,
+			};
+		} else {
+			return {
+				channel: opts.channel,
+				id: opts.edit_id,
 			};
 		}
 	}

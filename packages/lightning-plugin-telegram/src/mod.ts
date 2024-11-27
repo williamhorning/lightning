@@ -58,69 +58,61 @@ export class telegram_plugin extends plugin<telegram_config> {
 
 	/** process a message event */
 	async process_message(opts: message_options): Promise<process_result> {
-		try {
-			if (opts.action === 'delete') {
-				for (const id of opts.edit_id) {
-					await this.bot.api.deleteMessage(
-						opts.channel.id,
-						Number(id),
-					);
-				}
-
-				return {
-					id: opts.edit_id,
-					channel: opts.channel,
-				};
-			} else if (opts.action === 'edit') {
-				const content = from_lightning(opts.message)[0];
-
-				await this.bot.api.editMessageText(
+		if (opts.action === 'delete') {
+			for (const id of opts.edit_id) {
+				await this.bot.api.deleteMessage(
 					opts.channel.id,
-					Number(opts.edit_id[0]),
-					content.value,
+					Number(id),
+				);
+			}
+
+			return {
+				id: opts.edit_id,
+				channel: opts.channel,
+			};
+		} else if (opts.action === 'edit') {
+			const content = from_lightning(opts.message)[0];
+
+			await this.bot.api.editMessageText(
+				opts.channel.id,
+				Number(opts.edit_id[0]),
+				content.value,
+				{
+					parse_mode: 'MarkdownV2',
+				},
+			);
+
+			return {
+				id: opts.edit_id,
+				channel: opts.channel,
+			};
+		} else if (opts.action === 'create') {
+			const content = from_lightning(opts.message);
+			const messages = [];
+
+			for (const msg of content) {
+				const result = await this.bot.api[msg.function](
+					opts.channel.id,
+					msg.value,
 					{
+						reply_parameters: opts.reply_id
+							? {
+								message_id: Number(opts.reply_id),
+							}
+							: undefined,
 						parse_mode: 'MarkdownV2',
 					},
 				);
 
-				return {
-					id: opts.edit_id,
-					channel: opts.channel,
-				};
-			} else if (opts.action === 'create') {
-				const content = from_lightning(opts.message);
-				const messages = [];
-
-				for (const msg of content) {
-					const result = await this.bot.api[msg.function](
-						opts.channel.id,
-						msg.value,
-						{
-							reply_parameters: opts.reply_id
-								? {
-									message_id: Number(opts.reply_id),
-								}
-								: undefined,
-							parse_mode: 'MarkdownV2',
-						},
-					);
-
-					messages.push(String(result.message_id));
-				}
-
-				return {
-					id: messages,
-					channel: opts.channel,
-				};
-			} else {
-				throw new Error('unknown action');
+				messages.push(String(result.message_id));
 			}
-		} catch (e) {
-			// TODO(@williamhorning): improve error handling logic
+
 			return {
-				error: e as Error,
+				id: messages,
 				channel: opts.channel,
 			};
+		} else {
+			throw new Error('unknown action');
 		}
 	}
 }
