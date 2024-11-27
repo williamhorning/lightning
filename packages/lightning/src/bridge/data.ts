@@ -21,9 +21,12 @@ export interface bridge_settings {
 	use_rawname: boolean; /* rawname = username */
 }
 
-export interface bridge_message extends bridge {
-	original_id: string; /* original message id */
+export interface bridge_message {
+	id: string; /* original message id */
+	bridge_id: string; /* bridge id */
+	channels: bridge_channel[]; /* channels bridged */
 	messages: bridged_message[]; /* bridged messages */
+	settings: bridge_settings; /* settings for the bridge */
 }
 
 export interface bridged_message {
@@ -57,13 +60,11 @@ export class bridge_data {
 			settings JSONB NOT NULL
 		)`;
 		await pg.queryArray`CREATE TABLE bridge_messages (
-			original_id TEXT PRIMARY KEY,
-			id TEXT NOT NULL,
-			name TEXT NOT NULL,
-			channels JSONB NOT NULL REFERENCES bridges(channels),
+			id TEXT PRIMARY KEY,
+			bridge_id TEXT NOT NULL,
+			channels JSONB NOT NULL,
 			messages JSONB NOT NULL,
-			settings JSONB NOT NULL REFERENCES bridges(settings),
-			CONSTRAINT fk_id FOREIGN KEY(id) REFERENCES bridges(id)
+			settings JSONB NOT NULL
 		)`;
 	}
 
@@ -81,14 +82,11 @@ export class bridge_data {
 		return { id, ...bridge };
 	}
 
-	async update_bridge(bridge: bridge): Promise<bridge> {
+	async update_bridge(bridge: {channels: bridge_channel[], settings: bridge_settings, id: string}): Promise<void> {
 		await this.pg.queryArray`UPDATE bridges SET
-			name = ${bridge.name},
 			channels = ${bridge.channels},
 			settings = ${bridge.settings}
 			WHERE id = ${bridge.id}`;
-
-		return bridge;
 	}
 
 	async get_bridge_by_id(id: string): Promise<bridge | undefined> {
@@ -107,8 +105,8 @@ export class bridge_data {
 
 	async new_bridge_message(message: bridge_message): Promise<bridge_message> {
 		await this.pg.queryArray`INSERT INTO bridge_messages
-			(original_id, id, name, channels, messages, settings) VALUES
-			(${message.original_id}, ${message.id}, ${message.name}, ${message.channels}, ${message.messages}, ${message.settings})`;
+			(id, bridge_id, channels, messages, settings) VALUES
+			(${message.id}, ${message.bridge_id}, ${message.channels}, ${message.messages}, ${message.settings})`;
 
 		return message;
 	}
@@ -117,11 +115,10 @@ export class bridge_data {
 		message: bridge_message,
 	): Promise<bridge_message> {
 		await this.pg.queryArray`UPDATE bridge_messages SET
-			id = ${message.id},
 			channels = ${message.channels},
 			messages = ${message.messages},
 			settings = ${message.settings}
-			WHERE original_id = ${message.original_id}`;
+			WHERE id = ${message.id}`;
 
 		return message;
 	}

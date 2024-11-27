@@ -130,26 +130,28 @@ export async function handle_message(
 
 	await core.data[`${method}_bridge_message`]({
 		...br,
-		original_id: msg.id,
+		id: msg.id,
 		messages,
+		bridge_id: br.id,
 	});
 }
 
 async function disable_channel(
 	channel: bridge_channel,
-	bridge: bridge,
+	bridge: bridge | bridge_message,
 	core: lightning,
 	error: unknown,
 ): Promise<void> {
 	await log_error(error, { channel, bridge });
 
 	await core.data.update_bridge({
-		...bridge,
+		id: "bridge_id" in bridge ? bridge.bridge_id : bridge.id,
 		channels: bridge.channels.map((i) =>
 			i.id === channel.id && i.plugin === channel.plugin
 				? { ...i, disabled: true, data: error }
 				: i
 		),
+		settings: bridge.settings
 	});
 }
 
