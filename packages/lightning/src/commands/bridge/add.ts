@@ -1,12 +1,13 @@
 import type { bridge_channel } from '../../bridge/data.ts';
 import { log_error } from '../../errors.ts';
-import { create_message, type message } from '../../messages.ts';
 import type { command_execute_options } from '../mod.ts';
 
-export async function create(opts: command_execute_options): Promise<message> {
-    const result = await _lightning_bridge_add_common(opts, 'name');
+export async function create(
+    opts: command_execute_options,
+): Promise<string> {
+    const result = await _lightning_bridge_add_common(opts);
 
-    if (!('data' in result)) return result;
+    if (typeof result === 'string') return result;
 
     const bridge_data = {
         name: opts.arguments.name,
@@ -20,81 +21,68 @@ export async function create(opts: command_execute_options): Promise<message> {
 
     try {
         await opts.lightning.data.create_bridge(bridge_data);
-        return create_message(
-            `Bridge created successfully! You can now join it using \`${opts.lightning.config.cmd_prefix}join ${result.id}\`. Keep this id safe, don't share it with anyone, and delete this message.`,
-        );
+        return `Bridge created successfully! You can now join it using \`${opts.lightning.config.cmd_prefix}join ${result.id}\`. Keep this id safe, don't share it with anyone, and delete this message.`;
     } catch (e) {
-        return (await log_error(
+        throw await log_error(
             new Error('Failed to insert bridge into database', { cause: e }),
             bridge_data,
-        )).message;
+        );
     }
 }
 
-export async function join(opts: command_execute_options): Promise<message> {
+export async function join(
+    opts: command_execute_options,
+): Promise<string> {
+    const result = await _lightning_bridge_add_common(opts);
+
+    if (typeof result === 'string') return result;
+
     const target_bridge = await opts.lightning.data.get_bridge_by_id(
         opts.arguments.id,
     );
 
     if (!target_bridge) {
-        return create_message(
-            `Bridge with id \`${opts.arguments.id}\` not found. Make sure you have the correct id.`,
-        );
+        return `Bridge with id \`${opts.arguments.id}\` not found. Make sure you have the correct id.`;
     }
-
-    const result = await _lightning_bridge_add_common(opts, 'id');
-
-    if (!('data' in result)) return result;
 
     target_bridge.channels.push(result);
 
     try {
         await opts.lightning.data.edit_bridge(target_bridge);
 
-        return create_message(
-            `Bridge joined successfully!`,
-        );
+        return `Bridge joined successfully!`;
     } catch (e) {
-        return (await log_error(
+        throw await log_error(
             new Error('Failed to update bridge in database', {
                 cause: e,
             }),
             {
                 bridge: target_bridge,
             },
-        )).message;
+        );
     }
 }
 
 async function _lightning_bridge_add_common(
     opts: command_execute_options,
-    option_name: 'name' | 'id',
-): Promise<message | bridge_channel> {
+): Promise<string | bridge_channel> {
     const existing_bridge = await opts.lightning.data.get_bridge_by_channel(
         opts.channel,
     );
 
     if (existing_bridge) {
-        return create_message(
-            `You are already in a bridge called \`${existing_bridge.name}\`. You must leave it before being in another bridge. Try using \`${opts.lightning.config.cmd_prefix}leave\` or \`${opts.lightning.config.cmd_prefix}help\` commands.`,
-        );
-    }
-
-    if (!opts.arguments[option_name]) {
-        return create_message(
-            `Please provide the \`${option_name}\` argument. Try using \`${opts.lightning.config.cmd_prefix}help\` command.`,
-        );
+        return `You are already in a bridge called \`${existing_bridge.name}\`. You must leave it before being in another bridge. Try using \`${opts.lightning.config.cmd_prefix}leave\` or \`${opts.lightning.config.cmd_prefix}help\` commands.`
     }
 
     const plugin = opts.lightning.plugins.get(opts.plugin);
 
     if (!plugin) {
-        return (await log_error(
+        throw await log_error(
             new Error('Internal error: platform support not found'),
             {
                 plugin: opts.plugin,
             },
-        )).message;
+        );
     }
 
     let bridge_data;
@@ -102,13 +90,13 @@ async function _lightning_bridge_add_common(
     try {
         bridge_data = await plugin.create_bridge(opts.channel);
     } catch (e) {
-        return (await log_error(
+        throw await log_error(
             new Error('Failed to create bridge using plugin', { cause: e }),
             {
                 channel: opts.channel,
                 plugin_name: opts.plugin,
             },
-        )).message;
+        );
     }
 
     return {

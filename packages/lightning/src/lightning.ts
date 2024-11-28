@@ -1,12 +1,15 @@
 import type { ClientOptions } from '@db/postgres';
 import {
 	type command,
-	default_commands,
-} from './commands_v2/mod.ts';
+	execute_text_command,
+	run_command,
+	type run_command_options,
+} from './commands/mod.ts';
 import type { create_plugin, plugin } from './plugins.ts';
 import { bridge_data } from './bridge/data.ts';
 import { handle_message } from './bridge/msg.ts';
 import type { message } from './messages.ts';
+import { default_commands } from './commands/default.ts';
 
 /** configuration options for lightning */
 export interface config {
@@ -24,7 +27,7 @@ export class lightning {
 	/** bridge data handling */
 	data: bridge_data;
 	/** the commands registered */
-	commands: Map<string, command> = new Map(default_commands);
+	commands: Map<string, command> = default_commands;
 	/** the config used */
 	config: config;
 	/** the plugins loaded */
@@ -49,16 +52,21 @@ export class lightning {
 		for await (const { name, value } of plugin) {
 			await new Promise((res) => setTimeout(res, 150));
 
-			if (sessionStorage.getItem(`${value[0].plugin}-${value[0].id}`)) continue;
+			if (sessionStorage.getItem(`${value[0].plugin}-${value[0].id}`)) {
+				continue;
+			}
 
 			if (name === 'run_command') {
-				// TODO(jersey): migrate over to commands_v2
+				run_command({
+					...value[0],
+					lightning: this,
+				} as run_command_options);
 
 				continue;
 			}
 
 			if (name === 'create_message') {
-				// TODO(jersey): migrate over to commands_v2
+				execute_text_command(value[0] as message, this);
 			}
 
 			handle_message(

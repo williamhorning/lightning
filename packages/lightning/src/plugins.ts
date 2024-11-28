@@ -6,7 +6,7 @@ import type {
 	message_options,
 	process_result,
 } from './messages.ts';
-import type { command_execute_options } from './commands_v2/mod.ts';
+import type { run_command_options } from './commands/mod.ts';
 
 /** the way to make a plugin */
 export interface create_plugin<
@@ -29,7 +29,7 @@ export type plugin_events = {
 	/** when a message is deleted */
 	delete_message: [deleted_message];
 	/** when a command is run */
-	run_command: [Omit<command_execute_options, 'lightning'>];
+	run_command: [Omit<run_command_options, 'lightning'>];
 };
 
 /** a plugin for lightning */

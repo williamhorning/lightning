@@ -2,13 +2,11 @@ import { create, join } from './add.ts';
 import { leave, toggle } from './modify.ts';
 import { status } from './status.ts';
 import type { command } from '../mod.ts';
-import { create_message } from '../../messages.ts';
 
 export const bridge_command = {
     name: 'bridge',
     description: 'bridge commands',
-    execute: () =>
-        create_message('take a look at the subcommands of this command'),
+    execute: () => 'take a look at the subcommands of this command',
     subcommands: [
         {
             name: 'create',
