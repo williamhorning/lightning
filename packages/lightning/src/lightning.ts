@@ -10,6 +10,7 @@ import { handle_message } from './bridge/msg.ts';
 import { run_command } from './commands/run.ts';
 import { handle_command_message } from './commands/run.ts';
 import type { message } from './messages.ts';
+import { bridge_command } from './bridge/cmd.ts';
 
 /** configuration options for lightning */
 export interface config {
@@ -17,7 +18,7 @@ export interface config {
 	postgres_options: ClientOptions;
 	/** a list of plugins */
 	// deno-lint-ignore no-explicit-any
-	plugins?: create_plugin<plugin<any>>[];
+	plugins?: create_plugin<any>[];
 	/** the prefix used for commands */
 	cmd_prefix: string;
 }
@@ -30,8 +31,6 @@ export class lightning {
 	commands: Map<string, command> = new Map(default_commands);
 	/** the config used */
 	config: config;
-	/** set of processed messages */
-	private processed: Set<`${string}-${string}`> = new Set();
 	/** the plugins loaded */
 	plugins: Map<string, plugin<unknown>>;
 
@@ -39,6 +38,7 @@ export class lightning {
 	constructor(bridge_data: bridge_data, config: config) {
 		this.data = bridge_data;
 		this.config = config;
+		this.commands.set('bridge', bridge_command);
 		this.plugins = new Map<string, plugin<unknown>>();
 
 		for (const p of this.config.plugins || []) {
@@ -51,38 +51,32 @@ export class lightning {
 	}
 
 	private async _handle_events(plugin: plugin<unknown>) {
-		for await (const event of plugin) {
+		for await (const { name, value } of plugin) {
 			await new Promise((res) => setTimeout(res, 150));
 
-			const id = `${event.value[0].plugin}-${event.value[0].id}` as const;
+			if (sessionStorage.getItem(`${value[0].plugin}-${value[0].id}`)) continue;
 
-			if (!this.processed.has(id)) {
-				this.processed.add(id);
+			if (name === 'run_command') {
+				run_command({
+					...(value[0] as Omit<
+						command_arguments,
+						'lightning'
+					>),
+					lightning: this,
+				});
 
-				if (event.name === 'run_command') {
-					run_command({
-						...(event.value[0] as Omit<
-							command_arguments,
-							'lightning'
-						>),
-						lightning: this,
-					});
-
-					continue;
-				}
-
-				if (event.name === 'create_message') {
-					handle_command_message(event.value[0] as message, this);
-				}
-
-				handle_message(
-					this,
-					event.value[0] as message,
-					event.name.split('_')[0] as 'create',
-				);
-			} else {
-				this.processed.delete(id);
+				continue;
 			}
+
+			if (name === 'create_message') {
+				handle_command_message(value[0] as message, this);
+			}
+
+			handle_message(
+				this,
+				value[0] as message,
+				name.split('_')[0] as 'create',
+			);
 		}
 	}
 

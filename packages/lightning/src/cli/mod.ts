@@ -11,9 +11,10 @@ if (_.v || _.version) {
 } else if (_.h || _.help) {
 	run_help();
 } else if (_._[0] === 'run') {
+	// TODO(jersey): this is somewhat broken when acting as a JSR package
 	if (!_.config) _.config = join(Deno.cwd(), 'config.ts');
 
-	const config: config = await import(toFileUrl(_.config).toString());
+	const config: config = (await import(toFileUrl(_.config).toString())).default;
 
 	addEventListener('error', async (ev) => {
 		await log_error(ev.error, { type: 'global error' });

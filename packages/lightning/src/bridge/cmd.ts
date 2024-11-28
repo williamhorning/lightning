@@ -26,17 +26,20 @@ export const bridge_command = {
 					if (!opts.id && !opts.name) {
 						return `You must provide either an id or a name`;
 					}
+					
+					const p = lightning.plugins.get(plugin);
 
-					const bridge_channel = {
-						id: channel,
-						data: undefined as unknown,
-						disabled: false,
-						plugin,
-					};
+					if (!p) return (await log_error(
+						new Error('plugin not found'),
+						{
+							plugin,
+						},
+					)).message.content as string;
+
+					let data;
 
 					try {
-						bridge_channel.data = lightning.plugins.get(plugin)
-							?.create_bridge(channel);
+						data = await p.create_bridge(channel);
 					} catch (e) {
 						return (await log_error(
 							new Error('error creating bridge', { cause: e }),
@@ -46,6 +49,13 @@ export const bridge_command = {
 							},
 						)).message.content as string;
 					}
+
+					const bridge_channel = {
+						id: channel,
+						data,
+						disabled: false,
+						plugin,
+					};
 
 					if (opts.id) {
 						const bridge = await lightning.data.get_bridge_by_id(
@@ -57,7 +67,7 @@ export const bridge_command = {
 						bridge.channels.push(bridge_channel);
 
 						try {
-							await lightning.data.update_bridge(bridge);
+							await lightning.data.edit_bridge(bridge);
 							return `Bridge joined successfully`;
 						} catch (e) {
 							return (await log_error(
@@ -69,7 +79,7 @@ export const bridge_command = {
 						}
 					} else {
 						try {
-							await lightning.data.new_bridge({
+							await lightning.data.create_bridge({
 								name: opts.name,
 								channels: [bridge_channel],
 								settings: {
@@ -113,7 +123,7 @@ export const bridge_command = {
 					) => ch.id !== channel);
 
 					try {
-						await lightning.data.update_bridge(
+						await lightning.data.edit_bridge(
 							bridge,
 						);
 						return `Bridge left successfully`;
@@ -151,7 +161,7 @@ export const bridge_command = {
 						.settings[key];
 
 					try {
-						await lightning.data.update_bridge(
+						await lightning.data.edit_bridge(
 							bridge,
 						);
 						return `Setting toggled successfully`;
@@ -176,7 +186,7 @@ export const bridge_command = {
 
 					if (!existing_bridge) return `You are not in a bridge`;
 
-					return `You are in a bridge called ${existing_bridge.name} that's connected to ${
+					return `You are in a bridge called "${existing_bridge.name}" that's connected to ${
 						existing_bridge.channels.length - 1
 					} other channels`;
 				},

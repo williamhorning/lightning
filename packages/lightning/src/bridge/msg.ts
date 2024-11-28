@@ -126,9 +126,7 @@ export async function handle_message(
 		});
 	}
 
-	const method = type === 'create' ? 'new' : 'update';
-
-	await core.data[`${method}_bridge_message`]({
+	await core.data[`${type}_bridge_message`]({
 		...br,
 		id: msg.id,
 		messages,
@@ -144,7 +142,7 @@ async function disable_channel(
 ): Promise<void> {
 	await log_error(error, { channel, bridge });
 
-	await core.data.update_bridge({
+	await core.data.edit_bridge({
 		id: "bridge_id" in bridge ? bridge.bridge_id : bridge.id,
 		channels: bridge.channels.map((i) =>
 			i.id === channel.id && i.plugin === channel.plugin

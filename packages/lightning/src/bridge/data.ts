@@ -42,7 +42,7 @@ export class bridge_data {
 		const pg = new Client(pg_options);
 		await pg.connect();
 
-		await this.create_table(pg);
+		await bridge_data.create_table(pg);
 
 		return new bridge_data(pg);
 	}
@@ -53,92 +53,100 @@ export class bridge_data {
 
 		if (exists) return;
 
-		await pg.queryArray`CREATE TABLE bridges (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			channels JSONB NOT NULL,
-			settings JSONB NOT NULL
-		)`;
-		await pg.queryArray`CREATE TABLE bridge_messages (
-			id TEXT PRIMARY KEY,
-			bridge_id TEXT NOT NULL,
-			channels JSONB NOT NULL,
-			messages JSONB NOT NULL,
-			settings JSONB NOT NULL
-		)`;
+		await pg.queryArray`
+			CREATE TABLE bridges (
+				id       TEXT PRIMARY KEY,
+				name     TEXT NOT NULL,
+				channels JSONB NOT NULL,
+				settings JSONB NOT NULL
+			);
+
+			CREATE TABLE bridge_messages (
+				id        TEXT PRIMARY KEY,
+				bridge_id TEXT NOT NULL,
+				channels  JSONB NOT NULL,
+				messages  JSONB NOT NULL,
+				settings  JSONB NOT NULL
+			);
+		`;
 	}
 
 	private constructor(pg_client: Client) {
 		this.pg = pg_client;
 	}
 
-	async new_bridge(bridge: Omit<bridge, 'id'>): Promise<bridge> {
+	async create_bridge(br: Omit<bridge, "id">): Promise<bridge> {
 		const id = ulid();
 
-		await this.pg.queryArray`INSERT INTO bridges
-			(id, name, channels, settings) VALUES
-			(${id}, ${bridge.name}, ${bridge.channels}, ${bridge.settings})`;
+		await this.pg.queryArray`
+			INSERT INTO bridges (id, name, channels, settings)
+			VALUES (${id}, ${br.name}, ${JSON.stringify(br.channels)}, ${JSON.stringify(br.settings)})
+		`;
 
-		return { id, ...bridge };
+		return { id, ...br };
 	}
 
-	async update_bridge(bridge: {channels: bridge_channel[], settings: bridge_settings, id: string}): Promise<void> {
-		await this.pg.queryArray`UPDATE bridges SET
-			channels = ${bridge.channels},
-			settings = ${bridge.settings}
-			WHERE id = ${bridge.id}`;
+	async edit_bridge(br: Omit<bridge, "name">): Promise<void> {
+		await this.pg.queryArray`
+			UPDATE bridges
+			SET channels = ${JSON.stringify(br.channels)}, settings = ${JSON.stringify(br.settings)}
+			WHERE id = ${br.id}
+		`;
 	}
 
 	async get_bridge_by_id(id: string): Promise<bridge | undefined> {
-		const resp = await this.pg.queryObject<bridge>`
-			SELECT * FROM bridges WHERE id = ${id}`;
+		const res = await this.pg.queryObject<bridge>`
+			SELECT * FROM bridges
+			WHERE id = ${id}
+		`;
 
-		return resp.rows[0];
+		return res.rows[0];
 	}
 
-	async get_bridge_by_channel(channel: string): Promise<bridge | undefined> {
-		const resp = await this.pg.queryObject<bridge>`
-			SELECT * FROM bridges WHERE JSON_QUERY(channels, '$[*].id') = ${channel}`;
+	async get_bridge_by_channel(ch: string): Promise<bridge | undefined> {
+		const res = await this.pg.queryObject<bridge>(`
+			SELECT * FROM bridges
+			WHERE EXISTS (
+				SELECT 1 FROM jsonb_array_elements(channels) AS ch
+				WHERE ch->>'id' = '${ch}'
+			)
+		`);
 
-		return resp.rows[0];
+		return res.rows[0];
 	}
 
-	async new_bridge_message(message: bridge_message): Promise<bridge_message> {
+	async create_bridge_message(msg: bridge_message): Promise<void> {
 		await this.pg.queryArray`INSERT INTO bridge_messages
 			(id, bridge_id, channels, messages, settings) VALUES
-			(${message.id}, ${message.bridge_id}, ${message.channels}, ${message.messages}, ${message.settings})`;
-
-		return message;
+			(${msg.id}, ${msg.bridge_id}, ${JSON.stringify(msg.channels)}, ${JSON.stringify(msg.messages)}, ${JSON.stringify(msg.settings)})`;
 	}
 
-	async update_bridge_message(
-		message: bridge_message,
-	): Promise<bridge_message> {
-		await this.pg.queryArray`UPDATE bridge_messages SET
-			channels = ${message.channels},
-			messages = ${message.messages},
-			settings = ${message.settings}
-			WHERE id = ${message.id}`;
-
-		return message;
+	async edit_bridge_message(msg: bridge_message): Promise<void> {
+		await this.pg.queryArray`
+			UPDATE bridge_messages
+			SET messages = ${JSON.stringify(msg.messages)}, channels = ${JSON.stringify(msg.channels)}, settings = ${JSON.stringify(msg.settings)}
+			WHERE id = ${msg.id}
+		`;
 	}
 
-	async delete_bridge_message(id: string): Promise<void> {
-		await this.pg
-			.queryArray`DELETE FROM bridge_messages WHERE original_id = ${id}`;
+	async delete_bridge_message({ id }: bridge_message): Promise<void> {
+		await this.pg.queryArray`
+			DELETE FROM bridge_messages WHERE id = ${id}
+		`;
 	}
 
 	async get_bridge_message(id: string): Promise<bridge_message | undefined> {
-		const resp = await this.pg.queryObject<bridge_message>`
-			SELECT * FROM bridge_messages WHERE original_id = ${id}`;
+		const res = await this.pg.queryObject<bridge_message>(`
+			SELECT * FROM bridge_messages
+			WHERE id = '${id}' OR EXISTS (
+				SELECT 1 FROM jsonb_array_elements(messages) AS msg
+				WHERE EXISTS (
+					SELECT 1 FROM jsonb_array_elements(msg->'id') AS id
+					WHERE id = '${id}'
+				)
+			)
+		`);
 
-		return resp.rows[0];
-	}
-
-	async is_bridged_message(id: string): Promise<boolean> {
-		const resp = await this.pg.queryObject<bridge_message>`
-			SELECT * FROM bridge_messages WHERE JSON_QUERY(messages, '$[*].id') = ${id}`;
-
-		return resp.rows.length > 0;
+		return res.rows[0];
 	}
 }
