@@ -1,4 +1,4 @@
-import { log_error } from '../../errors.ts';
+import { logError } from '../../errors.ts';
 import type { command_execute_options } from '../mod.ts';
 
 export async function leave(opts: command_execute_options): Promise<string> {
@@ -18,12 +18,10 @@ export async function leave(opts: command_execute_options): Promise<string> {
         );
         return `Bridge left successfully`;
     } catch (e) {
-        throw await log_error(
-            new Error('Error updating bridge', { cause: e }),
-            {
-                bridge,
-            },
-        );
+        logError(e, {
+            message: 'Failed to update bridge in database',
+            extra: { bridge },
+        })
     }
 }
 
@@ -50,11 +48,9 @@ export async function toggle(opts: command_execute_options): Promise<string> {
         );
         return `Bridge settings updated successfully`;
     } catch (e) {
-        throw await log_error(
-            new Error('Error updating bridge', { cause: e }),
-            {
-                bridge,
-            },
-        );
+        logError(e, {
+            message: 'Failed to update bridge in database',
+            extra: { bridge },
+        })
     }
 }

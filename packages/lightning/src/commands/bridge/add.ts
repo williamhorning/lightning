@@ -1,5 +1,5 @@
 import type { bridge_channel } from '../../bridge/data.ts';
-import { log_error } from '../../errors.ts';
+import { logError } from '../../errors.ts';
 import type { command_execute_options } from '../mod.ts';
 
 export async function create(
@@ -23,10 +23,10 @@ export async function create(
         await opts.lightning.data.create_bridge(bridge_data);
         return `Bridge created successfully! You can now join it using \`${opts.lightning.config.cmd_prefix}join ${result.id}\`. Keep this id safe, don't share it with anyone, and delete this message.`;
     } catch (e) {
-        throw await log_error(
-            new Error('Failed to insert bridge into database', { cause: e }),
-            bridge_data,
-        );
+        logError(e, {
+            message: 'Failed to insert bridge into database',
+            extra: bridge_data
+        });
     }
 }
 
@@ -52,14 +52,10 @@ export async function join(
 
         return `Bridge joined successfully!`;
     } catch (e) {
-        throw await log_error(
-            new Error('Failed to update bridge in database', {
-                cause: e,
-            }),
-            {
-                bridge: target_bridge,
-            },
-        );
+        logError(e, {
+            message: 'Failed to update bridge in database',
+            extra: { target_bridge }
+        })
     }
 }
 
@@ -77,12 +73,9 @@ async function _lightning_bridge_add_common(
     const plugin = opts.lightning.plugins.get(opts.plugin);
 
     if (!plugin) {
-        throw await log_error(
-            new Error('Internal error: platform support not found'),
-            {
-                plugin: opts.plugin,
-            },
-        );
+        logError('Internal error: platform support not found', {
+            extra: { plugin: opts.plugin }
+        })
     }
 
     let bridge_data;
@@ -90,13 +83,10 @@ async function _lightning_bridge_add_common(
     try {
         bridge_data = await plugin.create_bridge(opts.channel);
     } catch (e) {
-        throw await log_error(
-            new Error('Failed to create bridge using plugin', { cause: e }),
-            {
-                channel: opts.channel,
-                plugin_name: opts.plugin,
-            },
-        );
+        logError(e, {
+            message: 'Failed to create bridge using plugin',
+            extra: { channel: opts.channel, plugin_name: opts.plugin }
+        })
     }
 
     return {

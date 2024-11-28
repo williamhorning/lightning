@@ -1,6 +1,6 @@
 import { parseArgs } from '@std/cli/parse-args';
 import { join, toFileUrl } from '@std/path';
-import { log_error } from '../errors.ts';
+import { logError } from '../errors.ts';
 import { type config, lightning } from '../lightning.ts';
 
 const version = '0.8.0';
@@ -16,21 +16,18 @@ if (_.v || _.version) {
 
 	const config: config = (await import(toFileUrl(_.config).toString())).default;
 
-	addEventListener('error', async (ev) => {
-		await log_error(ev.error, { type: 'global error' });
-		Deno.exit(1);
+	addEventListener('error', (ev) => {
+		logError(ev.error, { extra: { type: 'global error' } });
 	});
 
-	addEventListener('unhandledrejection', async (ev) => {
-		await log_error(ev.reason, { type: 'global rejection' });
-		Deno.exit(1);
+	addEventListener('unhandledrejection', (ev) => {
+		logError(ev.reason, { extra: { type: 'global rejection' } });
 	});
 
 	try {
 		await lightning.create(config);
 	} catch (e) {
-		await log_error(e, { type: 'global class error' });
-		Deno.exit(1);
+		logError(e, { extra: { type: 'global class error' } });
 	}
 } else if (_._[0] === 'migrations') {
 	// TODO(jersey): implement migrations

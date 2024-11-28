@@ -1,7 +1,6 @@
 import type { lightning } from '../lightning.ts';
 import { create_message, type message } from '../messages.ts';
-import { parseArgs } from '@std/cli/parse-args';
-import { type err, log_error } from '../errors.ts';
+import { LightningError } from '../errors.ts';
 
 export interface command_execute_options {
     channel: string;
@@ -23,25 +22,19 @@ export interface command {
     subcommands?: Omit<command, 'subcommands'>[];
     execute: (
         opts: command_execute_options,
-    ) => Promise<string | err> | string | err;
+    ) => Promise<string> | string;
 }
 
 export async function execute_text_command(msg: message, lightning: lightning) {
     if (!msg.content?.startsWith(lightning.config.cmd_prefix)) return;
 
-    const {
-        _: [cmd, ...rest],
-        ...args
-    } = parseArgs(
-        msg.content.replace(lightning.config.cmd_prefix, '').split(' '),
-    );
+    const [cmd, ...rest] = msg.content.replace(lightning.config.cmd_prefix, '').split(' ');
 
     return await run_command({
         ...msg,
         lightning,
         command: cmd as string,
         rest: rest as string[],
-        args,
     });
 }
 
@@ -87,7 +80,7 @@ export async function run_command(
         }
     }
 
-    let resp: string | err;
+    let resp: string | LightningError;
 
     try {
         resp = await command.execute({
@@ -95,19 +88,21 @@ export async function run_command(
             arguments: opts.args,
         });
     } catch (e) {
-        // TODO(jersey): we should have err be a class that extends Error so checking this is easier
-        if (typeof e === 'object' && e !== null && 'cause' in e) {
-            resp = e as err;
-        } else {
-            resp = await log_error(e, { ...opts, reply: undefined });
-        }
+        if (e instanceof LightningError) resp = e;
+        else resp = new LightningError(e, {
+            message: 'An error occurred while executing the command',
+            extra: { command: command.name },
+        })
     }
 
     try {
         if (typeof resp === 'string') {
             await opts.reply(create_message(resp), false);
-        } else await opts.reply(resp.message, false);
+        } else await opts.reply(resp.msg, false);
     } catch (e) {
-        await log_error(e, { ...opts, reply: undefined });
+        new LightningError(e, {
+            message: 'An error occurred while sending the command response',
+            extra: { command: command.name },
+        })
     }
 }
