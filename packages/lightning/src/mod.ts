@@ -1,8 +1,4 @@
-export type {
-	command,
-	command_arguments,
-	command_options,
-} from './commands/mod.ts';
+// TODO(jersey): add exports from commands_v2
 export { log_error } from './errors.ts';
 export { type config, lightning } from './lightning.ts';
 export * from './messages.ts';

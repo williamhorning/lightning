@@ -1,16 +1,12 @@
 import type { ClientOptions } from '@db/postgres';
 import {
 	type command,
-	type command_arguments,
 	default_commands,
-} from './commands/mod.ts';
+} from './commands_v2/mod.ts';
 import type { create_plugin, plugin } from './plugins.ts';
 import { bridge_data } from './bridge/data.ts';
 import { handle_message } from './bridge/msg.ts';
-import { run_command } from './commands/run.ts';
-import { handle_command_message } from './commands/run.ts';
 import type { message } from './messages.ts';
-import { bridge_command } from './bridge/cmd.ts';
 
 /** configuration options for lightning */
 export interface config {
@@ -38,7 +34,6 @@ export class lightning {
 	constructor(bridge_data: bridge_data, config: config) {
 		this.data = bridge_data;
 		this.config = config;
-		this.commands.set('bridge', bridge_command);
 		this.plugins = new Map<string, plugin<unknown>>();
 
 		for (const p of this.config.plugins || []) {
@@ -57,19 +52,13 @@ export class lightning {
 			if (sessionStorage.getItem(`${value[0].plugin}-${value[0].id}`)) continue;
 
 			if (name === 'run_command') {
-				run_command({
-					...(value[0] as Omit<
-						command_arguments,
-						'lightning'
-					>),
-					lightning: this,
-				});
+				// TODO(jersey): migrate over to commands_v2
 
 				continue;
 			}
 
 			if (name === 'create_message') {
-				handle_command_message(value[0] as message, this);
+				// TODO(jersey): migrate over to commands_v2
 			}
 
 			handle_message(

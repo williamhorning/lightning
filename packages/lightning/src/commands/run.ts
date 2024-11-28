@@ -4,6 +4,8 @@ import { log_error } from '../errors.ts';
 import type { lightning } from '../lightning.ts';
 import { parseArgs } from '@std/cli/parse-args';
 
+// TODO(jersey): migrate over to commands_v2
+
 export function handle_command_message(m: message, l: lightning) {
 	if (!m.content?.startsWith(l.config.cmd_prefix)) return;
 

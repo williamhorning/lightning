@@ -4,6 +4,8 @@ import type { APIInteraction } from 'discord-api-types';
 import { to_discord } from './discord.ts';
 import { instant } from './lightning.ts';
 
+// TODO(jersey): migrate over to commands_v2
+
 export function to_command(interaction: { api: API; data: APIInteraction }) {
 	if (interaction.data.type !== 2 || interaction.data.data.type !== 1) return;
 	const opts = {} as Record<string, string>;

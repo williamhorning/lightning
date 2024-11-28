@@ -1,5 +1,4 @@
 import { EventEmitter } from '@denosaurs/event';
-import type { command_arguments } from './commands/mod.ts';
 import type { lightning } from './lightning.ts';
 import type {
 	deleted_message,
@@ -7,6 +6,7 @@ import type {
 	message_options,
 	process_result,
 } from './messages.ts';
+import type { command_execute_options } from './commands_v2/mod.ts';
 
 /** the way to make a plugin */
 export interface create_plugin<
@@ -29,7 +29,7 @@ export type plugin_events = {
 	/** when a message is deleted */
 	delete_message: [deleted_message];
 	/** when a command is run */
-	run_command: [Omit<command_arguments, 'lightning'>];
+	run_command: [Omit<command_execute_options, 'lightning'>];
 };
 
 /** a plugin for lightning */
