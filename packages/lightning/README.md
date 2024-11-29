@@ -7,4 +7,7 @@ apps via plugins
 
 ## [docs](https://williamhorning.eu.org/bolt)
 
-<!-- TODO(jersey): add new example -->
+```ts
+import {} from "@jersey/lightning";
+// TODO(jersey): add example
+```

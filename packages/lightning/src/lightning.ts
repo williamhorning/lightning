@@ -1,25 +1,27 @@
 import type { ClientOptions } from '@db/postgres';
-import {
-	type command,
-	execute_text_command,
-	run_command,
-	type run_command_options,
-} from './commands/mod.ts';
-import type { create_plugin, plugin } from './plugins.ts';
-import { bridge_data } from './bridge/data.ts';
-import { handle_message } from './bridge/msg.ts';
-import type { message } from './messages.ts';
+import { bridge_message } from './bridge.ts';
 import { default_commands } from './commands/default.ts';
+import { execute_text_command, run_command } from './commands/runners.ts';
+import { bridge_data } from './database.ts';
+import type {
+	command,
+	create_command,
+	create_plugin,
+	message,
+	plugin,
+} from './structures/mod.ts';
 
 /** configuration options for lightning */
 export interface config {
+	/** error URL */
+	error_url?: string;
 	/** database options */
-	postgres_options: ClientOptions;
+	postgres: ClientOptions;
 	/** a list of plugins */
 	// deno-lint-ignore no-explicit-any
 	plugins?: create_plugin<any>[];
 	/** the prefix used for commands */
-	cmd_prefix: string;
+	prefix: string;
 }
 
 /** an instance of lightning */
@@ -48,6 +50,7 @@ export class lightning {
 		}
 	}
 
+	/** event handler */
 	private async _handle_events(plugin: plugin<unknown>) {
 		for await (const { name, value } of plugin) {
 			await new Promise((res) => setTimeout(res, 150));
@@ -56,8 +59,8 @@ export class lightning {
 				continue;
 			}
 
-			if (name === 'run_command') {
-				run_command(value[0] as run_command_options);
+			if (name === 'create_command') {
+				run_command(value[0] as create_command);
 				continue;
 			}
 
@@ -65,13 +68,13 @@ export class lightning {
 				execute_text_command(value[0] as message, this);
 			}
 
-			handle_message(this, name, value[0]);
+			bridge_message(this, name, value[0]);
 		}
 	}
 
 	/** create a new instance of lightning */
 	static async create(config: config): Promise<lightning> {
-		const data = await bridge_data.create(config.postgres_options);
+		const data = await bridge_data.create(config.postgres);
 
 		return new lightning(data, config);
 	}

@@ -21,8 +21,7 @@
 	},
 	"workspace": [
 		"./packages/lightning",
-		// TODO(jersey): remove these two
-		"./packages/lightning-old",
+		// TODO(jersey): contribute upstream
 		"./packages/postgres",
 		"./packages/lightning-plugin-telegram",
 		"./packages/lightning-plugin-revolt",

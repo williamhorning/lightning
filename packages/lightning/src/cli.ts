@@ -1,7 +1,7 @@
 import { parseArgs } from '@std/cli/parse-args';
 import { join, toFileUrl } from '@std/path';
-import { logError } from '../errors.ts';
-import { type config, lightning } from '../lightning.ts';
+import { lightning, type config } from './lightning.ts';
+import { log_error } from './structures/errors.ts';
 
 const version = '0.8.0';
 const _ = parseArgs(Deno.args);
@@ -14,23 +14,25 @@ if (_.v || _.version) {
 	// TODO(jersey): this is somewhat broken when acting as a JSR package
 	if (!_.config) _.config = join(Deno.cwd(), 'config.ts');
 
-	const config: config = (await import(toFileUrl(_.config).toString())).default;
+	const config = (await import(toFileUrl(_.config).toString())).default as config;
+
+	if (config?.error_url) Deno.env.set('LIGHTNING_ERROR_WEBHOOK', config.error_url);
 
 	addEventListener('error', (ev) => {
-		logError(ev.error, { extra: { type: 'global error' } });
+		log_error(ev.error, { extra: { type: 'global error' } });
 	});
 
 	addEventListener('unhandledrejection', (ev) => {
-		logError(ev.reason, { extra: { type: 'global rejection' } });
+		log_error(ev.reason, { extra: { type: 'global rejection' } });
 	});
 
 	try {
 		await lightning.create(config);
 	} catch (e) {
-		logError(e, { extra: { type: 'global class error' } });
+		log_error(e, { extra: { type: 'global class error' } });
 	}
 } else if (_._[0] === 'migrations') {
-	// TODO(jersey): implement migrations
+	// TODO(jersey): implement migrations (separate module?)
 } else {
 	console.log('[lightning] command not found, showing help');
 	run_help();

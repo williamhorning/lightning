@@ -1,13 +1,11 @@
 import { EventEmitter } from '@denosaurs/event';
-import type { lightning } from './lightning.ts';
+import type { lightning } from '../lightning.ts';
 import type {
 	create_message_opts,
 	delete_message_opts,
-	deleted_message,
 	edit_message_opts,
-	message,
-} from './messages.ts';
-import type { run_command_options } from './commands/mod.ts';
+} from './bridge.ts';
+import type { plugin_events } from './events.ts';
 
 /** the way to make a plugin */
 export interface create_plugin<
@@ -20,18 +18,6 @@ export interface create_plugin<
 	/** version(s) the plugin supports */
 	support: string[];
 }
-
-/** the events emitted by a plugin */
-export type plugin_events = {
-	/** when a message is created */
-	create_message: [message];
-	/** when a message is edited */
-	edit_message: [message];
-	/** when a message is deleted */
-	delete_message: [deleted_message];
-	/** when a command is run */
-	run_command: [run_command_options];
-};
 
 /** a plugin for lightning */
 export abstract class plugin<cfg> extends EventEmitter<plugin_events> {
