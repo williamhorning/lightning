@@ -132,72 +132,24 @@ export interface message extends deleted_message {
 	reply_id?: string;
 }
 
-/** the options given to plugins when a message needs to be sent */
+/** a message to be bridged */
 export interface create_message_opts {
-	/** the action to take */
-	action: 'create';
-	/** the channel to send the message to */
-	channel: bridge_channel;
-	/** the message to send */
-	message: message;
-	/** the id of the message to reply to */
-	reply_id?: string;
+	msg: message,
+	channel: bridge_channel,
+	reply_id?: string,
 }
 
-/** the options given to plugins when a message needs to be edited */
+/** a message to be edited */
 export interface edit_message_opts {
-	/** the action to take */
-	action: 'edit';
-	/** the channel to send the message to */
-	channel: bridge_channel;
-	/** the message to send */
-	message: message;
-	/** the id of the message to edit */
-	edit_id: string[];
-	/** the id of the message to reply to */
-	reply_id?: string;
+	msg: message,
+	channel: bridge_channel,
+	reply_id?: string,
+	edit_ids: string[],
 }
 
-/** the options given to plugins when a message needs to be deleted */
+/** a message to be deleted */
 export interface delete_message_opts {
-	/** the action to take */
-	action: 'delete';
-	/** the channel to send the message to */
-	channel: bridge_channel;
-	/** the message to send */
-	message: deleted_message;
-	/** the id of the message to delete */
-	edit_id: string[];
-	/** the id of the message to reply to */
-	reply_id?: string;
+	msg: deleted_message,
+	channel: bridge_channel,
+	edit_ids: string[],
 }
-
-/** the options given to plugins when a message needs to be processed */
-export type message_options =
-	| create_message_opts
-	| edit_message_opts
-	| delete_message_opts;
-
-/** successfully processed message */
-export interface processed_message {
-	/** whether there was an error */
-	error?: undefined;
-	/** the message that was processed */
-	id: string[];
-	/** the channel the message was sent to */
-	channel: bridge_channel;
-}
-
-/** messages not processed */
-export interface unprocessed_message {
-	/** the channel the message was to be sent to */
-	channel: bridge_channel;
-	/** whether the channel should be disabled */
-	disable?: boolean;
-	/** the error causing this */
-	// TODO(jersey): make this unknown ideally
-	error: Error;
-}
-
-/** process result */
-export type process_result = processed_message | unprocessed_message;

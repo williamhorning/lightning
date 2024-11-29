@@ -1,10 +1,11 @@
 import { EventEmitter } from '@denosaurs/event';
 import type { lightning } from './lightning.ts';
 import type {
+	create_message_opts,
+	delete_message_opts,
 	deleted_message,
+	edit_message_opts,
 	message,
-	message_options,
-	process_result,
 } from './messages.ts';
 import type { run_command_options } from './commands/mod.ts';
 
@@ -40,24 +41,31 @@ export abstract class plugin<cfg> extends EventEmitter<plugin_events> {
 	config: cfg;
 	/** the name of your plugin */
 	abstract name: string;
-
 	/** create a new plugin instance */
 	static new<T extends plugin<T['config']>>(
 		this: new (l: lightning, config: T['config']) => T,
 		config: T['config'],
 	): create_plugin<T> {
-		return { type: this, config, support: ['0.7.3'] };
+		return { type: this, config, support: ['0.8.0'] };
 	}
-
+	/** initialize a plugin with the given lightning instance and config */
 	constructor(l: lightning, config: cfg) {
 		super();
 		this.lightning = l;
 		this.config = config;
 	}
-
-	/** this should return the data you need to send to the channel given */
-	abstract create_bridge(channel: string): Promise<unknown> | unknown;
-
-	/** processes a message and returns information */
-	abstract process_message(opts: message_options): Promise<process_result>;
+	/** setup a channel to be used in a bridge */
+	abstract setup_channel(channel: string): Promise<unknown> | unknown;
+	/** send a message to a given channel */
+	abstract create_message(
+		opts: create_message_opts,
+	): Promise<string[]>;
+	/** edit a message in a given channel */
+	abstract edit_message(
+		opts: edit_message_opts,
+	): Promise<string[]>;
+	/** delete a message in a given channel */
+	abstract delete_message(
+		opts: delete_message_opts,
+	): Promise<string[]>;
 }

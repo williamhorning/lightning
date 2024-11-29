@@ -5,6 +5,8 @@ export interface LightningErrorOptions {
 	message?: string;
 	/** the extra data to log */
 	extra?: Record<string, unknown>;
+	/** whether to disable the channel */
+	disable?: boolean;
 }
 
 export class LightningError extends Error {
@@ -12,14 +14,16 @@ export class LightningError extends Error {
 	override cause: Error;
 	extra: Record<string, unknown>;
 	msg: message;
+	disable_channel?: boolean;
 
-	constructor(e: unknown, options?: LightningErrorOptions) {
+	constructor(e: unknown, public options?: LightningErrorOptions) {
 		if (e instanceof LightningError) {
 			super(e.message, { cause: e.cause });
 			this.id = e.id;
 			this.cause = e.cause;
 			this.extra = e.extra;
 			this.msg = e.msg;
+			this.disable_channel = e.disable_channel;
 			return;
 		}
 
@@ -35,6 +39,7 @@ export class LightningError extends Error {
 		this.id = crypto.randomUUID();
 		this.cause = cause;
 		this.extra = options?.extra ?? {};
+		this.disable_channel = options?.disable;
 		this.msg = create_message(
 			`Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\`\`\`\n${this.message}\n${this.id}\n\`\`\``
 		);
@@ -43,7 +48,7 @@ export class LightningError extends Error {
 
 	log() {
 		console.error(`%clightning error ${this.id}`, 'color: red');
-		console.error(this.cause, this.extra);
+		console.error(this.cause, this.options);
 
 		const webhook = Deno.env.get('LIGHTNING_ERROR_WEBHOOK');
 
@@ -83,35 +88,4 @@ export class LightningError extends Error {
 
 export function logError(e: unknown, options?: LightningErrorOptions): never {
 	throw new LightningError(e, options);
-}
-
-/** the error returned from log_error */
-export interface err {
-	/** id of the error */
-	id: string;
-	/** the original error */
-	cause: Error;
-	/** extra information about the error */
-	extra: Record<string, unknown>;
-	/** the message associated with the error */
-	message: message;
-}
-
-/**
- * logs an error and returns a unique id and a message for users
- * @param e the error to log
- * @param extra any extra data to log
- */
-export async function log_error(
-	e: unknown,
-	extra: Record<string, unknown> = {},
-): Promise<err> {
-	const error = new LightningError(e, { extra });
-
-	return {
-		id: error.id,
-		cause: error.cause,
-		extra: error.extra,
-		message: error.msg,
-	}
 }

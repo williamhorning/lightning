@@ -40,7 +40,7 @@ export class lightning {
 		this.plugins = new Map<string, plugin<unknown>>();
 
 		for (const p of this.config.plugins || []) {
-			if (p.support.some((v) => ['0.7.3'].includes(v))) {
+			if (p.support.includes('0.8.0')) {
 				const plugin = new p.type(this, p.config);
 				this.plugins.set(plugin.name, plugin);
 				this._handle_events(plugin);
@@ -65,11 +65,7 @@ export class lightning {
 				execute_text_command(value[0] as message, this);
 			}
 
-			handle_message(
-				this,
-				value[0] as message,
-				name.split('_')[0] as 'create',
-			);
+			handle_message(this, name, value[0]);
 		}
 	}
 

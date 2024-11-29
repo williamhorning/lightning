@@ -115,13 +115,13 @@ export class bridge_data {
 		return res.rows[0];
 	}
 
-	async create_bridge_message(msg: bridge_message): Promise<void> {
+	async create_message(msg: bridge_message): Promise<void> {
 		await this.pg.queryArray`INSERT INTO bridge_messages
 			(id, bridge_id, channels, messages, settings) VALUES
 			(${msg.id}, ${msg.bridge_id}, ${JSON.stringify(msg.channels)}, ${JSON.stringify(msg.messages)}, ${JSON.stringify(msg.settings)})`;
 	}
 
-	async edit_bridge_message(msg: bridge_message): Promise<void> {
+	async edit_message(msg: bridge_message): Promise<void> {
 		await this.pg.queryArray`
 			UPDATE bridge_messages
 			SET messages = ${JSON.stringify(msg.messages)}, channels = ${JSON.stringify(msg.channels)}, settings = ${JSON.stringify(msg.settings)}
@@ -129,13 +129,13 @@ export class bridge_data {
 		`;
 	}
 
-	async delete_bridge_message({ id }: bridge_message): Promise<void> {
+	async delete_message({ id }: bridge_message): Promise<void> {
 		await this.pg.queryArray`
 			DELETE FROM bridge_messages WHERE id = ${id}
 		`;
 	}
 
-	async get_bridge_message(id: string): Promise<bridge_message | undefined> {
+	async get_message(id: string): Promise<bridge_message | undefined> {
 		const res = await this.pg.queryObject<bridge_message>(`
 			SELECT * FROM bridge_messages
 			WHERE id = '${id}' OR EXISTS (

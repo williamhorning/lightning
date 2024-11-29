@@ -1,178 +1,176 @@
-import type { lightning } from '../lightning.ts';
-import { log_error } from '../errors.ts';
+import type { deleted_message, message } from '../messages.ts';
+import { type lightning, LightningError } from '../mod.ts';
 import type {
-	deleted_message,
-	message,
-	unprocessed_message,
-} from '../messages.ts';
-import type {
-	bridge,
-	bridge_channel,
-	bridge_message,
-	bridged_message,
+    bridge,
+    bridge_channel,
+    bridge_message,
+    bridged_message,
 } from './data.ts';
 
 export async function handle_message(
-	core: lightning,
-	msg: message | deleted_message,
-	type: 'create' | 'edit' | 'delete',
-): Promise<void> {
-	const br = type === 'create'
-		? await core.data.get_bridge_by_channel(msg.channel)
-		: await core.data.get_bridge_message(msg.id);
+    lightning: lightning,
+    event: 'create_message' | 'edit_message' | 'delete_message',
+    data: message | deleted_message,
+) {
+    // get the bridge and return if it doesn't exist
+    let bridge;
 
-	if (!br) return;
+    if (event === 'create_message') {
+        bridge = await lightning.data.get_bridge_by_channel(data.channel);
+    } else {
+        bridge = await lightning.data.get_message(data.id);
+    }
 
-	if (type !== 'create' && br.settings.allow_editing !== true) return;
+    if (!bridge) return;
 
-	if (
-		br.channels.find((i) =>
-			i.id === msg.channel && i.plugin === msg.plugin && i.disabled
-		)
-	) return;
+    // if editing isn't allowed, return
+    if (event !== 'create_message' && bridge.settings.allow_editing !== true) {
+        return;
+    }
 
-	const channels = br.channels.filter(
-		(i) => i.id !== msg.channel || i.plugin !== msg.plugin,
-	);
+    // if the channel this event is from is disabled, return
+    if (
+        bridge.channels.find((channel) =>
+            channel.id === data.channel && channel.plugin === data.plugin &&
+            channel.disabled
+        )
+    ) return;
 
-	if (channels.length < 1) return;
+    // filter out the channel this event is from and any disabled channels
+    const channels = bridge.channels.filter(
+        (i) => i.id !== data.channel || i.plugin !== data.plugin,
+    ).filter((i) => !i.disabled || !i.data);
 
-	const messages = [] as bridged_message[];
+    // if there are no more channels, return
+    if (channels.length < 1) return;
 
-	for (const ch of channels) {
-		if (!ch.data || ch.disabled) continue;
+    const messages = [] as bridged_message[];
 
-		const bridged_id = (br as Partial<bridge_message>).messages?.find((i) =>
-			i.channel === ch.id && i.plugin === ch.plugin
-		);
+    for (const channel of channels) {
+        let prior_bridged_ids;
 
-		if ((type !== 'create' && !bridged_id)) {
-			continue;
-		}
+        if (event !== 'create_message') {
+            prior_bridged_ids = (bridge as bridge_message).messages?.find((i) =>
+                i.channel === channel.id && i.plugin === channel.plugin
+            );
 
-		const plugin = core.plugins.get(ch.plugin);
+            if (!prior_bridged_ids) continue; // the message wasn't bridged previously
+        }
 
-		if (!plugin) {
-			await disable_channel(
-				ch,
-				br,
-				core,
-				(await log_error(
-					new Error(`plugin ${ch.plugin} doesn't exist`),
-					{ channel: ch, bridged_id },
-				)).cause,
-			);
+        const plugin = lightning.plugins.get(channel.plugin);
 
-			continue;
-		}
+        if (!plugin) {
+            await disable_channel(
+                channel,
+                bridge,
+                new LightningError(`plugin ${channel.plugin} doesn't exist`),
+                lightning,
+            );
+            continue;
+        }
 
-		const reply_id = await get_reply_id(core, msg as message, ch);
+        const reply_id = await get_reply_id(lightning, data, channel);
 
-		let res;
+        let result_ids: string[];
 
-		try {
-			res = await plugin.process_message({
-				action: type as 'edit',
-				channel: ch,
-				message: msg as message,
-				edit_id: bridged_id?.id as string[],
-				reply_id,
-			});
+        try {
+            result_ids = await plugin[event]({
+                channel,
+                reply_id,
+                edit_ids: prior_bridged_ids?.id as string[],
+                msg: data as message,
+            });
+        } catch (e) {
+            if (e instanceof LightningError && e.disable_channel) {
+                await disable_channel(channel, bridge, e, lightning);
+                continue;
+            }
 
-			if (res.error) throw res.error;
-		} catch (e) {
-			if (type === 'delete') continue;
+            // try sending an error message
 
-			if ((res as unprocessed_message).disable) {
-				await disable_channel(ch, br, core, e);
+            const err = e instanceof LightningError
+                ? e
+                : new LightningError(e, {
+                    message:
+                        `An error occurred while processing a message in the bridge.`,
+                });
 
-				continue;
-			}
+            try {
+                result_ids = await plugin[event]({
+                    channel,
+                    reply_id,
+                    edit_ids: prior_bridged_ids?.id as string[],
+                    msg: err.msg,
+                });
+            } catch (e) {
+                new LightningError(e, {
+                    message: `Failed to log error message in bridge`,
+                    extra: { channel, original_error: err.id },
+                });
 
-			const err = await log_error(e, {
-				channel: ch,
-				bridged_id,
-				message: msg,
-			});
+                continue;
+            }
+        }
 
-			try {
-				res = await plugin.process_message({
-					action: type as 'edit',
-					channel: ch,
-					message: err.message as message,
-					edit_id: bridged_id?.id as string[],
-					reply_id,
-				});
+        for (const result_id of result_ids) {
+            sessionStorage.setItem(`${channel.plugin}-${result_id}`, '1');
+        }
 
-				if (res.error) throw res.error;
-			} catch (e) {
-				await log_error(
-					new Error(`failed to log error`, { cause: e }),
-					{ channel: ch, bridged_id, original_id: err.id },
-				);
+        messages.push({
+            id: result_ids,
+            channel: channel.id,
+            plugin: channel.plugin,
+        });
+    }
 
-				continue;
-			}
-		}
-
-		for (const id of res.id) {
-			sessionStorage.setItem(`${ch.plugin}-${id}`, '1');
-		}
-
-		messages.push({
-			id: res.id,
-			channel: ch.id,
-			plugin: ch.plugin,
-		});
-	}
-
-	await core.data[`${type}_bridge_message`]({
-		...br,
-		id: msg.id,
-		messages,
-		bridge_id: br.id,
-	});
-}
-
-async function disable_channel(
-	channel: bridge_channel,
-	bridge: bridge | bridge_message,
-	core: lightning,
-	error: unknown,
-): Promise<void> {
-	await log_error(error, { channel, bridge });
-
-	await core.data.edit_bridge({
-		id: "bridge_id" in bridge ? bridge.bridge_id : bridge.id,
-		channels: bridge.channels.map((i) =>
-			i.id === channel.id && i.plugin === channel.plugin
-				? { ...i, disabled: true, data: error }
-				: i
-		),
-		settings: bridge.settings
-	});
+    await lightning.data[event]({
+        ...bridge,
+        id: data.id,
+        messages,
+        bridge_id: bridge.id,
+    });
 }
 
 async function get_reply_id(
-	core: lightning,
-	msg: message,
-	channel: bridge_channel,
+    core: lightning,
+    msg: message | deleted_message,
+    channel: bridge_channel,
 ): Promise<string | undefined> {
-	if (msg.reply_id) {
-		try {
-			const bridged = await core.data.get_bridge_message(msg.reply_id);
+    if ('reply_id' in msg && msg.reply_id) {
+        try {
+            const bridged = await core.data.get_message(msg.reply_id);
 
-			if (!bridged) return;
+            const bridged_message = bridged?.messages?.find((i) =>
+                i.channel === channel.id && i.plugin === channel.plugin
+            );
 
-			const br_ch = bridged.channels.find((i) =>
-				i.id === channel.id && i.plugin === channel.plugin
-			);
+            return bridged_message?.id[0];
+        } catch {
+            return;
+        }
+    }
+}
 
-			if (!br_ch) return;
+async function disable_channel(
+    channel: bridge_channel,
+    bridge: bridge | bridge_message,
+    error: LightningError,
+    lightning: lightning,
+) {
+    new LightningError(
+        `disabling channel ${channel.id} in bridge ${bridge.id}`,
+        {
+            extra: { original_error: error.id },
+        },
+    );
 
-			return br_ch.id;
-		} catch {
-			return;
-		}
-	}
+    await lightning.data.edit_bridge({
+        id: 'bridge_id' in bridge ? bridge.bridge_id : bridge.id,
+        channels: bridge.channels.map((i) =>
+            i.id === channel.id && i.plugin === channel.plugin
+                ? { ...i, disabled: true, data: error }
+                : i
+        ),
+        settings: bridge.settings,
+    });
 }

@@ -81,7 +81,7 @@ async function _lightning_bridge_add_common(
     let bridge_data;
 
     try {
-        bridge_data = await plugin.create_bridge(opts.channel);
+        bridge_data = await plugin.setup_channel(opts.channel);
     } catch (e) {
         logError(e, {
             message: 'Failed to create bridge using plugin',
