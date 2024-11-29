@@ -29,7 +29,7 @@ export type plugin_events = {
 	/** when a message is deleted */
 	delete_message: [deleted_message];
 	/** when a command is run */
-	run_command: [Omit<run_command_options, 'lightning'>];
+	run_command: [run_command_options];
 };
 
 /** a plugin for lightning */

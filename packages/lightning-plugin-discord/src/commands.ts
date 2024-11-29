@@ -1,15 +1,13 @@
 import type { API } from '@discordjs/core';
-import type { command, command_arguments } from '@jersey/lightning';
+import type { command, run_command_options, lightning } from '@jersey/lightning';
 import type { APIInteraction } from 'discord-api-types';
 import { to_discord } from './discord.ts';
 import { instant } from './lightning.ts';
 
-// TODO(jersey): migrate over to commands_v2
-
-export function to_command(interaction: { api: API; data: APIInteraction }) {
+export function to_command(interaction: { api: API; data: APIInteraction }, lightning: lightning) {
 	if (interaction.data.type !== 2 || interaction.data.data.type !== 1) return;
 	const opts = {} as Record<string, string>;
-	let subcmd = '';
+	let subcmd;
 
 	for (const opt of interaction.data.data.options || []) {
 		if (opt.type === 1) subcmd = opt.name;
@@ -17,8 +15,13 @@ export function to_command(interaction: { api: API; data: APIInteraction }) {
 	}
 
 	return {
-		cmd: interaction.data.data.name,
-		subcmd,
+		command: interaction.data.data.name,
+		subcommand: subcmd,
+		channel: interaction.data.channel.id,
+		id: interaction.data.id,
+		timestamp: instant(interaction.data.id),
+		lightning,
+		plugin: 'bolt-discord',
 		reply: async (msg) => {
 			await interaction.api.interactions.reply(
 				interaction.data.id,
@@ -26,45 +29,38 @@ export function to_command(interaction: { api: API; data: APIInteraction }) {
 				await to_discord(msg),
 			);
 		},
-		channel: interaction.data.channel.id,
-		plugin: 'bolt-discord',
-		opts,
-		timestamp: instant(interaction.data.id),
-	} as command_arguments;
+		args: opts,
+	} as run_command_options;
 }
 
-export function to_intent_opts({ options }: command) {
+export function to_intent_opts({ arguments: args, subcommands }: command) {
 	const opts = [];
 
-	if (options?.argument_name) {
-		opts.push({
-			name: options.argument_name,
-			description: 'option to pass to this command',
-			type: 3,
-			required: options.argument_required,
-		});
+	if (args) {
+		for (const arg of args) {
+			opts.push({
+				name: arg.name,
+				description: arg.description,
+				type: 3,
+				required: arg.required,
+			});
+		}
 	}
 
-	if (options?.subcommands) {
-		opts.push(
-			...options.subcommands.map((i) => {
-				return {
-					name: i.name,
-					description: i.description || i.name,
-					type: 1,
-					options: i.options?.argument_name
-						? [
-							{
-								name: i.options.argument_name,
-								description: i.options.argument_name,
-								type: 3,
-								required: i.options.argument_required || false,
-							},
-						]
-						: undefined,
-				};
-			}),
-		);
+	if (subcommands) {
+		for (const sub of subcommands) {
+			opts.push({
+				name: sub.name,
+				description: sub.description,
+				type: 1,
+				options: sub.arguments?.map((opt) => ({
+					name: opt.name,
+					description: opt.description,
+					type: 3,
+					required: opt.required,
+				})),
+			});
+		}
 	}
 
 	return opts;

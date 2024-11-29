@@ -57,11 +57,7 @@ export class lightning {
 			}
 
 			if (name === 'run_command') {
-				run_command({
-					...value[0],
-					lightning: this,
-				} as run_command_options);
-
+				run_command(value[0] as run_command_options);
 				continue;
 			}
 
