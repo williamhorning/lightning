@@ -8,7 +8,7 @@ export interface attachment {
 	name?: string;
 	/** whether or not the file has a spoiler */
 	spoiler?: boolean;
-	/** file size */
+	/** file size in MiB */
 	size: number;
 }
 

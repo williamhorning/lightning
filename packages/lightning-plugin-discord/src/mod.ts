@@ -2,110 +2,93 @@ import { Client } from '@discordjs/core';
 import { REST } from '@discordjs/rest';
 import { WebSocketManager } from '@discordjs/ws';
 import {
-	type lightning,
-	type message_options,
-	plugin,
-	type process_result,
+    type create_message_opts,
+    type delete_message_opts,
+    type edit_message_opts,
+    type lightning,
+    plugin,
 } from '@jersey/lightning';
 import { GatewayDispatchEvents } from 'discord-api-types';
-import { to_command, to_intent_opts } from './commands.ts';
-import { to_message } from './lightning.ts';
-import { process_message } from './process_message.ts';
+import * as bridge from './bridge_to_discord.ts';
+import { setup_slash_commands } from './slash_commands.ts';
+import { command_to } from './to_lightning/command.ts';
+import { deleted } from './to_lightning/deleted.ts';
+import { message } from './to_lightning/message.ts';
 
-/** options for the discord plugin */
-export type discord_config = {
-	/** your bot's application id */
-	app_id: string;
-	/** the token for your bot */
-	token: string;
-	/** whether or not to enable slash commands */
-	slash_cmds?: boolean;
-};
+/** configuration for the discord plugin */
+export interface discord_config {
+    /** the discord bot token */
+    token: string;
+    /** whether to enable slash commands */
+    slash_commands: boolean;
+    /** discord application id */
+    application_id: string;
+}
 
-/** the plugin to use */
 export class discord_plugin extends plugin<discord_config> {
-	bot: Client;
-	name = 'bolt-discord';
+    name = 'bolt-discord';
+    private api: Client['api'];
+    private client: Client;
 
-	/** setup the plugin */
-	constructor(l: lightning, config: discord_config) {
-		super(l, config);
-		this.config = config;
-		this.bot = this.setup_client();
-		this.setup_events();
-		this.setup_commands();
-	}
+    constructor(l: lightning, config: discord_config) {
+        super(l, config);
+        // @ts-ignore their type for makeRequest is funky
+        const rest = new REST({ version: '10', makeRequest: fetch }).setToken(
+            config.token,
+        );
+        const gateway = new WebSocketManager({
+            token: config.token,
+            intents: 0 | 33281,
+            rest,
+        });
+        // @ts-ignore Deno is wrong here.
+        this.client = new Client({ rest, gateway });
+        this.api = this.client.api;
 
-	private setup_client() {
-		const rest = new REST({
-			version: '10',
-			/* @ts-ignore this works */
-			makeRequest: fetch,
-		}).setToken(this.config.token);
+        setup_slash_commands(this.api, config, l);
+        this.setup_events();
+        gateway.connect();
+    }
 
-		const gateway = new WebSocketManager({
-			rest,
-			token: this.config.token,
-			intents: 0 | 33281,
-		});
+    private setup_events() {
+        // @ts-ignore I'm going to file an issue against Deno because this is so annoying
+        this.client.once(GatewayDispatchEvents.Ready, (ev) => {
+            console.log(
+                `bolt-discord: ready as ${ev.user.username}#${ev.user.discriminator} in ${ev.guilds.length} guilds`,
+            );
+        });
+        // @ts-ignore see above
+        this.client.on(GatewayDispatchEvents.MessageCreate, async (msg) => {
+            this.emit('create_message', await message(msg.api, msg.data));
+        });
+        // @ts-ignore see above
+        this.client.on(GatewayDispatchEvents.MessageUpdate, async (msg) => {
+            this.emit('edit_message', await message(msg.api, msg.data));
+        });
+        // @ts-ignore see above
+        this.client.on(GatewayDispatchEvents.MessageDelete, (msg) => {
+            this.emit('delete_message', deleted(msg.data));
+        });
+        // @ts-ignore see above
+        this.client.on(GatewayDispatchEvents.InteractionCreate, (cmd) => {
+            const command = command_to(cmd, this.lightning);
+            if (command) this.emit('create_command', command);
+        });
+    }
 
-		gateway.connect();
+    async setup_channel(channel: string) {
+        return await bridge.setup_bridge(this.api, channel);
+    }
 
-		// @ts-ignore this works?
-		return new Client({ rest, gateway });
-	}
+    async create_message(opts: create_message_opts) {
+        return await bridge.create_message(this.api, opts);
+    }
 
-	private setup_events() {
-		this.bot.on(GatewayDispatchEvents.MessageCreate, async (msg) => {
-			this.emit('create_message', await to_message(msg.api, msg.data));
-		});
+    async edit_message(opts: edit_message_opts) {
+        return await bridge.edit_message(this.api, opts);
+    }
 
-		this.bot.on(GatewayDispatchEvents.MessageUpdate, async (msg) => {
-			this.emit('edit_message', await to_message(msg.api, msg.data));
-		});
-
-		this.bot.on(GatewayDispatchEvents.MessageDelete, async (msg) => {
-			this.emit('delete_message', await to_message(msg.api, msg.data));
-		});
-
-		this.bot.on(GatewayDispatchEvents.InteractionCreate, (interaction) => {
-			const cmd = to_command(interaction, this.lightning);
-			if (cmd) this.emit('run_command', cmd);
-		});
-	}
-
-	private setup_commands() {
-		if (!this.config.slash_cmds) return;
-
-		this.bot.api.applicationCommands.bulkOverwriteGlobalCommands(
-			this.config.app_id,
-			[...this.lightning.commands.values()].map((command) => {
-				return {
-					name: command.name,
-					type: 1,
-					description: command.description || 'a command',
-					options: to_intent_opts(command),
-				};
-			}),
-		);
-	}
-
-	/** creates a webhook in the channel for a bridge */
-	async create_bridge(
-		channel: string,
-	): Promise<{ id: string; token?: string }> {
-		const { id, token } = await this.bot.api.channels.createWebhook(
-			channel,
-			{
-				name: 'lightning bridge',
-			},
-		);
-
-		return { id, token };
-	}
-
-	/** process a message event */
-	async process_message(opts: message_options): Promise<process_result> {
-		return await process_message(this.bot.api, opts);
-	}
+    async delete_message(opts: delete_message_opts) {
+        return await bridge.delete_message(this.api, opts);
+    }
 }
