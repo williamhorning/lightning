@@ -5,7 +5,6 @@
 	"imports": {
 		"@jersey/lightning": "jsr:@jersey/lightning@^0.8.0",
 		"telegramify-markdown": "npm:telegramify-markdown@^1.2.2",
-		"grammy": "npm:grammy@^1.28.0",
-		"grammy/types": "npm:grammy@^1.28.0/types"
+		"grammy": "npm:grammy@^1.32.0"
 	}
 }

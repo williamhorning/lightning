@@ -1,8 +1,9 @@
 import {
+	type create_message_opts,
+	type delete_message_opts,
+	type edit_message_opts,
 	type lightning,
-	type message_options,
 	plugin,
-	type process_result,
 } from '@jersey/lightning';
 import { Bot } from 'grammy';
 import { from_lightning, from_telegram } from './messages.ts';
@@ -20,7 +21,7 @@ export type telegram_config = {
 /** the plugin to use */
 export class telegram_plugin extends plugin<telegram_config> {
 	name = 'bolt-telegram';
-	bot: Bot;
+	private bot: Bot;
 
 	constructor(l: lightning, cfg: telegram_config) {
 		super(l, cfg);
@@ -41,7 +42,15 @@ export class telegram_plugin extends plugin<telegram_config> {
 	}
 
 	private serve_proxy() {
-		Deno.serve({ port: this.config.plugin_port }, (req: Request) => {
+		Deno.serve({
+			port: this.config.plugin_port,
+			onListen: (addr) => {
+				console.log(
+					`bolt-telegram: file proxy listening on http://localhost:${addr.port}`,
+					`bolt-telegram: also available at: ${this.config.plugin_url}`,
+				);
+			},
+		}, (req: Request) => {
 			const { pathname } = new URL(req.url);
 			return fetch(
 				`https://api.telegram.org/file/bot${this.bot.token}/${
@@ -52,67 +61,57 @@ export class telegram_plugin extends plugin<telegram_config> {
 	}
 
 	/** create a bridge */
-	create_bridge(channel: string): string {
+	setup_channel(channel: string) {
 		return channel;
 	}
 
-	/** process a message event */
-	async process_message(opts: message_options): Promise<process_result> {
-		if (opts.action === 'delete') {
-			for (const id of opts.edit_id) {
-				await this.bot.api.deleteMessage(
-					opts.channel.id,
-					Number(id),
-				);
-			}
+	async create_message(opts: create_message_opts) {
+		const content = from_lightning(opts.msg);
+		const messages = [];
 
-			return {
-				id: opts.edit_id,
-				channel: opts.channel,
-			};
-		} else if (opts.action === 'edit') {
-			const content = from_lightning(opts.message)[0];
-
-			await this.bot.api.editMessageText(
+		for (const msg of content) {
+			const result = await this.bot.api[msg.function](
 				opts.channel.id,
-				Number(opts.edit_id[0]),
-				content.value,
+				msg.value,
 				{
+					reply_parameters: opts.reply_id
+						? {
+							message_id: Number(opts.reply_id),
+						}
+						: undefined,
 					parse_mode: 'MarkdownV2',
 				},
 			);
 
-			return {
-				id: opts.edit_id,
-				channel: opts.channel,
-			};
-		} else if (opts.action === 'create') {
-			const content = from_lightning(opts.message);
-			const messages = [];
-
-			for (const msg of content) {
-				const result = await this.bot.api[msg.function](
-					opts.channel.id,
-					msg.value,
-					{
-						reply_parameters: opts.reply_id
-							? {
-								message_id: Number(opts.reply_id),
-							}
-							: undefined,
-						parse_mode: 'MarkdownV2',
-					},
-				);
-
-				messages.push(String(result.message_id));
-			}
-
-			return {
-				id: messages,
-				channel: opts.channel,
-			};
-		} else {
-			throw new Error('unknown action');
+			messages.push(String(result.message_id));
 		}
+
+		return messages;
+	}
+
+	async edit_message(opts: edit_message_opts) {
+		const content = from_lightning(opts.msg)[0];
+
+		await this.bot.api.editMessageText(
+			opts.channel.id,
+			Number(opts.edit_ids[0]),
+			content.value,
+			{
+				parse_mode: 'MarkdownV2',
+			},
+		);
+
+		return opts.edit_ids;
+	}
+
+	async delete_message(opts: delete_message_opts) {
+		for (const id of opts.edit_ids) {
+			await this.bot.api.deleteMessage(
+				opts.channel.id,
+				Number(id),
+			);
+		}
+
+		return opts.edit_ids;
 	}
 }
