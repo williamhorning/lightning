@@ -41,7 +41,7 @@ export class discord_plugin extends plugin<discord_config> {
             intents: 0 | 33281,
             rest,
         });
-        // @ts-ignore Deno is wrong here.
+        
         this.client = new Client({ rest, gateway });
         this.api = this.client.api;
 
@@ -51,25 +51,20 @@ export class discord_plugin extends plugin<discord_config> {
     }
 
     private setup_events() {
-        // @ts-ignore I'm going to file an issue against Deno because this is so annoying
-        this.client.once(GatewayDispatchEvents.Ready, (ev) => {
+        this.client.once(GatewayDispatchEvents.Ready, ({data}) => {
             console.log(
-                `bolt-discord: ready as ${ev.user.username}#${ev.user.discriminator} in ${ev.guilds.length} guilds`,
+                `bolt-discord: ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length} guilds`,
             );
         });
-        // @ts-ignore see above
         this.client.on(GatewayDispatchEvents.MessageCreate, async (msg) => {
             this.emit('create_message', await message(msg.api, msg.data));
         });
-        // @ts-ignore see above
         this.client.on(GatewayDispatchEvents.MessageUpdate, async (msg) => {
             this.emit('edit_message', await message(msg.api, msg.data));
         });
-        // @ts-ignore see above
         this.client.on(GatewayDispatchEvents.MessageDelete, (msg) => {
             this.emit('delete_message', deleted(msg.data));
         });
-        // @ts-ignore see above
         this.client.on(GatewayDispatchEvents.InteractionCreate, (cmd) => {
             const command = command_to(cmd, this.lightning);
             if (command) this.emit('create_command', command);
