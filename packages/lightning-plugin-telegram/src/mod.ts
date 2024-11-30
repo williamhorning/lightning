@@ -7,6 +7,7 @@ import {
 } from '@jersey/lightning';
 import { Bot } from 'grammy';
 import { from_lightning, from_telegram } from './messages.ts';
+import { file_proxy } from './file_proxy.ts';
 
 /** options for the telegram plugin */
 export type telegram_config = {
@@ -21,7 +22,7 @@ export type telegram_config = {
 /** the plugin to use */
 export class telegram_plugin extends plugin<telegram_config> {
 	name = 'bolt-telegram';
-	private bot: Bot;
+	bot: Bot;
 
 	constructor(l: lightning, cfg: telegram_config) {
 		super(l, cfg);
@@ -37,27 +38,8 @@ export class telegram_plugin extends plugin<telegram_config> {
 			this.emit('edit_message', msg);
 		});
 		// turns out it's impossible to deal with messages being deleted due to tdlib/telegram-bot-api#286
-		this.serve_proxy();
+		file_proxy(cfg);
 		this.bot.start();
-	}
-
-	private serve_proxy() {
-		Deno.serve({
-			port: this.config.plugin_port,
-			onListen: (addr) => {
-				console.log(
-					`bolt-telegram: file proxy listening on http://localhost:${addr.port}`,
-					`bolt-telegram: also available at: ${this.config.plugin_url}`,
-				);
-			},
-		}, (req: Request) => {
-			const { pathname } = new URL(req.url);
-			return fetch(
-				`https://api.telegram.org/file/bot${this.bot.token}/${
-					pathname.replace('/telegram/', '')
-				}`,
-			);
-		});
 	}
 
 	/** create a bridge */
