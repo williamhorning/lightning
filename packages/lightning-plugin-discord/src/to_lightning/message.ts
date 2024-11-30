@@ -1,12 +1,12 @@
 import type { API } from '@discordjs/core';
-import type { APIMessage } from 'discord-api-types';
+import type { GatewayMessageUpdateDispatchData } from 'discord-api-types';
 import { get_author } from '../discord_message/get_author.ts';
 import { message_to_discord } from '../discord_message/mod.ts';
 import type { message } from '@jersey/lightning';
 
 export async function message(
 	api: API,
-	message: APIMessage,
+	message: GatewayMessageUpdateDispatchData,
 ): Promise<message> {
 	if (message.flags && message.flags & 128) message.content = 'Loading...';
 
@@ -43,8 +43,8 @@ export async function message(
 		author: {
 			profile: avatar,
 			username: name,
-			rawname: message.author.username,
-			id: message.author.id,
+			rawname: message.author?.username || 'discord user',
+			id: message.author?.id || message.webhook_id || '',
 			color: '#5865F2',
 		},
 		channel: message.channel_id,
