@@ -68,7 +68,7 @@ export interface bridged_message {
 }
 
 /** a message to be bridged */
-export interface create_message_opts {
+export interface create_opts {
 	/** the actual message */
 	msg: message;
 	/** the channel to use */
@@ -78,7 +78,7 @@ export interface create_message_opts {
 }
 
 /** a message to be edited */
-export interface edit_message_opts {
+export interface edit_opts {
 	/** the actual message */
 	msg: message;
 	/** the channel to use */
@@ -90,7 +90,7 @@ export interface edit_message_opts {
 }
 
 /** a message to be deleted */
-export interface delete_message_opts {
+export interface delete_opts {
 	/** the actual deleted message */
 	msg: deleted_message;
 	/** the channel to use */

@@ -1,10 +1,6 @@
 import { EventEmitter } from '@denosaurs/event';
 import type { lightning } from '../lightning.ts';
-import type {
-	create_message_opts,
-	delete_message_opts,
-	edit_message_opts,
-} from './bridge.ts';
+import type { create_opts, delete_opts, edit_opts } from './bridge.ts';
 import type { plugin_events } from './events.ts';
 
 /** the way to make a plugin */
@@ -44,14 +40,14 @@ export abstract class plugin<cfg> extends EventEmitter<plugin_events> {
 	abstract setup_channel(channel: string): Promise<unknown> | unknown;
 	/** send a message to a given channel */
 	abstract create_message(
-		opts: create_message_opts,
+		opts: create_opts,
 	): Promise<string[]>;
 	/** edit a message in a given channel */
 	abstract edit_message(
-		opts: edit_message_opts,
+		opts: edit_opts,
 	): Promise<string[]>;
 	/** delete a message in a given channel */
 	abstract delete_message(
-		opts: delete_message_opts,
+		opts: delete_opts,
 	): Promise<string[]>;
 }

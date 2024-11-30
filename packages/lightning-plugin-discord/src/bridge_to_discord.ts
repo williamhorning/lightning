@@ -1,7 +1,7 @@
 import type {
-    create_message_opts,
-    delete_message_opts,
-    edit_message_opts,
+    create_opts,
+    delete_opts,
+    edit_opts,
 } from '@jersey/lightning';
 import { message_to_discord } from './discord_message/mod.ts';
 import { error_handler } from './error_handler.ts';
@@ -24,7 +24,7 @@ export async function setup_bridge(api: API, channel: string) {
     }
 }
 
-export async function create_message(api: API, opts: create_message_opts) {
+export async function create_message(api: API, opts: create_opts) {
     const data = opts.channel.data as data;
     const transformed = await message_to_discord(
         opts.msg,
@@ -46,7 +46,7 @@ export async function create_message(api: API, opts: create_message_opts) {
     }
 }
 
-export async function edit_message(api: API, opts: edit_message_opts) {
+export async function edit_message(api: API, opts: edit_opts) {
     const data = opts.channel.data as data;
     const transformed = await message_to_discord(
         opts.msg,
@@ -69,7 +69,7 @@ export async function edit_message(api: API, opts: edit_message_opts) {
     }
 }
 
-export async function delete_message(api: API, opts: delete_message_opts) {
+export async function delete_message(api: API, opts: delete_opts) {
     const data = opts.channel.data as data;
 
     try {

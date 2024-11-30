@@ -8,11 +8,11 @@ export async function get_author(api: API, message: APIMessage) {
 
     const channel = await api.channels.get(message.channel_id);
     
-    if ("guild_id" in channel) {
+    if ("guild_id" in channel && channel.guild_id) {
         try {
             const member = await api.guilds.getMember(channel.guild_id, message.author.id);
 
-            name ??= member.nick;
+            if (member.nick !== null && member.nick !== undefined) name = member.nick;
             avatar = member.avatar ? `https://cdn.discordapp.com/guilds/${channel.guild_id}/users/${message.author.id}/avatars/${member.avatar}.png` : avatar;
         } catch {
             // safe to ignore

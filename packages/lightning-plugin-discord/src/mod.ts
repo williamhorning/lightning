@@ -2,9 +2,9 @@ import { Client } from '@discordjs/core';
 import { REST } from '@discordjs/rest';
 import { WebSocketManager } from '@discordjs/ws';
 import {
-    type create_message_opts,
-    type delete_message_opts,
-    type edit_message_opts,
+    type create_opts,
+    type delete_opts,
+    type edit_opts,
     type lightning,
     plugin,
 } from '@jersey/lightning';
@@ -75,15 +75,15 @@ export class discord_plugin extends plugin<discord_config> {
         return await bridge.setup_bridge(this.api, channel);
     }
 
-    async create_message(opts: create_message_opts) {
+    async create_message(opts: create_opts) {
         return await bridge.create_message(this.api, opts);
     }
 
-    async edit_message(opts: edit_message_opts) {
+    async edit_message(opts: edit_opts) {
         return await bridge.edit_message(this.api, opts);
     }
 
-    async delete_message(opts: delete_message_opts) {
+    async delete_message(opts: delete_opts) {
         return await bridge.delete_message(this.api, opts);
     }
 }

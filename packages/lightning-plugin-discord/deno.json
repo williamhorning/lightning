@@ -7,6 +7,6 @@
 		"@discordjs/core": "npm:@discordjs/core@^2.0.0",
 		"@discordjs/rest": "npm:@discordjs/rest@^2.4.0",
 		"@discordjs/ws": "npm:@discordjs/ws@^2.0.0",
-		"discord-api-types": "npm:discord-api-types@^0.37.110/v10"
+		"discord-api-types": "npm:discord-api-types@0.37.97/v10"
 	}
 }

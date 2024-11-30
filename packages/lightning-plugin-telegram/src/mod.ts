@@ -1,7 +1,7 @@
 import {
-	type create_message_opts,
-	type delete_message_opts,
-	type edit_message_opts,
+	type create_opts,
+	type delete_opts,
+	type edit_opts,
 	type lightning,
 	plugin,
 } from '@jersey/lightning';
@@ -65,7 +65,7 @@ export class telegram_plugin extends plugin<telegram_config> {
 		return channel;
 	}
 
-	async create_message(opts: create_message_opts) {
+	async create_message(opts: create_opts) {
 		const content = from_lightning(opts.msg);
 		const messages = [];
 
@@ -89,7 +89,7 @@ export class telegram_plugin extends plugin<telegram_config> {
 		return messages;
 	}
 
-	async edit_message(opts: edit_message_opts) {
+	async edit_message(opts: edit_opts) {
 		const content = from_lightning(opts.msg)[0];
 
 		await this.bot.api.editMessageText(
@@ -104,7 +104,7 @@ export class telegram_plugin extends plugin<telegram_config> {
 		return opts.edit_ids;
 	}
 
-	async delete_message(opts: delete_message_opts) {
+	async delete_message(opts: delete_opts) {
 		for (const id of opts.edit_ids) {
 			await this.bot.api.deleteMessage(
 				opts.channel.id,
