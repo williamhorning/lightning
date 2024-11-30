@@ -1,6 +1,6 @@
 import { parseArgs } from '@std/cli/parse-args';
 import { join, toFileUrl } from '@std/path';
-import { lightning, type config } from './lightning.ts';
+import { type config, lightning } from './lightning.ts';
 import { log_error } from './structures/errors.ts';
 
 const version = '0.8.0';
@@ -14,9 +14,12 @@ if (_.v || _.version) {
 	// TODO(jersey): this is somewhat broken when acting as a JSR package
 	if (!_.config) _.config = join(Deno.cwd(), 'config.ts');
 
-	const config = (await import(toFileUrl(_.config).toString())).default as config;
+	const config = (await import(toFileUrl(_.config).toString()))
+		.default as config;
 
-	if (config?.error_url) Deno.env.set('LIGHTNING_ERROR_WEBHOOK', config.error_url);
+	if (config?.error_url) {
+		Deno.env.set('LIGHTNING_ERROR_WEBHOOK', config.error_url);
+	}
 
 	addEventListener('error', (ev) => {
 		log_error(ev.error, { extra: { type: 'global error' } });
