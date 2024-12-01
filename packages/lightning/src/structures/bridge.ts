@@ -24,8 +24,6 @@ export interface bridge_channel {
 	plugin: string;
 }
 
-// TODO(jersey): implement allow_everyone and use_rawname settings
-
 /** possible settings for a bridge */
 export interface bridge_settings {
 	/** allow editing/deletion */

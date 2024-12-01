@@ -25,10 +25,14 @@ export async function bridge_message(
 
 	if (!bridge) return;
 
-	// if editing isn't allowed, return
+	// handle bridge settings
 	if (event !== 'create_message' && bridge.settings.allow_editing !== true) {
 		return;
 	}
+
+	if (bridge.settings.use_rawname && "author" in data) data.author.username = data.author.rawname;
+
+	// TODO(jersey): implement allow_everyone here
 
 	// if the channel this event is from is disabled, return
 	if (
