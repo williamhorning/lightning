@@ -30,7 +30,9 @@ export async function bridge_message(
 		return;
 	}
 
-	if (bridge.settings.use_rawname && "author" in data) data.author.username = data.author.rawname;
+	if (bridge.settings.use_rawname && 'author' in data) {
+		data.author.username = data.author.rawname;
+	}
 
 	// if the channel this event is from is disabled, return
 	if (

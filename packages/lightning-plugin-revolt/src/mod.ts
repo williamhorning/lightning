@@ -32,41 +32,44 @@ export class revolt_plugin extends plugin<revolt_config> {
 	}
 
 	private setup_events() {
-        this.bot.bonfire.on('Ready', (ready) => {
-            console.log(`[bolt-revolt] ready in ${ready.channels.length} channels`)
-            console.log(`[bolt-revolt] and ${ready.servers.length} servers`)
-        })
+		this.bot.bonfire.on('Ready', (ready) => {
+			console.log(`[bolt-revolt] ready in ${ready.channels.length} channels`);
+			console.log(`[bolt-revolt] and ${ready.servers.length} servers`);
+		});
 
-        this.bot.bonfire.on("Message", async (msg) => {
-            if (!msg.channel || msg.channel === 'undefined') return;
-            
-            this.emit("create_message", await to_lightning(this.bot, msg));
-        })
+		this.bot.bonfire.on('Message', async (msg) => {
+			if (!msg.channel || msg.channel === 'undefined') return;
 
-        this.bot.bonfire.on('MessageUpdate', async (msg) => {
-            if (!msg.channel || msg.channel === 'undefined') return;
+			this.emit('create_message', await to_lightning(this.bot, msg));
+		});
 
-            this.emit("edit_message", await to_lightning(this.bot, msg.data as Message));
-        })
+		this.bot.bonfire.on('MessageUpdate', async (msg) => {
+			if (!msg.channel || msg.channel === 'undefined') return;
 
-        this.bot.bonfire.on('MessageDelete', (msg) => {
-            this.emit('delete_message', {
-                channel: msg.channel,
-                id: msg.id,
-                timestamp: Temporal.Now.instant(),
-                plugin: 'bolt-revolt'
-            })
-        })
+			this.emit(
+				'edit_message',
+				await to_lightning(this.bot, msg.data as Message),
+			);
+		});
 
-        this.bot.bonfire.on('socket_close', (info) => {
+		this.bot.bonfire.on('MessageDelete', (msg) => {
+			this.emit('delete_message', {
+				channel: msg.channel,
+				id: msg.id,
+				timestamp: Temporal.Now.instant(),
+				plugin: 'bolt-revolt',
+			});
+		});
+
+		this.bot.bonfire.on('socket_close', (info) => {
 			console.warn('[bolt-revolt] socket closed', info);
 			this.bot = createClient(this.config);
 			this.setup_events();
 		});
-    }
+	}
 
 	async setup_channel(channel: string) {
-		return await check_permissions(channel, this.bot, this.config.user_id)
+		return await check_permissions(channel, this.bot, this.config.user_id);
 	}
 
 	async create_message(opts: create_opts) {

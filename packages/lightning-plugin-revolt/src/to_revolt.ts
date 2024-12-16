@@ -1,5 +1,10 @@
 import type { DataMessageSend, SendableEmbed } from '@jersey/revolt-api-types';
-import { LightningError, type attachment, type embed, type message } from '@jersey/lightning';
+import {
+	type attachment,
+	type embed,
+	LightningError,
+	type message,
+} from '@jersey/lightning';
 import type { Client } from '@jersey/rvapi';
 
 export async function to_revolt(
@@ -66,9 +71,9 @@ async function upload_attachments(api: Client, attachments?: attachment[]) {
 				.then((id) => [id])
 				.catch((e) => {
 					new LightningError(e, {
-                        message: 'Failed to upload attachment',
-                        extra: { original: e },
-                    })
+						message: 'Failed to upload attachment',
+						extra: { original: e },
+					});
 					return [] as string[];
 				})
 		),

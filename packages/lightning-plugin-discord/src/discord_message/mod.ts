@@ -34,9 +34,11 @@ export async function message_to_discord(
 		}),
 		username: msg.author.username,
 		wait: true,
-		allowed_mentions: suppress_everyone ? {
-			parse: [AllowedMentionsTypes.Role, AllowedMentionsTypes.User],
-		} : undefined,
+		allowed_mentions: suppress_everyone
+			? {
+				parse: [AllowedMentionsTypes.Role, AllowedMentionsTypes.User],
+			}
+			: undefined,
 	};
 
 	if (api && channel && reply_id) {

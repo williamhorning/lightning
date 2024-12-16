@@ -28,7 +28,10 @@ export async function get_author(
 	} else if (msg.createdByWebhookId) {
 		// try to fetch webhook?
 		try {
-			const wh = await bot.webhooks.fetch(msg.serverId!, msg.createdByWebhookId);
+			const wh = await bot.webhooks.fetch(
+				msg.serverId!,
+				msg.createdByWebhookId,
+			);
 
 			return {
 				username: wh.name,
