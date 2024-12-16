@@ -88,7 +88,12 @@ export class guilded_plugin extends plugin<guilded_config> {
 			);
 
 			const res = await webhook.send(
-				await convert_msg(opts.msg, opts.channel.id, this.bot),
+				await convert_msg(
+					opts.msg,
+					opts.channel.id,
+					this.bot,
+					opts.settings.allow_everyone,
+				),
 			);
 
 			return [res.id];

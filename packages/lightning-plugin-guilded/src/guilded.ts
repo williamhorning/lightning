@@ -7,6 +7,7 @@ export async function convert_msg(
     msg: message,
     channel?: string,
     bot?: Client,
+    allow_everyone = true,
 ): Promise<guilded_msg> {
     const message = {
         content: msg.content,
@@ -36,6 +37,11 @@ export async function convert_msg(
     if (message.embeds?.length === 0 || !message.embeds) delete message.embeds;
 
     if (!message.content && !message.embeds) message.content = '*empty message*';
+
+    if (!allow_everyone && message.content) {
+        message.content = message.content.replace(/@everyone/g, '(a)everyone');
+        message.content = message.content.replace(/@here/g, '(a)here');
+    }
 
     return message;
 }

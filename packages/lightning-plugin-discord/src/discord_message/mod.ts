@@ -1,8 +1,9 @@
 import type { message } from '@jersey/lightning';
 import type { API } from '@discordjs/core';
-import type {
-	RESTPostAPIWebhookWithTokenJSONBody,
-	RESTPostAPIWebhookWithTokenQuery,
+import {
+	AllowedMentionsTypes,
+	type RESTPostAPIWebhookWithTokenJSONBody,
+	type RESTPostAPIWebhookWithTokenQuery,
 } from 'discord-api-types';
 import type { RawFile } from '@discordjs/rest';
 import { reply_embed } from './reply_embed.ts';
@@ -21,6 +22,7 @@ export async function message_to_discord(
 	api?: API,
 	channel?: string,
 	reply_id?: string,
+	suppress_everyone?: boolean,
 ): Promise<discord_message_send> {
 	const discord: discord_message_send = {
 		avatar_url: msg.author.profile,
@@ -32,6 +34,9 @@ export async function message_to_discord(
 		}),
 		username: msg.author.username,
 		wait: true,
+		allowed_mentions: suppress_everyone ? {
+			parse: [AllowedMentionsTypes.Role, AllowedMentionsTypes.User],
+		} : undefined,
 	};
 
 	if (api && channel && reply_id) {

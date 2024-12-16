@@ -27,6 +27,7 @@ export async function create_message(api: API, opts: create_opts) {
 		api,
 		opts.channel.id,
 		opts.reply_id,
+		opts.settings.allow_everyone,
 	);
 
 	try {
@@ -49,6 +50,7 @@ export async function edit_message(api: API, opts: edit_opts) {
 		api,
 		opts.channel.id,
 		opts.reply_id,
+		opts.settings.allow_everyone,
 	);
 
 	try {
