@@ -5,8 +5,8 @@ export function file_proxy(config: telegram_config) {
         port: config.plugin_port,
         onListen: (addr) => {
             console.log(
-                `bolt-telegram: file proxy listening on http://localhost:${addr.port}`,
-                `\nbolt-telegram: also available at: ${config.plugin_url}`,
+                `[bolt-telegram] file proxy listening on http://localhost:${addr.port}`,
+                `\n[bolt-telegram] also available at: ${config.plugin_url}`,
             );
         },
     }, (req: Request) => {

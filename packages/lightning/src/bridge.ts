@@ -32,8 +32,6 @@ export async function bridge_message(
 
 	if (bridge.settings.use_rawname && "author" in data) data.author.username = data.author.rawname;
 
-	// TODO(jersey): implement allow_everyone here
-
 	// if the channel this event is from is disabled, return
 	if (
 		bridge.channels.find((channel) =>
@@ -82,6 +80,7 @@ export async function bridge_message(
 		try {
 			result_ids = await plugin[event]({
 				channel,
+				settings: bridge.settings,
 				reply_id,
 				edit_ids: prior_bridged_ids?.id as string[],
 				msg: data as message,
@@ -101,6 +100,7 @@ export async function bridge_message(
 			try {
 				result_ids = await plugin[event]({
 					channel,
+					settings: bridge.settings,
 					reply_id,
 					edit_ids: prior_bridged_ids?.id as string[],
 					msg: err.msg,

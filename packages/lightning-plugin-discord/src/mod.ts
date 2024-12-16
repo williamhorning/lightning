@@ -53,7 +53,7 @@ export class discord_plugin extends plugin<discord_config> {
 	private setup_events() {
 		this.client.once(GatewayDispatchEvents.Ready, ({ data }) => {
 			console.log(
-				`bolt-discord: ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length} guilds`,
+				`[bolt-discord] ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length} guilds`,
 			);
 		});
 		this.client.on(GatewayDispatchEvents.MessageCreate, async (msg) => {

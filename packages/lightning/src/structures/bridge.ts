@@ -71,6 +71,8 @@ export interface create_opts {
 	msg: message;
 	/** the channel to use */
 	channel: bridge_channel;
+	/** the settings to use */
+	settings: bridge_settings;
 	/** message to reply to, if any */
 	reply_id?: string;
 }
@@ -81,6 +83,8 @@ export interface edit_opts {
 	msg: message;
 	/** the channel to use */
 	channel: bridge_channel;
+	/** the settings to use */
+	settings: bridge_settings;
 	/** message to reply to, if any */
 	reply_id?: string;
 	/** ids of messages to edit */
@@ -93,6 +97,8 @@ export interface delete_opts {
 	msg: deleted_message;
 	/** the channel to use */
 	channel: bridge_channel;
+	/** the settings to use */
+	settings: bridge_settings;
 	/** ids of messages to delete */
 	edit_ids: string[];
 }

@@ -1,12 +1,17 @@
 import {
+	type create_opts,
+	type delete_opts,
+	type edit_opts,
 	type lightning,
-	type message_options,
+	log_error,
 	plugin,
-	type process_result,
 } from '@jersey/lightning';
 import { Client, WebhookClient } from 'guilded.js';
-import { convert_msg, create_webhook } from './guilded.ts';
-import { tocore } from './messages.ts';
+import { error_handler } from './error_handler.ts';
+import { convert_msg } from './guilded.ts';
+import { guilded_to_message } from './guilded_message/mod.ts';
+
+// TODO(jersey): TEST THIS CODE
 
 /** options for the guilded plugin */
 export interface guilded_config {
@@ -16,28 +21,33 @@ export interface guilded_config {
 
 /** the plugin to use */
 export class guilded_plugin extends plugin<guilded_config> {
-	bot: Client;
 	name = 'bolt-guilded';
+	bot: Client;
 
 	constructor(l: lightning, c: guilded_config) {
 		super(l, c);
-		const h = {
+
+		const opts = {
 			headers: {
 				'x-guilded-bot-api-use-official-markdown': 'true',
 			},
 		};
-		this.bot = new Client({ token: c.token, rest: h, ws: h });
+
+		this.bot = new Client({ token: c.token, ws: opts, rest: opts });
 		this.setup_events();
 		this.bot.login();
 	}
 
 	private setup_events() {
+		this.bot.on('ready', () => {
+			console.log(`[bolt-guilded] logged in as ${this.bot.user?.name}`);
+		});
 		this.bot.on('messageCreated', async (message) => {
-			const msg = await tocore(message, this);
+			const msg = await guilded_to_message(message, this.bot);
 			if (msg) this.emit('create_message', msg);
 		});
 		this.bot.on('messageUpdated', async (message) => {
-			const msg = await tocore(message, this);
+			const msg = await guilded_to_message(message, this.bot);
 			if (msg) this.emit('edit_message', msg);
 		});
 		this.bot.on('messageDeleted', (del) => {
@@ -53,64 +63,53 @@ export class guilded_plugin extends plugin<guilded_config> {
 		});
 	}
 
-	/** create a bridge in this channel */
-	create_bridge(channel: string): Promise<{ id: string; token: string }> {
-		return create_webhook(this.bot, channel, this.config.token);
+	async setup_channel(channel: string) {
+		try {
+			// TODO(jersey): it may be worth it to add server/guild id to the message type...
+			const { serverId } = await this.bot.channels.fetch(channel);
+			const webhook = await this.bot.webhooks.create(serverId, {
+				channelId: channel,
+				name: 'Lightning Bridges',
+			});
+			if (!webhook.id || !webhook.token) {
+				log_error('failed to create webhook: missing id or token', {
+					extra: { webhook: webhook.raw },
+				});
+			}
+		} catch (e) {
+			return error_handler(e, channel, 'creating webhook');
+		}
 	}
 
-	async process_message(opts: message_options): Promise<process_result> {
-		if (opts.action === 'create') {
-			try {
-				const { id } = await new WebhookClient(
-					opts.channel.data as { token: string; id: string },
-				).send(
-					await convert_msg(opts.message, opts.channel.id, this),
-				);
-
-				return {
-					id: [id],
-					channel: opts.channel,
-				};
-			} catch (e) {
-				if (
-					(e as { response: { status: number } }).response
-						.status === 404
-				) {
-					return {
-						channel: opts.channel,
-						disable: true,
-						error: new Error('webhook not found!'),
-					};
-				} else if (
-					(e as { response: { status: number } }).response
-						.status === 403
-				) {
-					return {
-						channel: opts.channel,
-						disable: true,
-						error: new Error('no permission to send messages!'),
-					};
-				} else {
-					throw e;
-				}
-			}
-		} else if (opts.action === 'delete') {
-			const msg = await this.bot.messages.fetch(
-				opts.channel.id,
-				opts.edit_id[0],
+	async create_message(opts: create_opts) {
+		try {
+			const webhook = new WebhookClient(
+				opts.channel.data as { id: string; token: string },
 			);
 
-			await msg.delete();
+			const res = await webhook.send(
+				await convert_msg(opts.msg, opts.channel.id, this.bot),
+			);
 
-			return {
-				channel: opts.channel,
-				id: opts.edit_id,
-			};
-		} else {
-			return {
-				channel: opts.channel,
-				id: opts.edit_id,
-			};
+			return [res.id];
+		} catch (e) {
+			return error_handler(e, opts.channel.id, 'creating message');
+		}
+	}
+
+	// deno-lint-ignore require-await
+	async edit_message(opts: edit_opts) {
+		// guilded does not support editing messages
+		return opts.edit_ids;
+	}
+
+	async delete_message(opts: delete_opts) {
+		try {
+			await this.bot.messages.delete(opts.channel.id, opts.edit_ids[0]);
+
+			return opts.edit_ids;
+		} catch (e) {
+			return error_handler(e, opts.channel.id, 'deleting message');
 		}
 	}
 }

@@ -61,7 +61,7 @@ export class LightningError extends Error {
 
 		// the error-logging async fun
 		(async () => {
-			console.error(`%clightning error ${id}`, 'color: red');
+			console.error(`%c[lightning] error ${id}`, 'color: red');
 			console.error(cause, this.options);
 
 			const webhook = Deno.env.get('LIGHTNING_ERROR_WEBHOOK');
