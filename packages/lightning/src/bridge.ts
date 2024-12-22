@@ -170,6 +170,7 @@ async function disable_channel(
 	);
 
 	await lightning.data.edit_bridge({
+		name: 'name' in bridge ? bridge.name : bridge.id,
 		id: 'bridge_id' in bridge ? bridge.bridge_id : bridge.id,
 		channels: bridge.channels.map((i) =>
 			i.id === channel.id && i.plugin === channel.plugin

@@ -21,12 +21,12 @@
 	},
 	"workspace": [
 		"./packages/lightning",
-		// TODO(jersey): contribute upstream
+		// TODO(jersey): upstream pr
 		"./packages/postgres",
-		"./packages/lightning-plugin-telegram",
-		"./packages/lightning-plugin-revolt",
-		"./packages/lightning-plugin-guilded",
-		"./packages/lightning-plugin-discord"
+		"./packages/telegram",
+		"./packages/revolt",
+		"./packages/guilded",
+		"./packages/discord"
 	],
 	"lock": false,
 	"unstable": ["temporal"]

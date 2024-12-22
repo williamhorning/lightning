@@ -1,8 +1,11 @@
-import type { ClientOptions } from '@db/postgres';
 import { bridge_message } from './bridge.ts';
 import { default_commands } from './commands/default.ts';
 import { execute_text_command, run_command } from './commands/runners.ts';
-import { bridge_data } from './database.ts';
+import {
+	type bridge_data,
+	create_database,
+	type database_config,
+} from './database/mod.ts';
 import type {
 	command,
 	create_command,
@@ -16,7 +19,7 @@ export interface config {
 	/** error URL */
 	error_url?: string;
 	/** database options */
-	postgres: ClientOptions;
+	database: database_config;
 	/** a list of plugins */
 	// deno-lint-ignore no-explicit-any
 	plugins?: create_plugin<any>[];
@@ -74,7 +77,7 @@ export class lightning {
 
 	/** create a new instance of lightning */
 	static async create(config: config): Promise<lightning> {
-		const data = await bridge_data.create(config.postgres);
+		const data = await create_database(config.database);
 
 		return new lightning(data, config);
 	}
