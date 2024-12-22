@@ -12,17 +12,23 @@ export async function to_revolt(
 	message: message,
 	masquerade = true,
 ): Promise<DataMessageSend> {
+	const attachments = await upload_attachments(api, message.attachments);
+	const embeds = map_embeds(message.embeds);
+
 	if (
-		!message.content && (!message.embeds || message.embeds.length < 1) &&
-		(!message.attachments || message.attachments.length < 1)
+		(!message.content || message.content.length < 1) &&
+		(!embeds || embeds.length < 1) &&
+		(!attachments || attachments.length < 1)
 	) {
 		message.content = '*empty message*';
 	}
 
 	return {
-		attachments: await upload_attachments(api, message.attachments),
-		content: message.content,
-		embeds: map_embeds(message.embeds),
+		attachments,
+		content: (message.content?.length || 0) > 2000
+			? `${message.content?.substring(0, 1997)}...`
+			: message.content,
+		embeds,
 		replies: message.reply_id
 			? [{ id: message.reply_id, mention: true }]
 			: undefined,
