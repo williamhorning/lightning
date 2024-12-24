@@ -43,11 +43,11 @@ export class telegram_plugin extends plugin<telegram_config> {
 	}
 
 	/** create a bridge */
-	setup_channel(channel: string) {
+	setup_channel(channel: string): unknown {
 		return channel;
 	}
 
-	async create_message(opts: create_opts) {
+	async create_message(opts: create_opts): Promise<string[]> {
 		const content = from_lightning(opts.msg);
 		const messages = [];
 
@@ -71,7 +71,7 @@ export class telegram_plugin extends plugin<telegram_config> {
 		return messages;
 	}
 
-	async edit_message(opts: edit_opts) {
+	async edit_message(opts: edit_opts): Promise<string[]> {
 		const content = from_lightning(opts.msg)[0];
 
 		await this.bot.api.editMessageText(
@@ -86,7 +86,7 @@ export class telegram_plugin extends plugin<telegram_config> {
 		return opts.edit_ids;
 	}
 
-	async delete_message(opts: delete_opts) {
+	async delete_message(opts: delete_opts): Promise<string[]> {
 		for (const id of opts.edit_ids) {
 			await this.bot.api.deleteMessage(
 				opts.channel.id,

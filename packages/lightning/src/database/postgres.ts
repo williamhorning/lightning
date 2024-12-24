@@ -5,11 +5,6 @@ import type { bridge_data } from './mod.ts';
 
 export type { ClientOptions as postgres_config };
 
-/**
- * unfortunately this code only works with denodrivers/postgres#487
- * ideally jsr support and modernization would be merged but who knows
- */
-
 export class postgres implements bridge_data {
 	static async create(pg_options: ClientOptions): Promise<bridge_data> {
 		const pg = new Client(pg_options);

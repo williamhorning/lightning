@@ -10,7 +10,7 @@ export const default_commands = new Map([
 		name: 'help',
 		description: 'get help with the bot',
 		execute: () =>
-			'check out [the docs](https://williamhorning.eu.org/bolt/) for help.',
+			'check out [the docs](https://williamhorning.eu.org/lightning/) for help.',
 	}],
 	['ping', {
 		name: 'ping',

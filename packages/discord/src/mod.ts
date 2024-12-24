@@ -71,19 +71,19 @@ export class discord_plugin extends plugin<discord_config> {
 		});
 	}
 
-	async setup_channel(channel: string) {
+	async setup_channel(channel: string): Promise<unknown> {
 		return await bridge.setup_bridge(this.api, channel);
 	}
 
-	async create_message(opts: create_opts) {
+	async create_message(opts: create_opts): Promise<string[]> {
 		return await bridge.create_message(this.api, opts);
 	}
 
-	async edit_message(opts: edit_opts) {
+	async edit_message(opts: edit_opts): Promise<string[]> {
 		return await bridge.edit_message(this.api, opts);
 	}
 
-	async delete_message(opts: delete_opts) {
+	async delete_message(opts: delete_opts): Promise<string[]> {
 		return await bridge.delete_message(this.api, opts);
 	}
 }

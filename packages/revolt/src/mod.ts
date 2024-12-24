@@ -68,11 +68,11 @@ export class revolt_plugin extends plugin<revolt_config> {
 		});
 	}
 
-	async setup_channel(channel: string) {
+	async setup_channel(channel: string): Promise<unknown> {
 		return await check_permissions(channel, this.bot, this.config.user_id);
 	}
 
-	async create_message(opts: create_opts) {
+	async create_message(opts: create_opts): Promise<string[]> {
 		try {
 			const { _id } = (await this.bot.request(
 				'post',
@@ -86,7 +86,7 @@ export class revolt_plugin extends plugin<revolt_config> {
 		}
 	}
 
-	async edit_message(opts: edit_opts) {
+	async edit_message(opts: edit_opts): Promise<string[]> {
 		try {
 			await this.bot.request(
 				'patch',
@@ -100,7 +100,7 @@ export class revolt_plugin extends plugin<revolt_config> {
 		}
 	}
 
-	async delete_message(opts: delete_opts) {
+	async delete_message(opts: delete_opts): Promise<string[]> {
 		try {
 			await this.bot.request(
 				'delete',

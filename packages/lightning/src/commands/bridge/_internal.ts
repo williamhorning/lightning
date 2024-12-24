@@ -9,7 +9,7 @@ export async function bridge_add_common(
 	);
 
 	if (existing_bridge) {
-		return `You are already in a bridge called \`${existing_bridge.name}\`. You must leave it before being in another bridge. Try using \`${opts.lightning.config.prefix}leave\` or \`${opts.lightning.config.prefix}help\` commands.`;
+		return `You are already in a bridge called \`${existing_bridge.name}\`. You must leave it before being in another bridge. Try using \`${opts.lightning.config.prefix}bridge leave\` or \`${opts.lightning.config.prefix}help\` commands.`;
 	}
 
 	const plugin = opts.lightning.plugins.get(opts.plugin);

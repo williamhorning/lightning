@@ -1,7 +1,7 @@
 # lightning-plugin-telegram
 
 lightning-plugin-telegram is a plugin for
-[lightning](https://williamhroning.eu.org/lightning) that adds support for
+[lightning](https://williamhorning.eu.org/lightning) that adds support for
 telegram (including attachments via the included file proxy)
 
 ## example config

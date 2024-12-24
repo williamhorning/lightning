@@ -28,7 +28,7 @@ export interface bridge_channel {
 export interface bridge_settings {
 	/** allow editing/deletion */
 	allow_editing: boolean;
-	/** @everyone/@here/@room */
+	/** `@everyone/@here/@room` */
 	allow_everyone: boolean;
 	/** rawname = username */
 	use_rawname: boolean;

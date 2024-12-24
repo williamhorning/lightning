@@ -21,7 +21,7 @@
 	},
 	"workspace": [
 		"./packages/lightning",
-		// TODO(jersey): upstream pr
+		// TODO(jersey): denodrivers/postgres#487
 		"./packages/postgres",
 		"./packages/telegram",
 		"./packages/revolt",

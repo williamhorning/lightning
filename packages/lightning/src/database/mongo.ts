@@ -1,13 +1,14 @@
+import { type Collection, type ConnectOptions, MongoClient } from '@db/mongo';
+import { RedisClient } from '@iuioiua/r2d2';
 import { ulid } from '@std/ulid';
 import type { bridge } from '../structures/bridge.ts';
+import { log_error } from '../structures/errors.ts';
 import type { bridge_data } from './mod.ts';
-import { type Collection, type ConnectOptions, MongoClient } from '@db/mongo';
 import { redis_bridge_message_handler } from './redis_message.ts';
-import { RedisClient } from '@iuioiua/r2d2';
 
 export type mongo_config = {
-    database: ConnectOptions | string;
-    redis: Deno.ConnectOptions;
+	database: ConnectOptions | string;
+	redis: Deno.ConnectOptions;
 };
 
 export class mongo extends redis_bridge_message_handler implements bridge_data {
@@ -15,33 +16,44 @@ export class mongo extends redis_bridge_message_handler implements bridge_data {
 		const client = new MongoClient();
 		await client.connect(opts.database);
 
-        const database = client.database();
-        const db_data_version = await database.collection('lightning').findOne({ _id: 'db_data_version' });
-        const bridge_collection_exists = (await database.listCollectionNames()).includes('bridges');
+		const database = client.database();
+		const db_data_version = await database.collection('lightning').findOne({
+			_id: 'db_data_version',
+		});
+		const bridge_collection_exists = (await database.listCollectionNames())
+			.includes('bridges');
 
-        if (db_data_version?.version !== '0.8.0' && bridge_collection_exists) {
-            const version = db_data_version?.version ?? 'unknown';
+		if (db_data_version?.version !== '0.8.0' && bridge_collection_exists) {
+			log_error(
+				'Please delete the bridge collection or follow the migrations process in the documentation',
+				{
+					extra: {
+						see:
+							'https://williamhorning.eu.org/lightning/hosting/legacy-migrations',
+					},
+				},
+			);
+		} else if (!db_data_version && !bridge_collection_exists) {
+			await database.collection('lightning').insertOne({
+				_id: 'db_data_version',
+				version: '0.8.0',
+			});
+			await database.createCollection('bridges');
+		}
 
-            console.warn(`[lightning-mongo] migrating database from ${version} to 0.8.0`);
-            
-            // TODO(jersey): use code to feature detect the version if not present and then migrate
-			// it may be worth it to just allow migrations from the last version before redisforeverything
-			// and have anything prior use the migration script from back then
+		const redis = new RedisClient(await Deno.connect(opts.redis));
 
-            throw "not implemented";
-        }
-
-        const redis = new RedisClient(await Deno.connect(opts.redis));
+		// TODO(jersey): handle redis migrations here if applicable?
 
 		return new this(database.collection('bridges'), redis);
 	}
 
 	private constructor(
 		private bridges: Collection<bridge & { _id: string }>,
-        public redis: RedisClient,
+		public redis: RedisClient,
 	) {
-        super();
-    }
+		super();
+	}
 
 	async create_bridge(br: Omit<bridge, 'id'>): Promise<bridge> {
 		const id = ulid();

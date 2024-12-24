@@ -11,8 +11,6 @@ import { error_handler } from './error_handler.ts';
 import { convert_msg } from './guilded.ts';
 import { guilded_to_message } from './guilded_message/mod.ts';
 
-// TODO(jersey): TEST THIS CODE
-
 /** options for the guilded plugin */
 export interface guilded_config {
 	/** the token to use */
@@ -63,7 +61,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 		});
 	}
 
-	async setup_channel(channel: string) {
+	async setup_channel(channel: string): Promise<unknown> {
 		try {
 			// TODO(jersey): it may be worth it to add server/guild id to the message type...
 			const { serverId } = await this.bot.channels.fetch(channel);
@@ -76,12 +74,14 @@ export class guilded_plugin extends plugin<guilded_config> {
 					extra: { webhook: webhook.raw },
 				});
 			}
+
+			return { id: webhook.id, token: webhook.token };
 		} catch (e) {
 			return error_handler(e, channel, 'creating webhook');
 		}
 	}
 
-	async create_message(opts: create_opts) {
+	async create_message(opts: create_opts): Promise<string[]> {
 		try {
 			const webhook = new WebhookClient(
 				opts.channel.data as { id: string; token: string },
@@ -103,12 +103,12 @@ export class guilded_plugin extends plugin<guilded_config> {
 	}
 
 	// deno-lint-ignore require-await
-	async edit_message(opts: edit_opts) {
+	async edit_message(opts: edit_opts): Promise<string[]> {
 		// guilded does not support editing messages
 		return opts.edit_ids;
 	}
 
-	async delete_message(opts: delete_opts) {
+	async delete_message(opts: delete_opts): Promise<string[]> {
 		try {
 			await this.bot.messages.delete(opts.channel.id, opts.edit_ids[0]);
 

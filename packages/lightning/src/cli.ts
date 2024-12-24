@@ -34,8 +34,6 @@ if (_.v || _.version) {
 	} catch (e) {
 		log_error(e, { extra: { type: 'global class error' } });
 	}
-} else if (_._[0] === 'migrations') {
-	// TODO(jersey): implement migrations (separate module?)
 } else {
 	console.log('[lightning] command not found, showing help');
 	run_help();
@@ -48,7 +46,6 @@ function run_help() {
 	console.log('  Usage: lightning [subcommand] <options>');
 	console.log('  Subcommands:');
 	console.log('    run: run a lightning instance');
-	console.log('    migrations: run migration script');
 	console.log('  Options:');
 	console.log('    -h, --help: display this help message');
 	console.log('    -v, --version: display the version number');
