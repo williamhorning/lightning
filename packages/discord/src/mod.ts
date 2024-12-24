@@ -25,6 +25,7 @@ export interface discord_config {
 	application_id: string;
 }
 
+/** the plugin to use */
 export class discord_plugin extends plugin<discord_config> {
 	name = 'bolt-discord';
 	private api: Client['api'];

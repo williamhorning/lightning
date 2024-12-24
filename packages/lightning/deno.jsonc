@@ -3,7 +3,8 @@
 	"version": "0.8.0",
 	"exports": "./src/mod.ts",
 	"imports": {
-		"@db/mongo": "jsr:@db/mongo@^0.33.0",
+		// TODO(jersey): get updated @db/mongo w/updated web_bson
+		"@db/mongo": "jsr:@db/mongo@^0.34.0",
 		"@db/postgres": "jsr:@db/postgres@^0.19.4",
 		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",
 		"@iuioiua/r2d2": "jsr:@iuioiua/r2d2@2.1.2",
