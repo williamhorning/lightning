@@ -1,4 +1,4 @@
-FROM docker.io/denoland/deno:2.0.3
+FROM docker.io/denoland/deno:2.1.4
 
 # add lightning to the image
 RUN deno install -g -A --unstable-temporal ./cli/mod.ts
