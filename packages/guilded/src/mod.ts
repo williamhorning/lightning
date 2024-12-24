@@ -63,7 +63,6 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 	async setup_channel(channel: string): Promise<unknown> {
 		try {
-			// TODO(jersey): it may be worth it to add server/guild id to the message type...
 			const { serverId } = await this.bot.channels.fetch(channel);
 			const webhook = await this.bot.webhooks.create(serverId, {
 				channelId: channel,
