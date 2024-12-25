@@ -5,7 +5,7 @@ export async function files_up_to_25MiB(attachments: attachment[] | undefined) {
 	if (!attachments) return;
 
 	const files: RawFile[] = [];
-	const total_size = 0;
+	let total_size = 0;
 
 	for (const attachment of attachments) {
 		if (attachment.size >= 25) continue;
@@ -22,6 +22,8 @@ export async function files_up_to_25MiB(attachments: attachment[] | undefined) {
 				name: attachment.name ?? attachment.file.split('/').pop()!,
 				data,
 			});
+
+			total_size += attachment.size;
 		} catch {
 			continue;
 		}

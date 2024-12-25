@@ -13,8 +13,9 @@ if (_.v || _.version) {
 } else if (_._[0] === 'run') {
 	if (!_.config) _.config = join(Deno.cwd(), 'config.ts');
 
-	const config = (await import(toFileUrl(_.config).toString()))
-		.default as config;
+	const config_url = toFileUrl(_.config).toString();
+
+	const config = (await import(config_url)).default as config;
 
 	if (config?.error_url) {
 		Deno.env.set('LIGHTNING_ERROR_WEBHOOK', config.error_url);

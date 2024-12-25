@@ -5,7 +5,7 @@ import type { attachment, embed } from './media.ts';
  * @param text the text of the message (can be markdown)
  */
 export function create_message(text: string): message {
-	const data = {
+	return {
 		author: {
 			username: 'lightning',
 			profile: 'https://williamhorning.eu.org/assets/lightning.png',
@@ -19,7 +19,6 @@ export function create_message(text: string): message {
 		timestamp: Temporal.Now.instant(),
 		plugin: 'lightning',
 	};
-	return data;
 }
 
 /** a representation of a message that has been deleted */

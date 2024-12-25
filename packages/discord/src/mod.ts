@@ -12,7 +12,6 @@ import { GatewayDispatchEvents } from 'discord-api-types';
 import * as bridge from './bridge_to_discord.ts';
 import { setup_slash_commands } from './slash_commands.ts';
 import { command_to } from './to_lightning/command.ts';
-import { deleted } from './to_lightning/deleted.ts';
 import { message } from './to_lightning/message.ts';
 
 /** configuration for the discord plugin */
@@ -64,7 +63,12 @@ export class discord_plugin extends plugin<discord_config> {
 			this.emit('edit_message', await message(msg.api, msg.data));
 		});
 		this.client.on(GatewayDispatchEvents.MessageDelete, (msg) => {
-			this.emit('delete_message', deleted(msg.data));
+			this.emit('delete_message', {
+				channel: msg.data.channel_id,
+				id: msg.data.id,
+				plugin: 'bolt-discord',
+				timestamp: Temporal.Now.instant(),
+			});
 		});
 		this.client.on(GatewayDispatchEvents.InteractionCreate, (cmd) => {
 			const command = command_to(cmd, this.lightning);

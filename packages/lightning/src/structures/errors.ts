@@ -59,49 +59,51 @@ export class LightningError extends Error {
 			`Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\`\`\`\n${this.message}\n${this.id}\n\`\`\``,
 		);
 
-		// the error-logging async fun
-		(async () => {
-			console.error(`%c[lightning] error ${id}`, 'color: red');
-			console.error(cause, this.options);
+		this.log();
+	}
 
-			const webhook = Deno.env.get('LIGHTNING_ERROR_WEBHOOK');
+	/** log the error */
+	private async log(): Promise<void> {
+		console.error(`%c[lightning] error ${this.id}`, 'color: red');
+		console.error(this.cause, this.options);
 
-			for (const key in this.options?.extra) {
-				if (key === 'lightning') {
-					delete this.options.extra[key];
-				}
+		const webhook = Deno.env.get('LIGHTNING_ERROR_WEBHOOK');
 
-				if (
-					typeof this.options.extra[key] === 'object' &&
-					this.options.extra[key] !== null
-				) {
-					if ('lightning' in this.options.extra[key]) {
-						delete this.options.extra[key].lightning;
-					}
-				}
+		for (const key in this.options?.extra) {
+			if (key === 'lightning') {
+				delete this.options.extra[key];
 			}
 
-			if (webhook && webhook.length > 0) {
-				let json_str = `\`\`\`json\n${
-					JSON.stringify(this.options?.extra, null, 2)
-				}\n\`\`\``;
-
-				if (json_str.length > 2000) json_str = '*see console*';
-
-				await fetch(webhook, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						content: `# ${cause.message}\n*${id}*`,
-						embeds: [
-							{
-								title: 'extra',
-								description: json_str,
-							},
-						],
-					}),
-				});
+			if (
+				typeof this.options.extra[key] === 'object' &&
+				this.options.extra[key] !== null
+			) {
+				if ('lightning' in this.options.extra[key]) {
+					delete this.options.extra[key].lightning;
+				}
 			}
-		})();
+		}
+
+		if (webhook && webhook.length > 0) {
+			let json_str = `\`\`\`json\n${
+				JSON.stringify(this.options?.extra, null, 2)
+			}\n\`\`\``;
+
+			if (json_str.length > 2000) json_str = '*see console*';
+
+			await fetch(webhook, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					content: `# ${this.cause.message}\n*${this.id}*`,
+					embeds: [
+						{
+							title: 'extra',
+							description: json_str,
+						},
+					],
+				}),
+			});
+		}
 	}
 }

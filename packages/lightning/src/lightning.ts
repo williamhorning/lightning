@@ -44,17 +44,17 @@ export class lightning {
 		this.config = config;
 		this.plugins = new Map<string, plugin<unknown>>();
 
-		for (const p of this.config.plugins || []) {
-			if (p.support.includes('0.8.0')) {
-				const plugin = new p.type(this, p.config);
-				this.plugins.set(plugin.name, plugin);
-				this._handle_events(plugin);
+		for (const plugin of this.config.plugins || []) {
+			if (plugin.support.includes('0.8.0')) {
+				const plugin_instance = new plugin.type(this, plugin.config);
+				this.plugins.set(plugin_instance.name, plugin_instance);
+				this.handle_events(plugin_instance);
 			}
 		}
 	}
 
 	/** event handler */
-	private async _handle_events(plugin: plugin<unknown>) {
+	private async handle_events(plugin: plugin<unknown>) {
 		for await (const { name, value } of plugin) {
 			await new Promise((res) => setTimeout(res, 150));
 
