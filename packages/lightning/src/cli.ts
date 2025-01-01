@@ -52,4 +52,5 @@ function run_help() {
 	console.log('    -c, --config: the config file to use');
 	console.log('  Environment Variables:');
 	console.log('    LIGHTNING_ERROR_WEBHOOK: the webhook to send errors to');
+	console.log('    LIGHTNING_MIGRATE_CONFIRM: confirm migration on startup');
 }

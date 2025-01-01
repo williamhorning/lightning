@@ -4,14 +4,14 @@ import { ulid } from '@std/ulid';
 import type { bridge } from '../structures/bridge.ts';
 import { log_error } from '../structures/errors.ts';
 import type { bridge_data } from './mod.ts';
-import { redis_bridge_message_handler } from './redis_message.ts';
+import { redis_messages } from './redis_message.ts';
 
 export type mongo_config = {
 	database: ConnectOptions | string;
 	redis: Deno.ConnectOptions;
 };
 
-export class mongo extends redis_bridge_message_handler implements bridge_data {
+export class mongo extends redis_messages implements bridge_data {
 	static async create(opts: mongo_config) {
 		const client = new MongoClient();
 		await client.connect(opts.database);
@@ -43,16 +43,16 @@ export class mongo extends redis_bridge_message_handler implements bridge_data {
 
 		const redis = new RedisClient(await Deno.connect(opts.redis));
 
-		// TODO(jersey): handle redis migrations here if applicable?
+		await redis_messages.migrate(redis);
 
 		return new this(database.collection('bridges'), redis);
 	}
 
 	private constructor(
 		private bridges: Collection<bridge & { _id: string }>,
-		public redis: RedisClient,
+		redis: RedisClient,
 	) {
-		super();
+		super(redis);
 	}
 
 	async create_bridge(br: Omit<bridge, 'id'>): Promise<bridge> {
