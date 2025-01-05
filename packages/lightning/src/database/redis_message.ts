@@ -19,20 +19,15 @@ export class redis_messages {
 				'lightning-*',
 			]) as string[];
 
-			const new_data = [] as [string, bridge | bridge_message][];
+			const new_data = [] as [string, bridge | bridge_message | string][];
 
 			for (const key of all_keys) {
-				// TODO(jersey): this should probably not be done in memory
 				const type = await rd.sendCommand(['TYPE', key]) as string;
-
-				const value = await rd.sendCommand([
-					type === 'string' ? 'GET' : 'JSON.GET',
-					key,
-				]) as string;
+				const action = type === 'string' ? 'GET' : 'JSON.GET';
+				const value = await rd.sendCommand([action, key]) as string;
 
 				try {
 					const parsed = JSON.parse(value);
-					'failed to handle key, cancelling migration';
 
 					new_data.push([key, {
 						id: key.split('-')[2],
@@ -46,15 +41,8 @@ export class redis_messages {
 							allow_everyone: true,
 						},
 					}]);
-				} catch (e) {
-					log_error(e, {
-						extra: {
-							key,
-							type,
-							value,
-						},
-						message: 'failed to handle key, cancelling migration',
-					});
+				} catch {
+					new_data.push([key, value]);
 				}
 			}
 
