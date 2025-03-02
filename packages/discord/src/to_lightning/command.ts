@@ -12,8 +12,14 @@ export function command_to(
 	let subcmd;
 
 	for (const opt of interaction.data.data.options || []) {
-		if (opt.type === 1) subcmd = opt.name;
-		if (opt.type === 3) opts[opt.name] = opt.value;
+		if (opt.type === 1) {
+			subcmd = opt.name;
+			for (const subopt of opt.options || []) {
+				if (subopt.type === 3) opts[subopt.name] = subopt.value;
+			}
+		} else if (opt.type === 3) {
+			opts[opt.name] = opt.value;
+		}
 	}
 
 	return {
