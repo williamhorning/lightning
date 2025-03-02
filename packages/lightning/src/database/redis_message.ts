@@ -1,13 +1,19 @@
-import type { RedisClient } from '@iuioiua/r2d2';
+import type { RedisClient } from '@iuioiua/redis';
 import type { bridge, bridge_message } from '../structures/bridge.ts';
 import { log_error } from '../structures/errors.ts';
 
 export class redis_messages {
 	static async migrate(rd: RedisClient): Promise<void> {
-		const db_data_version = await rd.sendCommand([
+		let db_data_version = await rd.sendCommand([
 			'GET',
 			'lightning-db-version',
 		]);
+
+		if (db_data_version === null) {
+			const number_keys = await rd.sendCommand(["DBSIZE"]) as number;
+
+			if (number_keys === 0) db_data_version = '0.8.0';
+		}
 
 		if (db_data_version !== '0.8.0') {
 			console.warn(
@@ -106,5 +112,27 @@ export class redis_messages {
 		return await this.get_json<bridge_message>(
 			`lightning-message-${id}`,
 		);
+	}
+
+	async migration_get_messages(): Promise<bridge_message[]> {
+		const keys = await this.redis.sendCommand([
+			'KEYS',
+			'lightning-message-*',
+		]) as string[];
+
+		const messages = [] as bridge_message[];
+
+		for (const key of keys) {
+			const message = await this.get_json<bridge_message>(key);
+			if (message) messages.push(message);
+		}
+
+		return messages;
+	}
+
+	async migration_set_messages(messages: bridge_message[]): Promise<void> {
+		for (const message of messages) {
+			await this.create_message(message);
+		}
 	}
 }

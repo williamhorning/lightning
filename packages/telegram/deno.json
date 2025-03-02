@@ -4,7 +4,7 @@
 	"exports": "./src/mod.ts",
 	"imports": {
 		"@jersey/lightning": "jsr:@jersey/lightning@^0.8.0",
-		"telegramify-markdown": "npm:telegramify-markdown@^1.2.2",
-		"grammy": "npm:grammy@^1.32.0"
+		"telegramify-markdown": "npm:telegramify-markdown@^1.2.4",
+		"grammy": "npm:grammy@^1.35.0"
 	}
 }

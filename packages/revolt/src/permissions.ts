@@ -43,7 +43,7 @@ export async function check_permissions(
 }
 
 async function server_permissions(
-	channel: Channel,
+	channel: Channel & { channel_type: 'TextChannel' },
 	client: Client,
 	bot_id: string,
 ) {

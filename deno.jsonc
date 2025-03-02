@@ -21,8 +21,6 @@
 	},
 	"workspace": [
 		"./packages/lightning",
-		// TODO(jersey)
-		"./packages/postgres",
 		"./packages/telegram",
 		"./packages/revolt",
 		"./packages/guilded",

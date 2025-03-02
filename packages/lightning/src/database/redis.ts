@@ -1,4 +1,4 @@
-import { RedisClient } from '@iuioiua/r2d2';
+import { RedisClient } from '@iuioiua/redis';
 import { ulid } from '@std/ulid';
 import type { bridge } from '../structures/bridge.ts';
 import type { bridge_data } from './mod.ts';
@@ -55,5 +55,46 @@ export class redis extends redis_messages implements bridge_data {
 		]);
 		if (!channel || channel === 'OK') return;
 		return await this.get_json<bridge>(`lightning-bridge-${channel}`);
+	}
+
+	async migration_get_bridges(): Promise<bridge[]> {
+		const keys = await this.redis.sendCommand([
+			'KEYS',
+			'lightning-bridge-*',
+		]) as string[];
+
+		const bridges = [] as bridge[];
+
+		for (const key of keys) {
+			const bridge = await this.get_bridge_by_id(
+				key.replace('lightning-bridge-', ''),
+			);
+
+			if (bridge) bridges.push(bridge);
+		}
+
+		return bridges;
+	}
+
+	async migration_set_bridges(bridges: bridge[]): Promise<void> {
+		for (const bridge of bridges) {
+			await this.redis.sendCommand([
+				'SET',
+				`lightning-bridge-${bridge.id}`,
+				JSON.stringify(bridge),
+			]);
+		}
+	}
+
+	static async migration_get_instance(): Promise<bridge_data> {
+		const hostname = prompt('Please enter your Redis hostname (localhost):') ||
+			'localhost';
+		const port = prompt('Please enter your Redis port (6379):') || '6379';
+
+		return await redis.create({
+			hostname,
+			port: parseInt(port),
+			transport: 'tcp',
+		});
 	}
 }

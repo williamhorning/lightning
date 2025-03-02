@@ -8,6 +8,7 @@ export type { ClientOptions as postgres_config };
 export class postgres implements bridge_data {
 	static async create(pg_options: ClientOptions): Promise<bridge_data> {
 		const pg = new Client(pg_options);
+
 		await pg.connect();
 		await pg.queryArray`
             CREATE TABLE IF NOT EXISTS lightning (
@@ -35,6 +36,7 @@ export class postgres implements bridge_data {
                 settings  JSONB NOT NULL
             );
         `;
+
 		return new this(pg);
 	}
 
@@ -119,5 +121,59 @@ export class postgres implements bridge_data {
         `);
 
 		return res.rows[0];
+	}
+
+	async migration_get_bridges(): Promise<bridge[]> {
+		const res = await this.pg.queryObject<bridge>(`
+            SELECT * FROM bridges
+        `);
+
+		return res.rows;
+	}
+
+	async migration_get_messages(): Promise<bridge_message[]> {
+		const res = await this.pg.queryObject<bridge_message>(`
+            SELECT * FROM bridge_messages
+        `);
+
+		return res.rows;
+	}
+
+	async migration_set_messages(messages: bridge_message[]): Promise<void> {
+		for (const msg of messages) {
+			await this.create_message(msg);
+		}
+	}
+
+	async migration_set_bridges(bridges: bridge[]): Promise<void> {
+		for (const br of bridges) {
+			await this.pg.queryArray`
+                INSERT INTO bridges (id, name, channels, settings)
+                VALUES (${br.id}, ${br.name}, ${JSON.stringify(br.channels)}, ${
+				JSON.stringify(br.settings)
+			})
+            `;
+		}
+	}
+
+	static async migration_get_instance(): Promise<bridge_data> {
+		const pg_user = prompt('Please enter your Postgres username (server):') ||
+			'server';
+		const pg_password =
+			prompt('Please enter your Postgres password (password):') || 'password';
+		const pg_host = prompt('Please enter your Postgres host (localhost):') ||
+			'localhost';
+		const pg_port = prompt('Please enter your Postgres port (5432):') ||
+			'5432';
+		const pg_db = prompt('Please enter your Postgres database (lightning):') ||
+			'lightning';
+
+		return await postgres.create({
+			user: pg_user,
+			password: pg_password,
+			hostname: pg_host,
+			port: parseInt(pg_port),
+			database: pg_db,
+		});
 	}
 }

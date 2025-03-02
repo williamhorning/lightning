@@ -27,7 +27,7 @@ export async function to_lightning(
 		content: message.content ?? undefined,
 		embeds: (message.embeds as Embed[] | undefined)?.map<embed>((i) => {
 			return {
-				color: i.colour ? parseInt(i.colour.replace('#', ''), 16) : undefined,
+				color: "colour" in i && i.colour ? parseInt(i.colour.replace('#', ''), 16) : undefined,
 				...i,
 			} as embed;
 		}),

@@ -1,5 +1,5 @@
 import { type Collection, type ConnectOptions, MongoClient } from '@db/mongo';
-import { RedisClient } from '@iuioiua/r2d2';
+import { RedisClient } from '@iuioiua/redis';
 import { ulid } from '@std/ulid';
 import type { bridge } from '../structures/bridge.ts';
 import { log_error } from '../structures/errors.ts';
@@ -77,5 +77,35 @@ export class mongo extends redis_messages implements bridge_data {
 				}],
 			},
 		});
+	}
+
+	async migration_get_bridges(): Promise<bridge[]> {
+		return await this.bridges.find().toArray();
+	}
+
+	async migration_set_bridges(bridges: bridge[]): Promise<void> {
+		await this.bridges.insertMany(bridges.map((b) => ({ _id: b.id, ...b })));
+	}
+
+	static async migration_get_instance(): Promise<bridge_data> {
+		const redis_hostname =
+			prompt('Please enter your Redis hostname (localhost):') || 'localhost';
+		const redis_port = prompt('Please enter your Redis port (6379):') ||
+			'6379';
+		const mongo_str = prompt(
+			'Please enter your MongoDB connection string (mongodb://localhost:27017):',
+		) ||
+			'mongodb://localhost:27017';
+
+		const redis = new RedisClient(
+			await Deno.connect({
+				hostname: redis_hostname,
+				port: parseInt(redis_port),
+			}),
+		);
+		const client = new MongoClient();
+		await client.connect(mongo_str);
+
+		return new mongo(client.database('lightning').collection('bridges'), redis);
 	}
 }
