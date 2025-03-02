@@ -83,6 +83,14 @@ export class redis extends redis_messages implements bridge_data {
 				`lightning-bridge-${bridge.id}`,
 				JSON.stringify(bridge),
 			]);
+
+			for (const channel of bridge.channels) {
+				await this.redis.sendCommand([
+					'SET',
+					`lightning-bchannel-${channel.id}`,
+					bridge.id,
+				]);
+			};
 		}
 	}
 

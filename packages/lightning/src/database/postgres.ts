@@ -10,6 +10,12 @@ export class postgres implements bridge_data {
 		const pg = new Client(pg_options);
 
 		await pg.connect();
+		await postgres.setup_schema(pg);
+
+		return new this(pg);
+	}
+
+	private static async setup_schema(pg: Client) {
 		await pg.queryArray`
             CREATE TABLE IF NOT EXISTS lightning (
                 prop  TEXT PRIMARY KEY,
@@ -36,8 +42,6 @@ export class postgres implements bridge_data {
                 settings  JSONB NOT NULL
             );
         `;
-
-		return new this(pg);
 	}
 
 	private constructor(private pg: Client) {}
@@ -141,7 +145,11 @@ export class postgres implements bridge_data {
 
 	async migration_set_messages(messages: bridge_message[]): Promise<void> {
 		for (const msg of messages) {
-			await this.create_message(msg);
+			try {
+				await this.create_message(msg);
+			} catch {
+				console.warn(`failed to insert message ${msg.id}`);
+			}
 		}
 	}
 

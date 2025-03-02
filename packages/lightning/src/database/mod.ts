@@ -73,14 +73,14 @@ export async function handle_migration() {
 	console.log('Downloading bridges...');
 	let bridges = await start.migration_get_bridges();
 
-	console.log('Setting bridges...');
+	console.log(`Copying ${bridges.length} bridges...`);
 	await end.migration_set_bridges(bridges);
 	bridges = [];
 
 	console.log('Downloading messages...');
 	let messages = await start.migration_get_messages();
 
-	console.log('Setting messages...');
+	console.log(`Copying ${messages.length} messages...`);
 	await end.migration_set_messages(messages);
 	messages = [];
 

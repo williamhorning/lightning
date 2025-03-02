@@ -134,5 +134,7 @@ export class redis_messages {
 		for (const message of messages) {
 			await this.create_message(message);
 		}
+
+		await this.redis.sendCommand(['SET', 'lightning-db-version', '0.8.0']);
 	}
 }
