@@ -29,10 +29,19 @@ export class redis extends redis_messages implements bridge_data {
 	}
 
 	async edit_bridge(br: bridge): Promise<void> {
+		const old_bridge = await this.get_bridge_by_id(br.id);
+
+		for (const channel of old_bridge?.channels || []) {
+			await this.redis.sendCommand([
+				'DEL',
+				`lightning-bchannel-${channel.id}`,
+			]);
+		}
+
 		await this.redis.sendCommand([
 			'SET',
 			`lightning-bridge-${br.id}`,
-			JSON.stringify({ ...br, name }),
+			JSON.stringify(br),
 		]);
 
 		for (const channel of br.channels) {

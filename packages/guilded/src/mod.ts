@@ -38,7 +38,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 	private setup_events() {
 		this.bot.on('ready', () => {
-			console.log(`[bolt-guilded] logged in as ${this.bot.user?.name}`);
+			console.log(`[bolt-guilded] ready as ${this.bot.user?.name}`);
 		});
 		this.bot.on('messageCreated', async (message) => {
 			const msg = await guilded_to_message(message, this.bot);

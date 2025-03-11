@@ -47,18 +47,22 @@ function map_embeds(embeds?: embed[]): SendableEmbed[] | undefined {
 
 	return embeds.map((embed) => {
 		const data: SendableEmbed = {
-			colour: `#${embed.color?.toString(16)}`,
-			description: embed.description,
-			icon_url: embed.author?.icon_url,
-			media: embed.image?.url,
-			title: embed.title,
-			url: embed.url,
+			icon_url: embed.author?.icon_url ?? null,
+			url: embed.url ?? null,
+			title: embed.title ?? null,
+			description: embed.description ?? '',
+			media: embed.image?.url ?? null,
+			colour: embed.color ? `#${embed.color.toString(16)}` : null,
 		};
 
 		if (embed.fields) {
 			for (const field of embed.fields) {
 				data.description += `\n\n**${field.name}**\n${field.value}`;
 			}
+		}
+
+		if (data.description?.length === 0) {
+			data.description = null;
 		}
 
 		return data;

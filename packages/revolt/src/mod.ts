@@ -33,8 +33,9 @@ export class revolt_plugin extends plugin<revolt_config> {
 
 	private setup_events() {
 		this.bot.bonfire.on('Ready', (ready) => {
-			console.log(`[bolt-revolt] ready in ${ready.channels.length} channels`);
-			console.log(`[bolt-revolt] and ${ready.servers.length} servers`);
+			console.log(
+				`[bolt-revolt] ready in ${ready.channels.length} channels and ${ready.servers.length} servers`,
+			);
 		});
 
 		this.bot.bonfire.on('Message', async (msg) => {
@@ -46,9 +47,24 @@ export class revolt_plugin extends plugin<revolt_config> {
 		this.bot.bonfire.on('MessageUpdate', async (msg) => {
 			if (!msg.channel || msg.channel === 'undefined') return;
 
+			let old_msg: Message;
+
+			try {
+				old_msg = await this.bot.request(
+					'get',
+					`/channels/${msg.channel}/messages/${msg.id}`,
+					undefined,
+				) as Message;
+			} catch {
+				return;
+			}
+
 			this.emit(
 				'edit_message',
-				await to_lightning(this.bot, msg.data as Message),
+				await to_lightning(this.bot, {
+					...old_msg,
+					...msg.data,
+				}),
 			);
 		});
 

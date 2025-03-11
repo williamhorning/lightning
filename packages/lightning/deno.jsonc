@@ -3,7 +3,8 @@
 	"version": "0.8.0",
 	"exports": "./src/mod.ts",
 	"imports": {
-		// TODO(jersey): get updated @db/mongo w/updated web_bson
+		// TODO(jersey): get @db/mongo@^0.34.0 on JSR
+		// TODO(jersey): get updated @db/postgres on JSR
 		"@db/mongo": "jsr:@db/mongo@^0.33.0",
 		"@db/postgres": "jsr:@jersey/test@0.8.6",
 		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",

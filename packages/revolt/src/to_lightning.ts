@@ -1,14 +1,9 @@
-import type {
-	Channel,
-	Embed,
-	Member,
-	Message,
-	User,
-} from '@jersey/revolt-api-types';
+import type { Channel, Embed, Message, User } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
 import type { embed, message, message_author } from '@jersey/lightning';
 import { decodeTime } from '@std/ulid';
 import { to_revolt } from './to_revolt.ts';
+import { fetch_member } from './fetch_member.ts';
 
 export async function to_lightning(
 	api: Client,
@@ -27,7 +22,9 @@ export async function to_lightning(
 		content: message.content ?? undefined,
 		embeds: (message.embeds as Embed[] | undefined)?.map<embed>((i) => {
 			return {
-				color: "colour" in i && i.colour ? parseInt(i.colour.replace('#', ''), 16) : undefined,
+				color: 'colour' in i && i.colour
+					? parseInt(i.colour.replace('#', ''), 16)
+					: undefined,
 				...i,
 			} as embed;
 		}),
@@ -85,11 +82,7 @@ async function get_author(
 			return author_data;
 		} else {
 			try {
-				const member = await api.request(
-					'get',
-					`/servers/${channel.server}/members/${author_id}`,
-					undefined,
-				) as Member;
+				const member = await fetch_member(api, channel, author_id);
 
 				return {
 					...author_data,

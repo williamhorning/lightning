@@ -1,7 +1,8 @@
 import type { Client } from '@jersey/rvapi';
-import type { Channel, Member, Role, Server } from '@jersey/revolt-api-types';
+import type { Channel, Role, Server } from '@jersey/revolt-api-types';
 import { LightningError, log_error } from '@jersey/lightning';
 import { handle_error } from './error_handler.ts';
+import { fetch_member } from './fetch_member.ts';
 
 const permissions_to_check = [
 	1 << 23, // ManageMessages
@@ -24,12 +25,10 @@ export async function check_permissions(
 
 		if (channel.channel_type === 'Group') {
 			if (channel.permissions && (channel.permissions & permissions)) {
-				return channel;
+				return channel._id;
 			}
 
-			log_error(
-				'insufficient group permissions: missing ManageMessages and/or Masquerade',
-			);
+			log_error('missing ManageMessages and/or Masquerade permission');
 		} else if (channel.channel_type === 'TextChannel') {
 			return await server_permissions(channel, client, bot_id);
 		} else {
@@ -53,11 +52,7 @@ async function server_permissions(
 		undefined,
 	) as Server;
 
-	const member = await client.request(
-		'get',
-		`/servers/${channel.server}/members/${bot_id}`,
-		undefined,
-	) as Member;
+	const member = await fetch_member(client, channel, bot_id);
 
 	// check server permissions
 	let total_permissions = server.default_permissions;
@@ -87,9 +82,7 @@ async function server_permissions(
 		}
 	}
 
-	if (total_permissions & permissions) return channel;
+	if (total_permissions & permissions) return channel._id;
 
-	log_error(
-		'insufficient group permissions: missing ManageMessages and/or Masquerade',
-	);
+	log_error('missing ManageMessages and/or Masquerade permission');
 }
