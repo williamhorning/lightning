@@ -14,6 +14,15 @@ export type mongo_config = {
 export class mongo extends redis_messages implements bridge_data {
 	static async create(opts: mongo_config) {
 		const client = new MongoClient();
+
+		if (
+			typeof opts.database === 'string' && opts.database.includes('localhost')
+		) {
+			console.warn(
+				"[lightning-mongo] if MongoDB doesn't connect, please replace localhost with 127.0.0.1 and try again",
+			);
+		}
+
 		await client.connect(opts.database);
 
 		const database = client.database();
