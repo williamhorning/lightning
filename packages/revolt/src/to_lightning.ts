@@ -14,7 +14,7 @@ export async function to_lightning(
 			return {
 				file: `https://autumn.revolt.chat/attachments/${i._id}/${i.filename}`,
 				name: i.filename,
-				size: i.size,
+				size: i.size / 1048576,
 			};
 		}),
 		author: await get_author(api, message.author, message.channel),

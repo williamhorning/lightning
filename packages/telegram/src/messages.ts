@@ -56,7 +56,8 @@ export async function from_telegram(
 				...base,
 				attachments: [{
 					file: `${cfg.plugin_url}/${file.file_path}`,
-					size: (file.file_size ?? 0) / 1000000,
+					name: file.file_path,
+					size: (file.file_size ?? 0) / 1048576,
 				}],
 			};
 		}
