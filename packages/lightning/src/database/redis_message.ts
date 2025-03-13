@@ -42,7 +42,7 @@ export class redis_messages {
 						messages: parsed.messages,
 						name: `migrated bridge ${parsed.id}`,
 						settings: {
-							allow_editing: parsed.allow_editing,
+							allow_editing: true,
 							use_rawname: parsed.use_rawname,
 							allow_everyone: true,
 						},
