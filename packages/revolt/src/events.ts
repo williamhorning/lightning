@@ -10,7 +10,7 @@ export function setup_events(
 ) {
 	bot.bonfire.on('Ready', (ready) => {
 		console.log(
-			`[bolt-revolt] ready in ${ready.channels.length} channels and ${ready.servers.length} servers`,
+			`[revolt] ready in ${ready.channels.length} channels and ${ready.servers.length} servers`,
 		);
 	});
 
@@ -54,7 +54,7 @@ export function setup_events(
 	});
 
 	bot.bonfire.on('socket_close', (info) => {
-		console.warn('[bolt-revolt] socket closed', info);
+		console.warn('[revolt] socket closed', info);
 		bot = createClient(config);
 		setup_events(bot, config, emit);
 	});

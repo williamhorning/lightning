@@ -4,8 +4,8 @@ export function setup_file_proxy(config: telegram_config) {
 	Deno.serve({
 		port: config.proxy_port,
 		onListen: ({ port }) => {
-			console.log(`[bolt-telegram] file proxy listening on localhost:${port}`);
-			console.log(`[bolt-telegram] also available at: ${config.proxy_url}`);
+			console.log(`[telegram] file proxy listening on localhost:${port}`);
+			console.log(`[telegram] also available at: ${config.proxy_url}`);
 		},
 	}, (req: Request) => {
 		const { pathname } = new URL(req.url);

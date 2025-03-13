@@ -5,7 +5,7 @@ import type { guilded_plugin } from './mod.ts';
 export function setup_events(bot: Client, emit: guilded_plugin['emit']) {
 	// @ts-ignore deno isn't properly handling the eventemitter code
 	bot.on('ready', () => {
-		console.log(`[bolt-guilded] ready as ${bot.user?.name}`);
+		console.log(`[guilded] ready as ${bot.user?.name}`);
 	});
 	// @ts-ignore deno isn't properly handling the eventemitter code
 	bot.on('messageCreated', async (message) => {

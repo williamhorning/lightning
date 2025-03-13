@@ -11,7 +11,7 @@ export function setup_events(
 	// @ts-ignore deno isn't properly handling the eventemitter code
 	client.once(GatewayDispatchEvents.Ready, ({ data }) => {
 		console.log(
-			`[bolt-discord] ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length} guilds`,
+			`[discord] ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length} guilds`,
 		);
 	});
 	// @ts-ignore deno isn't properly handling the eventemitter code
