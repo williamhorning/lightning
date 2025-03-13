@@ -8,7 +8,7 @@ export interface create_command extends Omit<Omit<command_opts, 'args'>, 'lightn
 	/** the subcommand, if any, to use */
 	subcommand?: string;
 	/** arguments, if any, to use */
-	args?: Record<string, string>;
+	args?: Record<string, string | undefined>;
 	/** extra string options */
 	rest?: string[];
 	/** event reply function */

@@ -4,9 +4,8 @@
 	"license": "MIT",
 	"exports": "./src/mod.ts",
 	"imports": {
-		// TODO(jersey): get @db/mongo@^0.34.0 on JSR
+		"@db/mongo": "jsr:@db/mongo@^0.34.0",
 		// TODO(jersey): get updated @db/postgres on JSR
-		"@db/mongo": "jsr:@db/mongo@^0.33.0",
 		"@db/postgres": "jsr:@jersey/test@0.8.6",
 		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",
 		"@iuioiua/redis": "jsr:@iuioiua/redis@^1.0.1",

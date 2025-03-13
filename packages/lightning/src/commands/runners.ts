@@ -39,7 +39,7 @@ export async function run_command(
 
 	for (const arg of command.arguments || []) {
 		if (!opts.args[arg.name]) {
-			opts.args[arg.name] = opts.rest?.shift() as string;
+			opts.args[arg.name] = opts.rest?.shift();
 		}
 
 		if (!opts.args[arg.name]) {
@@ -57,15 +57,15 @@ export async function run_command(
 	try {
 		resp = await command.execute({
 			...opts,
-			args: opts.args,
+			args: opts.args as Record<string, string>,
 			lightning
 		});
 	} catch (e) {
 		if (e instanceof LightningError) resp = e;
-		else {resp = new LightningError(e, {
-				message: 'An error occurred while executing the command',
-				extra: { command: command.name },
-			});}
+		else resp = new LightningError(e, {
+			message: 'An error occurred while executing the command',
+			extra: { command: command.name },
+		});
 	}
 
 	try {
