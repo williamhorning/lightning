@@ -15,12 +15,12 @@ export async function fetch_author(
 			calculateUserDefaultAvatarIndex(message.author.id)
 		}.png`;
 
-	let username = message.author.global_name ?? message.author.username;
+	let username = message.author.global_name || message.author.username;
 
 	if (message.guild_id) {
 		try {
 			// remove type assertion once deno resolves the return type for getMember properly
-			const member = message.member ?? await api.guilds.getMember(
+			const member = message.member || await api.guilds.getMember(
 				message.guild_id,
 				message.author.id,
 			) as APIGuildMember;
