@@ -57,8 +57,6 @@ export interface message_author {
 	rawname: string;
 	/** a url pointing to the authors profile picture */
 	profile?: string;
-	/** a url pointing to the authors banner */
-	banner?: string;
 	/** the author's id */
 	id: string;
 	/** the color of an author */

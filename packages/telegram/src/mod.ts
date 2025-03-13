@@ -6,18 +6,18 @@ import {
 	plugin,
 } from '@jersey/lightning';
 import { Bot } from 'grammy';
-import { from_lightning, from_telegram } from './messages.ts';
-import { file_proxy } from './file_proxy.ts';
+import { get_lightning_message, get_telegram_message } from './messages.ts';
+import { setup_file_proxy } from './file_proxy.ts';
 
 /** options for the telegram plugin */
-export type telegram_config = {
+export interface telegram_config {
 	/** the token for the bot */
 	bot_token: string;
 	/** the port the plugins proxy will run on */
-	plugin_port: number;
+	proxy_port: number;
 	/** the publically accessible url of the plugin */
-	plugin_url: string;
-};
+	proxy_url: string;
+}
 
 /** the plugin to use */
 export class telegram_plugin extends plugin<telegram_config> {
@@ -28,17 +28,17 @@ export class telegram_plugin extends plugin<telegram_config> {
 		super(l, cfg);
 		this.bot = new Bot(cfg.bot_token);
 		this.bot.on('message', async (ctx) => {
-			const msg = await from_telegram(ctx, cfg);
+			const msg = await get_telegram_message(ctx, cfg);
 			if (!msg) return;
 			this.emit('create_message', msg);
 		});
 		this.bot.on('edited_message', async (ctx) => {
-			const msg = await from_telegram(ctx, cfg);
+			const msg = await get_telegram_message(ctx, cfg);
 			if (!msg) return;
 			this.emit('edit_message', msg);
 		});
 		// turns out it's impossible to deal with messages being deleted due to tdlib/telegram-bot-api#286
-		file_proxy(cfg);
+		setup_file_proxy(cfg);
 		this.bot.start();
 	}
 
@@ -48,10 +48,9 @@ export class telegram_plugin extends plugin<telegram_config> {
 	}
 
 	async create_message(opts: create_opts): Promise<string[]> {
-		const content = from_lightning(opts.msg);
 		const messages = [];
 
-		for (const msg of content) {
+		for (const msg of get_lightning_message(opts.msg)) {
 			const result = await this.bot.api[msg.function](
 				opts.channel.id,
 				msg.value,
@@ -72,12 +71,10 @@ export class telegram_plugin extends plugin<telegram_config> {
 	}
 
 	async edit_message(opts: edit_opts): Promise<string[]> {
-		const content = from_lightning(opts.msg)[0];
-
 		await this.bot.api.editMessageText(
 			opts.channel.id,
 			Number(opts.edit_ids[0]),
-			content.value,
+			get_lightning_message(opts.msg)[0].value,
 			{
 				parse_mode: 'MarkdownV2',
 			},

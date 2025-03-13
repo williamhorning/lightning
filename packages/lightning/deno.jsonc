@@ -1,6 +1,7 @@
 {
 	"name": "@jersey/lightning",
 	"version": "0.8.0",
+	"license": "MIT",
 	"exports": "./src/mod.ts",
 	"imports": {
 		// TODO(jersey): get @db/mongo@^0.34.0 on JSR
@@ -9,8 +10,8 @@
 		"@db/postgres": "jsr:@jersey/test@0.8.6",
 		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",
 		"@iuioiua/redis": "jsr:@iuioiua/redis@^1.0.1",
-		"@std/cli/parse-args": "jsr:@std/cli@^1.0.3/parse-args",
-		"@std/path": "jsr:@std/path@^1.0.0",
+		"@std/cli/parse-args": "jsr:@std/cli@^1.0.14/parse-args",
+		"@std/path": "jsr:@std/path@^1.0.8",
 		"@std/ulid": "jsr:@std/ulid@^1.0.0"
 	}
 }

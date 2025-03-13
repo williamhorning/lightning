@@ -2,7 +2,7 @@ import type { command_opts } from './commands.ts';
 import type { deleted_message, message } from './messages.ts';
 
 /** command execution event */
-export interface create_command extends Omit<command_opts, 'args'> {
+export interface create_command extends Omit<Omit<command_opts, 'args'>, 'lightning'> {
 	/** the command to run */
 	command: string;
 	/** the subcommand, if any, to use */

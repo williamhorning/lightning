@@ -1,15 +1,15 @@
 import type { Client } from '@jersey/rvapi';
 import type { Channel, Role, Server } from '@jersey/revolt-api-types';
 import { LightningError, log_error } from '@jersey/lightning';
-import { handle_error } from './error_handler.ts';
-import { fetch_member } from './fetch_member.ts';
+import { handle_error } from './errors.ts';
+import { fetch_member } from './member.ts';
 
-const permissions_to_check = [
+const permissions_bits = [
 	1 << 23, // ManageMessages
 	1 << 28, // Masquerade
 ];
 
-const permissions = permissions_to_check.reduce((a, b) => a | b, 0);
+const permissions = permissions_bits.reduce((a, b) => a | b, 0);
 
 export async function check_permissions(
 	channel_id: string,
@@ -58,14 +58,14 @@ async function server_permissions(
 	let total_permissions = server.default_permissions;
 
 	for (const role of (member.roles || [])) {
-		const { permissions: role_perms } = await client.request(
+		const { permissions: role_permissions } = await client.request(
 			'get',
 			`/servers/${channel.server}/roles/${role}`,
 			undefined,
 		) as Role;
 
-		total_permissions |= role_perms.a || 0;
-		total_permissions &= ~role_perms.d || 0;
+		total_permissions |= role_permissions.a || 0;
+		total_permissions &= ~role_permissions.d || 0;
 	}
 
 	// apply default allow/denies

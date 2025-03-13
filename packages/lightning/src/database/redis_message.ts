@@ -10,7 +10,7 @@ export class redis_messages {
 		]);
 
 		if (db_data_version === null) {
-			const number_keys = await rd.sendCommand(["DBSIZE"]) as number;
+			const number_keys = await rd.sendCommand(['DBSIZE']) as number;
 
 			if (number_keys === 0) db_data_version = '0.8.0';
 		}

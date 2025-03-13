@@ -99,7 +99,7 @@ export class redis extends redis_messages implements bridge_data {
 					`lightning-bchannel-${channel.id}`,
 					bridge.id,
 				]);
-			};
+			}
 		}
 	}
 

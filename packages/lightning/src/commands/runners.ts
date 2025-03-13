@@ -14,17 +14,16 @@ export async function execute_text_command(msg: message, lightning: lightning) {
 
 	return await run_command({
 		...msg,
-		lightning,
 		command: cmd as string,
 		rest: rest as string[],
-	});
+	}, lightning);
 }
 
 export async function run_command(
 	opts: create_command,
+	lightning: lightning
 ) {
-	let command = opts.lightning.commands.get(opts.command) ??
-		opts.lightning.commands.get('help')!;
+	let command = lightning.commands.get(opts.command) ?? lightning.commands.get('help')!;
 
 	const subcommand_name = opts.subcommand ?? opts.rest?.shift();
 
@@ -46,7 +45,7 @@ export async function run_command(
 		if (!opts.args[arg.name]) {
 			return opts.reply(
 				create_message(
-					`Please provide the \`${arg.name}\` argument. Try using the \`${opts.lightning.config.prefix}help\` command.`,
+					`Please provide the \`${arg.name}\` argument. Try using the \`${lightning.config.prefix}help\` command.`,
 				),
 				false,
 			);
@@ -59,6 +58,7 @@ export async function run_command(
 		resp = await command.execute({
 			...opts,
 			args: opts.args,
+			lightning
 		});
 	} catch (e) {
 		if (e instanceof LightningError) resp = e;

@@ -63,7 +63,7 @@ export class lightning {
 			}
 
 			if (name === 'create_command') {
-				run_command(value[0] as create_command);
+				run_command(value[0] as create_command, this);
 				continue;
 			}
 

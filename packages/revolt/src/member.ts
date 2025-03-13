@@ -1,36 +1,34 @@
 import type { Channel, Member } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
 
-interface member_map_value {
+const member_cache = new Map<`${string}/${string}`, {
 	value: Member;
 	expiry: number;
-}
-
-const member_map = new Map<string, member_map_value>();
+}>();
 
 export async function fetch_member(
 	client: Client,
 	channel: Channel & { channel_type: 'TextChannel' },
-	user_id: string,
+	user: string,
 ): Promise<Member> {
 	const time_now = Temporal.Now.instant().epochMilliseconds;
 
-	const member = member_map.get(user_id);
+	const member = member_cache.get(`${channel.server}/${user}`);
 
 	if (member && member.expiry > time_now) {
 		return member.value;
 	}
 
-	const member_resp = await client.request(
+	const response = await client.request(
 		'get',
-		`/servers/${channel.server}/members/${user_id}`,
+		`/servers/${channel.server}/members/${user}`,
 		undefined,
-	);
+	) as Member;
 
-	member_map.set(user_id, {
-		value: member_resp as Member,
+	member_cache.set(`${channel.server}/${user}`, {
+		value: response,
 		expiry: time_now + 300000,
 	});
 
-	return member_resp as Member;
+	return response;
 }

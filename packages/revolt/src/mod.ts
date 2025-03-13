@@ -7,10 +7,10 @@ import {
 } from '@jersey/lightning';
 import { type Client, createClient } from '@jersey/rvapi';
 import type { Message } from '@jersey/revolt-api-types';
-import { handle_error } from './error_handler.ts';
+import { handle_error } from './errors.ts';
 import { check_permissions } from './permissions.ts';
-import { to_revolt } from './to_revolt.ts';
-import { to_lightning } from './to_lightning.ts';
+import { get_revolt_message } from './messages.ts';
+import { setup_events } from './events.ts';
 
 /** the config for the revolt plugin */
 export interface revolt_config {
@@ -28,60 +28,7 @@ export class revolt_plugin extends plugin<revolt_config> {
 	constructor(l: lightning, config: revolt_config) {
 		super(l, config);
 		this.bot = createClient(config);
-		this.setup_events();
-	}
-
-	private setup_events() {
-		this.bot.bonfire.on('Ready', (ready) => {
-			console.log(
-				`[bolt-revolt] ready in ${ready.channels.length} channels and ${ready.servers.length} servers`,
-			);
-		});
-
-		this.bot.bonfire.on('Message', async (msg) => {
-			if (!msg.channel || msg.channel === 'undefined') return;
-
-			this.emit('create_message', await to_lightning(this.bot, msg));
-		});
-
-		this.bot.bonfire.on('MessageUpdate', async (msg) => {
-			if (!msg.channel || msg.channel === 'undefined') return;
-
-			let old_msg: Message;
-
-			try {
-				old_msg = await this.bot.request(
-					'get',
-					`/channels/${msg.channel}/messages/${msg.id}`,
-					undefined,
-				) as Message;
-			} catch {
-				return;
-			}
-
-			this.emit(
-				'edit_message',
-				await to_lightning(this.bot, {
-					...old_msg,
-					...msg.data,
-				}),
-			);
-		});
-
-		this.bot.bonfire.on('MessageDelete', (msg) => {
-			this.emit('delete_message', {
-				channel: msg.channel,
-				id: msg.id,
-				timestamp: Temporal.Now.instant(),
-				plugin: 'bolt-revolt',
-			});
-		});
-
-		this.bot.bonfire.on('socket_close', (info) => {
-			console.warn('[bolt-revolt] socket closed', info);
-			this.bot = createClient(this.config);
-			this.setup_events();
-		});
+		setup_events(this.bot, config, this.emit);
 	}
 
 	async setup_channel(channel: string): Promise<unknown> {
@@ -93,7 +40,7 @@ export class revolt_plugin extends plugin<revolt_config> {
 			const { _id } = (await this.bot.request(
 				'post',
 				`/channels/${opts.channel.id}/messages`,
-				await to_revolt(this.bot, opts.msg, true),
+				await get_revolt_message(this.bot, opts.msg, true),
 			)) as Message;
 
 			return [_id];
@@ -107,7 +54,7 @@ export class revolt_plugin extends plugin<revolt_config> {
 			await this.bot.request(
 				'patch',
 				`/channels/${opts.channel.id}/messages/${opts.edit_ids[0]}`,
-				await to_revolt(this.bot, opts.msg, true),
+				await get_revolt_message(this.bot, opts.msg, true),
 			);
 
 			return opts.edit_ids;

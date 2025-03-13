@@ -1,3 +1,4 @@
+import { WebhookClient } from '@guildedjs/api';
 import {
 	type create_opts,
 	type delete_opts,
@@ -6,10 +7,10 @@ import {
 	log_error,
 	plugin,
 } from '@jersey/lightning';
-import { Client, WebhookClient } from 'guilded.js';
-import { error_handler } from './error_handler.ts';
-import { convert_msg } from './guilded.ts';
-import { guilded_to_message } from './guilded_message/mod.ts';
+import { Client } from 'guilded.js';
+import { handle_error } from './errors.ts';
+import { setup_events } from './events.ts';
+import { get_guilded_message } from './messages.ts';
 
 /** options for the guilded plugin */
 export interface guilded_config {
@@ -32,33 +33,9 @@ export class guilded_plugin extends plugin<guilded_config> {
 		};
 
 		this.bot = new Client({ token: c.token, ws: opts, rest: opts });
-		this.setup_events();
-		this.bot.login();
-	}
 
-	private setup_events() {
-		this.bot.on('ready', () => {
-			console.log(`[bolt-guilded] ready as ${this.bot.user?.name}`);
-		});
-		this.bot.on('messageCreated', async (message) => {
-			const msg = await guilded_to_message(message, this.bot);
-			if (msg) this.emit('create_message', msg);
-		});
-		this.bot.on('messageUpdated', async (message) => {
-			const msg = await guilded_to_message(message, this.bot);
-			if (msg) this.emit('edit_message', msg);
-		});
-		this.bot.on('messageDeleted', (del) => {
-			this.emit('delete_message', {
-				channel: del.channelId,
-				id: del.id,
-				plugin: 'bolt-guilded',
-				timestamp: Temporal.Instant.from(del.deletedAt),
-			});
-		});
-		this.bot.ws.emitter.on('exit', () => {
-			this.bot.ws.connect();
-		});
+		setup_events(this.bot, this.emit);
+		this.bot.login();
 	}
 
 	async setup_channel(channel: string): Promise<unknown> {
@@ -76,7 +53,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 			return { id: webhook.id, token: webhook.token };
 		} catch (e) {
-			return error_handler(e, channel, 'creating webhook');
+			return handle_error(e, channel);
 		}
 	}
 
@@ -87,7 +64,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 			);
 
 			const res = await webhook.send(
-				await convert_msg(
+				await get_guilded_message(
 					opts.msg,
 					opts.channel.id,
 					this.bot,
@@ -97,13 +74,13 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 			return [res.id];
 		} catch (e) {
-			return error_handler(e, opts.channel.id, 'creating message');
+			return handle_error(e, opts.channel.id);
 		}
 	}
 
+	// guilded doesn't support editing messages
 	// deno-lint-ignore require-await
 	async edit_message(opts: edit_opts): Promise<string[]> {
-		// guilded does not support editing messages
 		return opts.edit_ids;
 	}
 
@@ -113,7 +90,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 			return opts.edit_ids;
 		} catch (e) {
-			return error_handler(e, opts.channel.id, 'deleting message');
+			return handle_error(e, opts.channel.id, true);
 		}
 	}
 }
