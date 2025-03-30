@@ -2,13 +2,12 @@
 
 lightning-plugin-guilded is a plugin for
 [lightning](https://williamhorning.eu.org/lightning) that adds support for
-telegram
+guilded
 
 ## example config
 
 ```ts
-import type { config } from 'jsr:@jersey/lightning@0.7.4';
-import { guilded_plugin } from 'jsr:@jersey/lightning-plugin-guilded@0.7.4';
+import { guilded_plugin } from 'jsr:@jersey/lightning-plugin-guilded@0.8.0';
 
 export default {
 	plugins: [
@@ -16,5 +15,5 @@ export default {
 			token: 'your_token',
 		}),
 	],
-} as config;
+};
 ```

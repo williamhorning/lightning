@@ -1,4 +1,3 @@
-import { WebhookClient } from '@guildedjs/api';
 import {
 	type create_opts,
 	type delete_opts,
@@ -7,10 +6,10 @@ import {
 	log_error,
 	plugin,
 } from '@jersey/lightning';
-import { Client } from 'guilded.js';
 import { handle_error } from './errors.ts';
-import { setup_events } from './events.ts';
-import { get_guilded_message } from './messages.ts';
+import { get_guilded_message, get_lightning_message } from './messages.ts';
+import { type Client, createClient } from '@jersey/guildapi';
+import type { ServerChannel } from '@jersey/guilded-api-types';
 
 /** options for the guilded plugin */
 export interface guilded_config {
@@ -26,28 +25,54 @@ export class guilded_plugin extends plugin<guilded_config> {
 	constructor(l: lightning, c: guilded_config) {
 		super(l, c);
 
-		const opts = {
-			headers: {
-				'x-guilded-bot-api-use-official-markdown': 'true',
-			},
-		};
+		this.bot = createClient(c.token);
 
-		this.bot = new Client({ token: c.token, ws: opts, rest: opts });
+		this.bot.socket.on('ready', (user) => {
+			console.log(`[guilded] ready as ${user.name}`);
+		});
 
-		setup_events(this.bot, this.emit);
-		this.bot.login();
+		this.bot.socket.on('ChatMessageCreated', async ({ d: { message } }) => {
+			const msg = await get_lightning_message(message, this.bot);
+			if (msg) this.emit('create_message', msg);
+		});
+
+		this.bot.socket.on('ChatMessageUpdated', async ({ d: { message } }) => {
+			const msg = await get_lightning_message(message, this.bot);
+			if (msg) this.emit('edit_message', msg);
+		});
+
+		this.bot.socket.on('ChatMessageDeleted', ({ d: { message } }) => {
+			this.emit('delete_message', {
+				channel: message.channelId,
+				id: message.id,
+				plugin: 'bolt-guilded',
+				timestamp: Temporal.Instant.from(message.deletedAt),
+			});
+		});
+
+		this.bot.socket.connect();
 	}
 
 	async setup_channel(channel: string): Promise<unknown> {
 		try {
-			const { serverId } = await this.bot.channels.fetch(channel);
-			const webhook = await this.bot.webhooks.create(serverId, {
-				channelId: channel,
-				name: 'Lightning Bridges',
-			});
+			const { channel: { serverId } } = await this.bot.request(
+				'get',
+				`/channels/${channel}`,
+				undefined,
+			) as { channel: ServerChannel };
+
+			const { webhook } = await this.bot.request(
+				'post',
+				`/servers/${serverId}/webhooks`,
+				{
+					channelId: channel,
+					name: 'Lightning Bridges',
+				},
+			);
+
 			if (!webhook.id || !webhook.token) {
 				log_error('failed to create webhook: missing id or token', {
-					extra: { webhook: webhook.raw },
+					extra: { webhook: webhook },
 				});
 			}
 
@@ -59,18 +84,21 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 	async create_message(opts: create_opts): Promise<string[]> {
 		try {
-			const webhook = new WebhookClient(
-				opts.channel.data as { id: string; token: string },
-			);
-
-			const res = await webhook.send(
-				await get_guilded_message(
-					opts.msg,
-					opts.channel.id,
-					this.bot,
-					opts.settings.allow_everyone,
-				),
-			);
+			const data = opts.channel.data as { id: string; token: string };
+			const res = await (await fetch(
+				`https://media.guilded.gg/webhooks/${data.id}/${data.token}`,
+				{
+					method: 'POST',
+					body: JSON.stringify(
+						await get_guilded_message(
+							opts.msg,
+							opts.channel.id,
+							this.bot,
+							opts.settings.allow_everyone,
+						),
+					),
+				},
+			)).json();
 
 			return [res.id];
 		} catch (e) {
@@ -86,7 +114,12 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 	async delete_message(opts: delete_opts): Promise<string[]> {
 		try {
-			await this.bot.messages.delete(opts.channel.id, opts.edit_ids[0]);
+			await this.bot.request(
+				'delete',
+				// @ts-expect-error: guilded's openapi spec is really bad
+				`/channels/${opts.channel}/messages/${opts.edit_ids[0]}`,
+				undefined,
+			);
 
 			return opts.edit_ids;
 		} catch (e) {

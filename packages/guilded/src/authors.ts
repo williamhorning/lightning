@@ -1,56 +1,44 @@
 import type { message, message_author } from '@jersey/lightning';
-import type { Client, Message } from 'guilded.js';
+import type { Client } from '@jersey/guildapi';
+import type { ChatMessage, ServerMember } from '@jersey/guilded-api-types';
 
 export async function fetch_author(
-	msg: Message,
+	msg: ChatMessage,
 	bot: Client,
 ): Promise<message_author> {
-	if (!msg.createdByWebhookId && msg.authorId !== 'Ann6LewA') {
-		try {
-			const author = await bot.members.fetch(
-				msg.serverId!,
-				msg.authorId,
-			);
+	try {
+		if (!msg.createdByWebhookId) {
+			const author = await bot.request(
+				'get',
+				`/servers/${msg.serverId}/members/${msg.createdBy}`,
+				undefined,
+			) as ServerMember;
 
 			return {
-				username: author.nickname || author.username || author.user?.name ||
-					'Guilded User',
-				rawname: author.username || author.user?.name || 'Guilded User',
-				id: msg.authorId,
-				profile: author.user?.avatar || undefined,
+				username: author.nickname || author.user.name,
+				rawname: author.user.name,
+				id: msg.createdBy,
+				profile: author.user.avatar || undefined,
 			};
-		} catch {
-			return {
-				username: 'Guilded User',
-				rawname: 'GuildedUser',
-				id: msg.authorId,
-			};
-		}
-	} else if (msg.createdByWebhookId) {
-		try {
-			const webhook = await bot.webhooks.fetch(
-				msg.serverId!,
-				msg.createdByWebhookId,
+		} else {
+			const { webhook } = await bot.request(
+				'get',
+				`/servers/${msg.serverId}/webhooks/${msg.createdByWebhookId}`,
+				undefined,
 			);
 
 			return {
 				username: webhook.name,
 				rawname: webhook.name,
 				id: webhook.id,
-				profile: webhook.raw.avatar,
-			};
-		} catch {
-			return {
-				username: 'Guilded Webhook',
-				rawname: 'GuildedWebhook',
-				id: msg.createdByWebhookId,
+				profile: webhook.avatar,
 			};
 		}
-	} else {
+	} catch {
 		return {
 			username: 'Guilded User',
 			rawname: 'GuildedUser',
-			id: msg.authorId,
+			id: msg.createdByWebhookId ?? msg.createdBy,
 		};
 	}
 }

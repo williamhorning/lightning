@@ -1,26 +1,32 @@
-import type { WebhookMessageContent } from '@guildedjs/api';
 import type { message } from '@jersey/lightning';
-import type { Client, Message } from 'guilded.js';
+import type { Client } from '@jersey/guildapi';
 import { fetch_attachments } from './attachments.ts';
 import { fetch_author, get_valid_username } from './authors.ts';
 import { get_guilded_embeds, get_lightning_embeds } from './embeds.ts';
 import { fetch_reply_embed } from './replies.ts';
+import type { ChatEmbed, ChatMessage } from '@jersey/guilded-api-types';
 
-type guilded_webhook_payload = Exclude<WebhookMessageContent, string>;
+type webhook_payload = {
+	content?: string;
+	embeds?: ChatEmbed[];
+	replyMessageIds?: string[];
+	avatar_url?: string;
+	username?: string;
+};
 
 export async function get_lightning_message(
-	msg: Message,
+	msg: ChatMessage,
 	bot: Client,
 ): Promise<message | undefined> {
-	if (msg.serverId === null) return;
+	if (!msg.serverId) return;
 
-	let content = msg.content.replaceAll('\n```\n```\n', '\n');
+	let content = msg.content?.replaceAll('\n```\n```\n', '\n');
 
-	const urls = content.match(
+	const urls = content?.match(
 		/!\[.*\]\(https:\/\/cdn\.gldcdn\.com\/ContentMediaGenericFiles\/.*\)/gm,
 	) || [];
 
-	content = content.replaceAll(
+	content = content?.replaceAll(
 		/!\[.*\]\(https:\/\/cdn\.gldcdn\.com\/ContentMediaGenericFiles\/.*\)/gm,
 		'',
 	);
@@ -33,16 +39,22 @@ export async function get_lightning_message(
 		attachments: await fetch_attachments(bot, urls),
 		channel: msg.channelId,
 		id: msg.id,
-		timestamp: Temporal.Instant.fromEpochMilliseconds(
-			msg.createdAt.valueOf(),
+		timestamp: Temporal.Instant.from(
+			msg.createdAt,
 		),
 		embeds: get_lightning_embeds(msg.embeds),
 		plugin: 'bolt-guilded',
 		reply: async (reply: message) => {
-			await msg.reply(await get_guilded_message(reply));
+			await bot.request(
+				'post',
+				`/channels/${msg.channelId}/messages`,
+				await get_guilded_message(reply),
+			);
 		},
 		content,
-		reply_id: msg.isReply ? msg.replyMessageIds[0] : undefined,
+		reply_id: msg.replyMessageIds && msg.replyMessageIds.length > 0
+			? msg.replyMessageIds[0]
+			: undefined,
 	};
 }
 
@@ -51,8 +63,8 @@ export async function get_guilded_message(
 	channel?: string,
 	bot?: Client,
 	everyone = true,
-): Promise<guilded_webhook_payload> {
-	const message: guilded_webhook_payload = {
+): Promise<webhook_payload> {
+	const message: webhook_payload = {
 		content: msg.content,
 		avatar_url: msg.author.profile,
 		username: get_valid_username(msg),

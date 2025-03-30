@@ -5,7 +5,7 @@
 	"exports": "./src/mod.ts",
 	"imports": {
 		"@jersey/lightning": "jsr:@jersey/lightning@^0.8.0",
-		"guilded.js": "npm:guilded.js@^0.25.0",
-		"@guildedjs/api": "npm:@guildedjs/api@^0.4.0"
+		"@jersey/guildapi": "jsr:@jersey/guildapi@^0.0.1",
+		"@jersey/guilded-api-types": "jsr:@jersey/guilded-api-types@0.0.1"
 	}
 }

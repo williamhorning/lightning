@@ -20,14 +20,19 @@ export class redis_messages {
 				`[lightning-redis] migrating database from ${db_data_version} to 0.8.0`,
 			);
 
+			console.log('[lightning-redis] getting keys');
+
 			const all_keys = await rd.sendCommand([
 				'KEYS',
 				'lightning-*',
 			]) as string[];
 
+			console.log('[lightning-redis] got keys');
+
 			const new_data = [] as [string, bridge | bridge_message | string][];
 
 			for (const key of all_keys) {
+				console.log(`[lightning-redis] migrating key ${key}`);
 				const type = await rd.sendCommand(['TYPE', key]) as string;
 				const action = type === 'string' ? 'GET' : 'JSON.GET';
 				const value = await rd.sendCommand([action, key]) as string;
@@ -51,6 +56,11 @@ export class redis_messages {
 					new_data.push([key, value]);
 				}
 			}
+
+			Deno.writeTextFileSync(
+				'lightning-redis-migration.json',
+				JSON.stringify(new_data, null, 2),
+			);
 
 			console.warn('[lightning-redis] do you want to continue?');
 
