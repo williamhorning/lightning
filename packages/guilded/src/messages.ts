@@ -48,8 +48,8 @@ export async function get_lightning_message(
 			await bot.request(
 				'post',
 				`/channels/${msg.channelId}/messages`,
-				await get_guilded_message(reply),
-			);
+				{ content: reply.content! },
+			).catch(async e=>console.log(await e.cause.text()));
 		},
 		content,
 		reply_id: msg.replyMessageIds && msg.replyMessageIds.length > 0

@@ -27,5 +27,5 @@
 		"./packages/discord"
 	],
 	"lock": false,
-	"unstable": ["temporal"]
+	"unstable": ["net", "temporal"]
 }

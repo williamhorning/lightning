@@ -8,11 +8,11 @@ export async function fetch_author(
 ): Promise<message_author> {
 	try {
 		if (!msg.createdByWebhookId) {
-			const author = await bot.request(
+			const { member: author } = await bot.request(
 				'get',
 				`/servers/${msg.serverId}/members/${msg.createdBy}`,
 				undefined,
-			) as ServerMember;
+			) as { member: ServerMember };
 
 			return {
 				username: author.nickname || author.user.name,

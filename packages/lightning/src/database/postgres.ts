@@ -92,8 +92,7 @@ export class postgres implements bridge_data {
             (id, bridge_id, channels, messages, settings) VALUES
             (${msg.id}, ${msg.bridge_id}, ${JSON.stringify(msg.channels)}, ${
 			JSON.stringify(msg.messages)
-		}, ${JSON.stringify(msg.settings)})
-        `;
+		}, ${JSON.stringify(msg.settings)})`;
 	}
 
 	async edit_message(msg: bridge_message): Promise<void> {
@@ -112,15 +111,14 @@ export class postgres implements bridge_data {
         `;
 	}
 
+	// FIXME(jersey): this is horendously wrong somewhere
 	async get_message(id: string): Promise<bridge_message | undefined> {
 		const res = await this.pg.queryObject<bridge_message>(`
             SELECT * FROM bridge_messages
             WHERE id = '${id}' OR EXISTS (
                 SELECT 1 FROM jsonb_array_elements(messages) AS msg
-                WHERE EXISTS (
-                    SELECT 1 FROM jsonb_array_elements(msg->'id') AS id
-                    WHERE id = '${id}'
-                )
+				CROSS JOIN jsonb_array_elements_text(msg->'id') AS id_element
+                WHERE id_element = '${id}'
             )
         `);
 

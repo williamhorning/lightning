@@ -8,7 +8,7 @@ import {
 } from '@jersey/lightning';
 import { handle_error } from './errors.ts';
 import { get_guilded_message, get_lightning_message } from './messages.ts';
-import { type Client, createClient } from '@jersey/guildapi';
+import { type Client, createClient, SocketManager } from '@jersey/guildapi';
 import type { ServerChannel } from '@jersey/guilded-api-types';
 
 /** options for the guilded plugin */
@@ -26,6 +26,11 @@ export class guilded_plugin extends plugin<guilded_config> {
 		super(l, c);
 
 		this.bot = createClient(c.token);
+
+		this.bot.socket = new SocketManager({
+			token: c.token,
+			replayMissedEvents: false,
+		});
 
 		this.bot.socket.on('ready', (user) => {
 			console.log(`[guilded] ready as ${user.name}`);
@@ -89,6 +94,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 				`https://media.guilded.gg/webhooks/${data.id}/${data.token}`,
 				{
 					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(
 						await get_guilded_message(
 							opts.msg,
@@ -102,6 +108,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 
 			return [res.id];
 		} catch (e) {
+			console.log(e);
 			return handle_error(e, opts.channel.id);
 		}
 	}
@@ -116,7 +123,7 @@ export class guilded_plugin extends plugin<guilded_config> {
 		try {
 			await this.bot.request(
 				'delete',
-				// @ts-expect-error: guilded's openapi spec is really bad
+				// @ts-expect-error: this is typed wrong
 				`/channels/${opts.channel}/messages/${opts.edit_ids[0]}`,
 				undefined,
 			);

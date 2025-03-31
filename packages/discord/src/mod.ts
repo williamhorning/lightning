@@ -48,7 +48,7 @@ export class discord_plugin extends plugin<discord_config> {
 		this.api = this.client.api;
 
 		set_slash_commands(this.api, config, l);
-		setup_events(this.client, this.emit);
+		setup_events(this.client, this.emit.bind(this));
 		gateway.connect();
 	}
 
