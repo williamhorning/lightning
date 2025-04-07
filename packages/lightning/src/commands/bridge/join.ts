@@ -9,7 +9,7 @@ export async function join(
 
 	if (typeof result === 'string') return result;
 
-	const target_bridge = await opts.lightning.data.get_bridge_by_id(
+	const target_bridge = await opts.bridge_data.get_bridge_by_id(
 		opts.args.id,
 	);
 
@@ -20,7 +20,7 @@ export async function join(
 	target_bridge.channels.push(result);
 
 	try {
-		await opts.lightning.data.edit_bridge(target_bridge);
+		await opts.bridge_data.edit_bridge(target_bridge);
 
 		return `Bridge joined successfully!`;
 	} catch (e) {

@@ -1,8 +1,9 @@
+import { bridge_settings_list } from '../../structures/bridge.ts';
 import type { command_opts } from '../../structures/commands.ts';
 
 export async function status(opts: command_opts): Promise<string> {
-	const bridge = await opts.lightning.data.get_bridge_by_channel(
-		opts.channel,
+	const bridge = await opts.bridge_data.get_bridge_by_channel(
+		opts.channel_id,
 	);
 
 	if (!bridge) return `You are not in a bridge`;
@@ -15,7 +16,11 @@ export async function status(opts: command_opts): Promise<string> {
 
 	str += `\nSettings:\n`;
 
-	for (const [key, value] of Object.entries(bridge.settings)) {
+	for (
+		const [key, value] of Object.entries(bridge.settings).filter(([key]) =>
+			bridge_settings_list.includes(key)
+		)
+	) {
 		str += `- \`${key}\` ${value ? '✔' : '❌'}\n`;
 	}
 

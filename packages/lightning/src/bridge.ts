@@ -18,33 +18,24 @@ export async function bridge_message(
 	let bridge;
 
 	if (event === 'create_message') {
-		bridge = await lightning.data.get_bridge_by_channel(data.channel);
+		bridge = await lightning.data.get_bridge_by_channel(data.channel_id);
 	} else {
-		bridge = await lightning.data.get_message(data.id);
+		bridge = await lightning.data.get_message(data.message_id);
 	}
 
 	if (!bridge) return;
 
-	// handle bridge settings
-	if (event !== 'create_message' && bridge.settings.allow_editing !== true) {
-		return;
-	}
-
-	if (bridge.settings.use_rawname && 'author' in data) {
-		data.author.username = data.author.rawname;
-	}
-
 	// if the channel this event is from is disabled, return
 	if (
 		bridge.channels.find((channel) =>
-			channel.id === data.channel && channel.plugin === data.plugin &&
+			channel.id === data.channel_id && channel.plugin === data.plugin &&
 			channel.disabled
 		)
 	) return;
 
 	// filter out the channel this event is from and any disabled channels
 	const channels = bridge.channels.filter(
-		(i) => i.id !== data.channel || i.plugin !== data.plugin,
+		(i) => i.id !== data.channel_id || i.plugin !== data.plugin,
 	).filter((i) => !i.disabled || !i.data);
 
 	// if there are no more channels, return
@@ -80,13 +71,31 @@ export async function bridge_message(
 		let result_ids: string[];
 
 		try {
-			result_ids = await plugin[event]({
-				channel,
-				settings: bridge.settings,
-				reply_id,
-				edit_ids: prior_bridged_ids?.id as string[],
-				msg: data as message,
-			});
+			switch (event) {
+				case 'create_message':
+				case 'edit_message':
+					result_ids = await plugin.send_message({
+						...(data as message),
+						reply_id,
+						channel_id: channel.id,
+						message_id: prior_bridged_ids?.id[0] ?? '',
+					}, {
+						channel,
+						settings: bridge.settings,
+						edit_ids: prior_bridged_ids?.id,
+					});
+					break;
+				case 'delete_message':
+					result_ids = await plugin.delete_messages(
+						prior_bridged_ids!.id.map((i) => {
+							return {
+								...(data as deleted_message),
+								message_id: i,
+								channel_id: channel.id,
+							};
+						}),
+					);
+			}
 		} catch (e) {
 			if (e instanceof LightningError && e.disable_channel) {
 				await disable_channel(channel, bridge, e, lightning);
@@ -100,13 +109,7 @@ export async function bridge_message(
 			});
 
 			try {
-				result_ids = await plugin[event]({
-					channel,
-					settings: bridge.settings,
-					reply_id,
-					edit_ids: prior_bridged_ids?.id as string[],
-					msg: err.msg,
-				});
+				result_ids = await plugin.send_message(err.msg);
 			} catch (e) {
 				new LightningError(e, {
 					message: `Failed to log error message in bridge`,
@@ -130,7 +133,7 @@ export async function bridge_message(
 
 	await lightning.data[event]({
 		...bridge,
-		id: data.id,
+		id: data.message_id,
 		messages,
 		bridge_id: bridge.id,
 	});

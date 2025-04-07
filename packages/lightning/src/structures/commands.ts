@@ -1,4 +1,6 @@
-import type { lightning } from '../lightning.ts';
+import type { bridge_data } from '../database/mod.ts';
+import type { plugin } from './plugins.ts';
+import type { message } from './messages.ts';
 
 /** representation of a command */
 export interface command {
@@ -29,13 +31,36 @@ export interface command_argument {
 /** options passed to command#execute */
 export interface command_opts {
 	/** the channel the command was run in */
-	channel: string;
+	channel_id: string;
 	/** the plugin the command was run with */
 	plugin: string;
 	/** the time the command was sent */
 	timestamp: Temporal.Instant;
 	/** arguments for the command */
 	args: Record<string, string>;
-	/** a lightning instance */
-	lightning: lightning;
+	/** the command prefix used */
+	prefix: string;
+	/** bridge data (for bridge commands) */
+	bridge_data: bridge_data;
+	/** plugin data */
+	plugins: Map<string, plugin<unknown>>;
+}
+
+/** command execution event */
+export interface create_command
+	extends Pick<command_opts, "channel_id" | "plugin" | "timestamp"> {
+	/** the command to run */
+	command: string;
+	/** the subcommand, if any, to use */
+	subcommand?: string;
+	/** arguments, if any, to use */
+	args?: Record<string, string | undefined>;
+	/** the command prefix used */
+	prefix?: string;
+	/** extra string options */
+	rest?: string[];
+	/** event reply function */
+	reply: (message: message) => Promise<void>;
+	/** id of the associated event */
+	message_id: string;
 }

@@ -20,8 +20,8 @@ export async function create(
 	};
 
 	try {
-		const { id } = await opts.lightning.data.create_bridge(bridge_data);
-		return `Bridge created successfully!\nYou can now join it using \`${opts.lightning.config.prefix}bridge join ${id}\`.\nKeep this ID safe, don't share it with anyone, and delete this message.`;
+		const { id } = await opts.bridge_data.create_bridge(bridge_data);
+		return `Bridge created successfully!\nYou can now join it using \`${opts.prefix}bridge join ${id}\`.\nKeep this ID safe, don't share it with anyone, and delete this message.`;
 	} catch (e) {
 		log_error(e, {
 			message: 'Failed to insert bridge into database',

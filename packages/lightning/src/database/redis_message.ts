@@ -29,33 +29,35 @@ export class redis_messages {
 
 			console.log('[lightning-redis] got keys');
 
-			const new_data = [] as [string, bridge | bridge_message | string][];
-
-			for (const key of all_keys) {
+			const new_data = await Promise.all(all_keys.map(async (key: string) => {
 				console.log(`[lightning-redis] migrating key ${key}`);
 				const type = await rd.sendCommand(['TYPE', key]) as string;
-				const action = type === 'string' ? 'GET' : 'JSON.GET';
-				const value = await rd.sendCommand([action, key]) as string;
+				const value = await rd.sendCommand([
+					type === 'string' ? 'GET' : 'JSON.GET',
+					key,
+				]) as string;
 
 				try {
 					const parsed = JSON.parse(value);
-
-					new_data.push([key, {
-						id: key.split('-')[2],
-						bridge_id: parsed.id,
-						channels: parsed.channels,
-						messages: parsed.messages,
-						name: `migrated bridge ${parsed.id}`,
-						settings: {
-							allow_editing: true,
-							use_rawname: parsed.use_rawname,
-							allow_everyone: true,
-						},
-					}]);
+					return [
+						key,
+						JSON.stringify(
+							{
+								id: key.split('-')[2],
+								bridge_id: parsed.id,
+								channels: parsed.channels,
+								messages: parsed.messages,
+								name: parsed.id,
+								settings: {
+									allow_everyone: false,
+								},
+							} as bridge | bridge_message,
+						),
+					];
 				} catch {
-					new_data.push([key, value]);
+					return [key, value];
 				}
-			}
+			}));
 
 			Deno.writeTextFileSync(
 				'lightning-redis-migration.json',
@@ -69,16 +71,14 @@ export class redis_messages {
 
 			if (write || env_confirm === 'true') {
 				await rd.sendCommand(['DEL', ...all_keys]);
-
-				const data = new_data.map((
-					[key, value],
-				) => [key, JSON.stringify(value)]);
-
-				await rd.sendCommand(['MSET', ...data.flat()]);
-				await rd.sendCommand(['SET', 'lightning-db-version', '0.8.0']);
+				await rd.sendCommand([
+					'MSET',
+					'lightning-db-version',
+					'0.8.0',
+					...new_data.flat(1),
+				]);
 
 				console.warn('[lightning-redis] data written to database');
-				return;
 			} else {
 				console.warn('[lightning-redis] data not written to database');
 				log_error('migration cancelled');

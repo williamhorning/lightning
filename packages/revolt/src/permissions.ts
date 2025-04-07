@@ -1,36 +1,64 @@
 import type { Client } from '@jersey/rvapi';
-import type { Channel, Role, Server } from '@jersey/revolt-api-types';
 import { LightningError, log_error } from '@jersey/lightning';
 import { handle_error } from './errors.ts';
-import { fetch_member } from './member.ts';
+import { fetchChannel, fetchMember, fetchRole, fetchServer } from './cache.ts';
 
-const permissions_bits = [
+const permission_bits = [
 	1 << 23, // ManageMessages
 	1 << 28, // Masquerade
 ];
 
-const permissions = permissions_bits.reduce((a, b) => a | b, 0);
+const needed_permissions = permission_bits.reduce((a, b) => a | b, 0);
 
 export async function check_permissions(
-	channel_id: string,
+	channelID: string,
+	botID: string,
 	client: Client,
-	bot_id: string,
 ) {
 	try {
-		const channel = await client.request(
-			'get',
-			`/channels/${channel_id}`,
-			undefined,
-		) as Channel;
+		const channel = await fetchChannel(client, channelID);
 
 		if (channel.channel_type === 'Group') {
-			if (channel.permissions && (channel.permissions & permissions)) {
+			if (channel.permissions && (channel.permissions & needed_permissions)) {
 				return channel._id;
 			}
 
 			log_error('missing ManageMessages and/or Masquerade permission');
 		} else if (channel.channel_type === 'TextChannel') {
-			return await server_permissions(channel, client, bot_id);
+			const server = await fetchServer(client, channel.server);
+			const member = await fetchMember(client, channel.server, botID);
+
+			// check server permissions
+			let currentPermissions = server.default_permissions;
+
+			for (const role of (member.roles || [])) {
+				const { permissions: role_permissions } = await fetchRole(
+					client,
+					server._id,
+					role,
+				);
+
+				currentPermissions |= role_permissions.a || 0;
+				currentPermissions &= ~role_permissions.d || 0;
+			}
+
+			// apply default allow/denies
+			if (channel.default_permissions) {
+				currentPermissions |= channel.default_permissions.a;
+				currentPermissions &= ~channel.default_permissions.d;
+			}
+
+			// apply role permissions
+			if (channel.role_permissions) {
+				for (const role of (member.roles || [])) {
+					currentPermissions |= channel.role_permissions[role]?.a || 0;
+					currentPermissions &= ~channel.role_permissions[role]?.d || 0;
+				}
+			}
+
+			if (currentPermissions & needed_permissions) return channel._id;
+
+			log_error('missing ManageMessages and/or Masquerade permission');
 		} else {
 			log_error(`unsupported channel type: ${channel.channel_type}`);
 		}
@@ -39,50 +67,4 @@ export async function check_permissions(
 
 		handle_error(e);
 	}
-}
-
-async function server_permissions(
-	channel: Channel & { channel_type: 'TextChannel' },
-	client: Client,
-	bot_id: string,
-) {
-	const server = await client.request(
-		'get',
-		`/servers/${channel.server}`,
-		undefined,
-	) as Server;
-
-	const member = await fetch_member(client, channel, bot_id);
-
-	// check server permissions
-	let total_permissions = server.default_permissions;
-
-	for (const role of (member.roles || [])) {
-		const { permissions: role_permissions } = await client.request(
-			'get',
-			`/servers/${channel.server}/roles/${role}`,
-			undefined,
-		) as Role;
-
-		total_permissions |= role_permissions.a || 0;
-		total_permissions &= ~role_permissions.d || 0;
-	}
-
-	// apply default allow/denies
-	if (channel.default_permissions) {
-		total_permissions |= channel.default_permissions.a;
-		total_permissions &= ~channel.default_permissions.d;
-	}
-
-	// apply role permissions
-	if (channel.role_permissions) {
-		for (const role of (member.roles || [])) {
-			total_permissions |= channel.role_permissions[role]?.a || 0;
-			total_permissions &= ~channel.role_permissions[role]?.d || 0;
-		}
-	}
-
-	if (total_permissions & permissions) return channel._id;
-
-	log_error('missing ManageMessages and/or Masquerade permission');
 }

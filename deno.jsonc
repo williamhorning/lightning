@@ -19,13 +19,7 @@
 			]
 		}
 	},
-	"workspace": [
-		"./packages/lightning",
-		"./packages/telegram",
-		"./packages/revolt",
-		"./packages/guilded",
-		"./packages/discord"
-	],
+	"workspace": ["./packages/*"],
 	"lock": false,
 	"unstable": ["net", "temporal"]
 }

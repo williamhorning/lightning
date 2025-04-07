@@ -3,8 +3,8 @@ import { log_error } from '../../structures/errors.ts';
 import { bridge_settings_list } from '../../structures/bridge.ts';
 
 export async function toggle(opts: command_opts): Promise<string> {
-	const bridge = await opts.lightning.data.get_bridge_by_channel(
-		opts.channel,
+	const bridge = await opts.bridge_data.get_bridge_by_channel(
+		opts.channel_id,
 	);
 
 	if (!bridge) return `You are not in a bridge`;
@@ -18,7 +18,7 @@ export async function toggle(opts: command_opts): Promise<string> {
 	bridge.settings[key] = !bridge.settings[key];
 
 	try {
-		await opts.lightning.data.edit_bridge(
+		await opts.bridge_data.edit_bridge(
 			bridge,
 		);
 		return `Bridge settings updated successfully`;

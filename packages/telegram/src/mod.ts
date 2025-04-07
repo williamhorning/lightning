@@ -1,63 +1,74 @@
 import {
-	type create_opts,
-	type delete_opts,
-	type edit_opts,
-	type lightning,
+	type bridge_message_opts,
+	type deleted_message,
+	type message,
 	plugin,
 } from '@jersey/lightning';
 import { Bot } from 'grammy';
-import { get_lightning_message, get_telegram_message } from './messages.ts';
-import { setup_file_proxy } from './file_proxy.ts';
+import { getIncomingMessage } from './incoming.ts';
+import { getOutgoingMessage } from './outgoing.ts';
 
 /** options for the telegram plugin */
 export interface telegram_config {
 	/** the token for the bot */
-	bot_token: string;
+	token: string;
 	/** the port the plugins proxy will run on */
 	proxy_port: number;
 	/** the publically accessible url of the plugin */
 	proxy_url: string;
 }
 
-/** the plugin to use */
-export class telegram_plugin extends plugin<telegram_config> {
+export default class TelegramPlugin extends plugin<telegram_config> {
 	name = 'bolt-telegram';
-	bot: Bot;
+	private bot: Bot;
 
-	constructor(l: lightning, cfg: telegram_config) {
-		super(l, cfg);
-		this.bot = new Bot(cfg.bot_token);
-		this.bot.on('message', async (ctx) => {
-			const msg = await get_telegram_message(ctx, cfg);
-			if (!msg) return;
-			this.emit('create_message', msg);
-		});
-		this.bot.on('edited_message', async (ctx) => {
-			const msg = await get_telegram_message(ctx, cfg);
-			if (!msg) return;
-			this.emit('edit_message', msg);
-		});
-		// turns out it's impossible to deal with messages being deleted due to tdlib/telegram-bot-api#286
-		setup_file_proxy(cfg);
+	constructor(opts: telegram_config) {
+		super(opts);
+		this.bot = new Bot(opts.token);
 		this.bot.start();
+
+		this.bot.on(['message', 'edited_message'], async (ctx) => {
+			const msg = await getIncomingMessage(ctx, this.config.proxy_url);
+			if (msg) this.emit('create_message', msg);
+		});
+
+		Deno.serve({
+			port: this.config.proxy_port,
+			onListen: ({ port }) => {
+				this.log(
+					'info',
+					`file proxy listening on localhost:${port}`,
+					`also available at: ${this.config.proxy_url}`,
+				);
+			},
+		}, (req: Request) => {
+			const { pathname } = new URL(req.url);
+			return fetch(
+				`https://api.telegram.org/file/bot${this.config.token}/${
+					pathname.replace('/telegram/', '')
+				}`,
+			);
+		});
 	}
 
-	/** create a bridge */
 	setup_channel(channel: string): unknown {
 		return channel;
 	}
 
-	async create_message(opts: create_opts): Promise<string[]> {
+	async send_message(
+		message: message,
+		data?: bridge_message_opts,
+	): Promise<string[]> {
 		const messages = [];
 
-		for (const msg of get_lightning_message(opts.msg)) {
+		for (const msg of getOutgoingMessage(message, data !== undefined)) {
 			const result = await this.bot.api[msg.function](
-				opts.channel.id,
+				message.channel_id,
 				msg.value,
 				{
-					reply_parameters: opts.reply_id
+					reply_parameters: message.reply_id
 						? {
-							message_id: Number(opts.reply_id),
+							message_id: Number(message.reply_id),
 						}
 						: undefined,
 					parse_mode: 'MarkdownV2',
@@ -70,11 +81,14 @@ export class telegram_plugin extends plugin<telegram_config> {
 		return messages;
 	}
 
-	async edit_message(opts: edit_opts): Promise<string[]> {
+	async edit_message(
+		message: message,
+		opts: bridge_message_opts & { edit_ids: string[] },
+	): Promise<string[]> {
 		await this.bot.api.editMessageText(
 			opts.channel.id,
 			Number(opts.edit_ids[0]),
-			get_lightning_message(opts.msg)[0].value,
+			getOutgoingMessage(message, true)[0].value,
 			{
 				parse_mode: 'MarkdownV2',
 			},
@@ -83,14 +97,14 @@ export class telegram_plugin extends plugin<telegram_config> {
 		return opts.edit_ids;
 	}
 
-	async delete_message(opts: delete_opts): Promise<string[]> {
-		for (const id of opts.edit_ids) {
-			await this.bot.api.deleteMessage(
-				opts.channel.id,
-				Number(id),
-			);
+	async delete_messages(messages: deleted_message[]): Promise<string[]> {
+		const successful: string[] = [];
+
+		for (const msg of messages) {
+			await this.bot.api.deleteMessage(msg.channel_id, Number(msg.message_id));
+			successful.push(msg.message_id);
 		}
 
-		return opts.edit_ids;
+		return successful;
 	}
 }

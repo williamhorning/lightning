@@ -45,9 +45,12 @@ export class lightning {
 		this.plugins = new Map<string, plugin<unknown>>();
 
 		for (const plugin of this.config.plugins || []) {
-			if (plugin.support.includes('0.8.0')) {
-				const plugin_instance = new plugin.type(this, plugin.config);
+			if (plugin.support.includes('0.8.0-alpha.1')) {
+				const plugin_instance: plugin<unknown> = new plugin.type(plugin.config);
 				this.plugins.set(plugin_instance.name, plugin_instance);
+				if (plugin_instance.set_commands) {
+					plugin_instance.set_commands(this.commands.values().toArray());
+				}
 				this.handle_events(plugin_instance);
 			}
 		}
@@ -58,20 +61,25 @@ export class lightning {
 		for await (const { name, value } of plugin) {
 			await new Promise((res) => setTimeout(res, 150));
 
-			if (sessionStorage.getItem(`${value[0].plugin}-${value[0].id}`)) {
+			if (sessionStorage.getItem(`${value[0].plugin}-${value[0].message_id}`)) {
 				continue;
 			}
 
-			if (name === 'create_command') {
-				run_command(value[0] as create_command, this);
-				continue;
+			switch (name) {
+				case 'create_command':
+					run_command(value[0] as create_command, this);
+					break;
+				case 'create_message':
+					execute_text_command(value[0] as message, this);
+					bridge_message(this, name, value[0]);
+					break;
+				case 'edit_message':
+					bridge_message(this, name, value[0]);
+					break;
+				case 'delete_message':
+					bridge_message(this, name, value[0]);
+					break;
 			}
-
-			if (name === 'create_message') {
-				execute_text_command(value[0] as message, this);
-			}
-
-			bridge_message(this, name, value[0]);
 		}
 	}
 

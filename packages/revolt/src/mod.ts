@@ -1,79 +1,125 @@
+import { type Client, createClient } from '@jersey/rvapi';
+import { getIncomingMessage } from './incoming.ts';
+import type { Message as APIMessage } from '@jersey/revolt-api-types';
+import { handle_error } from './errors.ts';
+import { getOutgoingMessage } from './outgoing.ts';
+import { fetchMessage } from './cache.ts';
+import { check_permissions } from './permissions.ts';
 import {
-	type create_opts,
-	type delete_opts,
-	type edit_opts,
-	type lightning,
+	type bridge_message_opts,
+	type deleted_message,
+	type message,
 	plugin,
 } from '@jersey/lightning';
-import { type Client, createClient } from '@jersey/rvapi';
-import type { Message } from '@jersey/revolt-api-types';
-import { handle_error } from './errors.ts';
-import { check_permissions } from './permissions.ts';
-import { get_revolt_message } from './messages.ts';
-import { setup_events } from './events.ts';
 
-/** the config for the revolt plugin */
-export interface revolt_config {
-	/** the token for the revolt bot */
+export interface RevoltOptions {
 	token: string;
-	/** the user id for the bot */
 	user_id: string;
 }
 
-/** the plugin to use */
-export class revolt_plugin extends plugin<revolt_config> {
-	bot: Client;
+export default class RevoltPlugin extends plugin<RevoltOptions> {
 	name = 'bolt-revolt';
+	private client: Client;
 
-	constructor(l: lightning, config: revolt_config) {
-		super(l, config);
-		this.bot = createClient(config);
-		setup_events(this.bot, config, this.emit);
+	constructor(opts: RevoltOptions) {
+		super(opts);
+		this.client = createClient({ token: opts.token });
+		this.setupEvents();
 	}
 
-	async setup_channel(channel: string): Promise<unknown> {
-		return await check_permissions(channel, this.bot, this.config.user_id);
+	private setupEvents() {
+		this.client.bonfire.on('Message', async (data) => {
+			const msg = await getIncomingMessage(data, this.client);
+			if (msg) this.emit('create_message', msg);
+		}).on('MessageDelete', (data) => {
+			this.emit('delete_message', {
+				channel_id: data.channel,
+				message_id: data.id,
+				plugin: this.name,
+				timestamp: Temporal.Now.instant(),
+			});
+		}).on('MessageUpdate', async (data) => {
+			let oldMessage: APIMessage;
+
+			try {
+				oldMessage = await fetchMessage(this.client, data.channel, data.id);
+			} catch {
+				return;
+			}
+
+			const msg = await getIncomingMessage({
+				...oldMessage,
+				...data,
+			}, this.client);
+
+			if (msg) this.emit('edit_message', msg);
+		}).on('Ready', (data) => {
+			this.log(
+				'info',
+				`ready in ${data.servers.length} servers as ${
+					data.users.find((i) => i._id === this.config.user_id)?.username
+				}`,
+				`invite me at https://app.revolt.chat/bot/${this.config.user_id}`,
+			);
+		});
 	}
 
-	async create_message(opts: create_opts): Promise<string[]> {
+	async setup_channel(channelID: string): Promise<unknown> {
+		return await check_permissions(channelID, this.config.user_id, this.client);
+	}
+
+	async send_message(
+		message: message,
+		data?: bridge_message_opts,
+	): Promise<string[]> {
 		try {
-			const { _id } = (await this.bot.request(
-				'post',
-				`/channels/${opts.channel.id}/messages`,
-				await get_revolt_message(this.bot, opts.msg, true),
-			)) as Message;
-
-			return [_id];
+			return [
+				(await this.client.request(
+					'post',
+					`/channels/${message.channel_id}/messages`,
+					await getOutgoingMessage(this.client, message, data !== undefined),
+				) as APIMessage)._id,
+			];
 		} catch (e) {
 			return handle_error(e);
 		}
 	}
 
-	async edit_message(opts: edit_opts): Promise<string[]> {
+	async edit_message(
+		message: message,
+		data?: bridge_message_opts & { edit_ids: string[] },
+	): Promise<string[]> {
 		try {
-			await this.bot.request(
-				'patch',
-				`/channels/${opts.channel.id}/messages/${opts.edit_ids[0]}`,
-				await get_revolt_message(this.bot, opts.msg, true),
-			);
-
-			return opts.edit_ids;
+			return [
+				(await this.client.request(
+					'patch',
+					`/channels/${message.channel_id}/messages/${
+						data?.edit_ids[0] ?? message.message_id
+					}`,
+					await getOutgoingMessage(this.client, message, data !== undefined),
+				) as APIMessage)._id,
+			];
 		} catch (e) {
-			return handle_error(e, true);
+			return handle_error(e);
 		}
 	}
 
-	async delete_message(opts: delete_opts): Promise<string[]> {
-		try {
-			await this.bot.request(
-				'delete',
-				`/channels/${opts.channel.id}/messages/${opts.edit_ids[0]}`,
-				undefined,
-			);
+	async delete_messages(messages: deleted_message[]): Promise<string[]> {
+		const successful = [];
 
-			return opts.edit_ids;
-		} catch (e) {
-			return handle_error(e, true);
+		for (const msg of messages) {
+			try {
+				await this.client.request(
+					'delete',
+					`/channels/${msg.channel_id}/messages/${msg.message_id}`,
+					undefined,
+				);
+				successful.push(msg.message_id);
+			} catch (e) {
+				handle_error(e);
+			}
 		}
+
+		return successful;
 	}
 }

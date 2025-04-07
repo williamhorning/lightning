@@ -1,5 +1,3 @@
-import type { deleted_message, message } from './messages.ts';
-
 /** representation of a bridge */
 export interface bridge {
 	/** ulid secret used as primary key */
@@ -26,19 +24,13 @@ export interface bridge_channel {
 
 /** possible settings for a bridge */
 export interface bridge_settings {
-	/** allow editing/deletion */
-	allow_editing: boolean;
 	/** `@everyone/@here/@room` */
 	allow_everyone: boolean;
-	/** rawname = username */
-	use_rawname: boolean;
 }
 
 /** list of settings for a bridge */
 export const bridge_settings_list = [
-	'allow_editing',
 	'allow_everyone',
-	'use_rawname',
 ];
 
 /** representation of a bridged message collection */
@@ -65,40 +57,12 @@ export interface bridged_message {
 	plugin: string;
 }
 
-/** a message to be bridged */
-export interface create_opts {
-	/** the actual message */
-	msg: message;
+/** options for a message to be bridged */
+export interface bridge_message_opts {
 	/** the channel to use */
 	channel: bridge_channel;
+	/** ids of messages to edit, if any */
+	edit_ids?: string[];
 	/** the settings to use */
 	settings: bridge_settings;
-	/** message to reply to, if any */
-	reply_id?: string;
-}
-
-/** a message to be edited */
-export interface edit_opts {
-	/** the actual message */
-	msg: message;
-	/** the channel to use */
-	channel: bridge_channel;
-	/** the settings to use */
-	settings: bridge_settings;
-	/** message to reply to, if any */
-	reply_id?: string;
-	/** ids of messages to edit */
-	edit_ids: string[];
-}
-
-/** a message to be deleted */
-export interface delete_opts {
-	/** the actual deleted message */
-	msg: deleted_message;
-	/** the channel to use */
-	channel: bridge_channel;
-	/** the settings to use */
-	settings: bridge_settings;
-	/** ids of messages to delete */
-	edit_ids: string[];
 }
