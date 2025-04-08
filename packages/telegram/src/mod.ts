@@ -20,6 +20,7 @@ export interface telegram_config {
 
 export default class TelegramPlugin extends plugin<telegram_config> {
 	name = 'bolt-telegram';
+	support = ['0.8.0-alpha.1'];
 	private bot: Bot;
 
 	constructor(opts: telegram_config) {

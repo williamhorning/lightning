@@ -18,6 +18,7 @@ export interface GuildedOptions {
 
 export default class GuildedPlugin extends plugin<GuildedOptions> {
 	name = 'bolt-guilded';
+	support = ['0.8.0-alpha.1'];
 	private client: Client;
 
 	constructor(opts: GuildedOptions) {

@@ -15,18 +15,6 @@ export type plugin_events = {
 	create_command: [create_command];
 };
 
-/** the way to make a plugin */
-export interface create_plugin<
-	plugin_type extends plugin<plugin_type['config']>,
-> {
-	/** the actual constructor of the plugin */
-	type: new (config: plugin_type['config']) => plugin_type;
-	/** the configuration options for the plugin */
-	config: plugin_type['config'];
-	/** version(s) the plugin supports */
-	support: string[];
-}
-
 /** a plugin for lightning */
 export interface plugin<cfg> {
 	/** set commands on the platform, if available */
@@ -39,19 +27,13 @@ export abstract class plugin<cfg> extends EventEmitter<plugin_events> {
 	config: cfg;
 	/** the name of your plugin */
 	abstract name: string;
-	/** create a new plugin instance */
-	static new<T extends plugin<T['config']>>(
-		this: new (config: T['config']) => T,
-		config: T['config'],
-	): create_plugin<T> {
-		return { type: this, config, support: ['0.8.0-alpha.1'] };
-	}
+	/** the versions supported by your plugin */
+	abstract support: string[]
 	/** initialize a plugin with the given lightning instance and config */
 	constructor(config: cfg) {
 		super();
 		this.config = config;
 	}
-
 	/** log something to the console */
 	log(type: 'info' | 'warn' | 'error', ...args: unknown[]) {
 		for (const arg of args) {

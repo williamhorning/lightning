@@ -9,7 +9,6 @@ import {
 import type {
 	command,
 	create_command,
-	create_plugin,
 	message,
 	plugin,
 } from './structures/mod.ts';
@@ -21,8 +20,7 @@ export interface config {
 	/** database options */
 	database: database_config;
 	/** a list of plugins */
-	// deno-lint-ignore no-explicit-any
-	plugins?: create_plugin<any>[];
+	plugins?: plugin<unknown>[];
 	/** the prefix used for commands */
 	prefix: string;
 }
@@ -46,12 +44,11 @@ export class lightning {
 
 		for (const plugin of this.config.plugins || []) {
 			if (plugin.support.includes('0.8.0-alpha.1')) {
-				const plugin_instance: plugin<unknown> = new plugin.type(plugin.config);
-				this.plugins.set(plugin_instance.name, plugin_instance);
-				if (plugin_instance.set_commands) {
-					plugin_instance.set_commands(this.commands.values().toArray());
+				this.plugins.set(plugin.name, plugin);
+				if (plugin.set_commands) {
+					plugin.set_commands(this.commands.values().toArray());
 				}
-				this.handle_events(plugin_instance);
+				this.handle_events(plugin);
 			}
 		}
 	}

@@ -19,6 +19,7 @@ export interface RevoltOptions {
 
 export default class RevoltPlugin extends plugin<RevoltOptions> {
 	name = 'bolt-revolt';
+	support = ['0.8.0-alpha.1'];
 	private client: Client;
 
 	constructor(opts: RevoltOptions) {

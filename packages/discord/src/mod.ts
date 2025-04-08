@@ -2,14 +2,18 @@ import { REST, type RESTOptions } from '@discordjs/rest';
 import { WebSocketManager } from '@discordjs/ws';
 import { Client } from '@discordjs/core';
 import { GatewayDispatchEvents } from 'discord-api-types';
-import { getDeletedMessage, getIncomingCommand, getIncomingMessage } from './incoming.ts';
+import {
+	getDeletedMessage,
+	getIncomingCommand,
+	getIncomingMessage,
+} from './incoming.ts';
 import { handle_error } from './errors.ts';
 import { getOutgoingMessage } from './outgoing.ts';
 import {
 	type bridge_message_opts,
+	type command,
 	type deleted_message,
 	type message,
-	type command,
 	plugin,
 } from '@jersey/lightning';
 import { setup_commands } from './commands.ts';
@@ -22,6 +26,7 @@ export interface DiscordOptions {
 
 export default class DiscordPlugin extends plugin<DiscordOptions> {
 	name = 'bolt-discord';
+	support = ['0.8.0-alpha.1'];
 	private client: Client;
 
 	constructor(config: DiscordOptions) {
@@ -58,7 +63,7 @@ export default class DiscordPlugin extends plugin<DiscordOptions> {
 			const msg = await getIncomingMessage(data);
 			if (msg) this.emit('edit_message', msg);
 		}).on(GatewayDispatchEvents.InteractionCreate, (data) => {
-			const cmd = getIncomingCommand(data)
+			const cmd = getIncomingCommand(data);
 			if (cmd) this.emit('create_command', cmd);
 		}).on(GatewayDispatchEvents.Ready, async ({ data }) => {
 			this.log(
