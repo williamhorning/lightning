@@ -28,17 +28,11 @@ export abstract class plugin<cfg> extends EventEmitter<plugin_events> {
 	/** the name of your plugin */
 	abstract name: string;
 	/** the versions supported by your plugin */
-	abstract support: string[]
+	abstract support: string[];
 	/** initialize a plugin with the given lightning instance and config */
 	constructor(config: cfg) {
 		super();
 		this.config = config;
-	}
-	/** log something to the console */
-	log(type: 'info' | 'warn' | 'error', ...args: unknown[]) {
-		for (const arg of args) {
-			console[type](`[${this.name}]`, arg);
-		}
 	}
 	/** setup a channel to be used in a bridge */
 	abstract setup_channel(channel: string): Promise<unknown> | unknown;

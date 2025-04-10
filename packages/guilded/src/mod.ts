@@ -43,7 +43,7 @@ export default class GuildedPlugin extends plugin<GuildedOptions> {
 			const msg = await getIncomingMessage(data.d.message, this.client);
 			if (msg) this.emit('edit_message', msg);
 		}).on('ready', (data) => {
-			this.log('info', `Ready as ${data.name} (${data.id})`);
+			console.log(`[guilded] ready as ${data.name} (${data.id})`);
 		});
 	}
 

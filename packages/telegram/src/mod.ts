@@ -36,10 +36,8 @@ export default class TelegramPlugin extends plugin<telegram_config> {
 		Deno.serve({
 			port: this.config.proxy_port,
 			onListen: ({ port }) => {
-				this.log(
-					'info',
-					`file proxy listening on localhost:${port}`,
-					`also available at: ${this.config.proxy_url}`,
+				console.log(
+					`[telegram] proxy available at localhost:${port} or ${this.config.proxy_url}`,
 				);
 			},
 		}, (req: Request) => {

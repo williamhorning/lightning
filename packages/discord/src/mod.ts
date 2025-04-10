@@ -66,10 +66,9 @@ export default class DiscordPlugin extends plugin<DiscordOptions> {
 			const cmd = getIncomingCommand(data);
 			if (cmd) this.emit('create_command', cmd);
 		}).on(GatewayDispatchEvents.Ready, async ({ data }) => {
-			this.log(
-				'info',
-				`ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length} guilds`,
-				`invite me at https://discord.com/oauth2/authorize?client_id=${
+			console.log(
+				`[discord] ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length}`,
+				`[discord] invite me at https://discord.com/oauth2/authorize?client_id=${
 					(await this.client.api.applications.getCurrent()).id
 				}&scope=bot&permissions=8`,
 			);

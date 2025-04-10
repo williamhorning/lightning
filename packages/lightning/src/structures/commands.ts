@@ -48,7 +48,7 @@ export interface command_opts {
 
 /** command execution event */
 export interface create_command
-	extends Pick<command_opts, "channel_id" | "plugin" | "timestamp"> {
+	extends Pick<command_opts, 'channel_id' | 'plugin' | 'timestamp'> {
 	/** the command to run */
 	command: string;
 	/** the subcommand, if any, to use */

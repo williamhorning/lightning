@@ -55,12 +55,11 @@ export default class RevoltPlugin extends plugin<RevoltOptions> {
 
 			if (msg) this.emit('edit_message', msg);
 		}).on('Ready', (data) => {
-			this.log(
-				'info',
-				`ready in ${data.servers.length} servers as ${
+			console.log(
+				`[revolt] ready as ${
 					data.users.find((i) => i._id === this.config.user_id)?.username
-				}`,
-				`invite me at https://app.revolt.chat/bot/${this.config.user_id}`,
+				} in ${data.servers.length}`,
+				`[revolt] invite me at https://app.revolt.chat/bot/${this.config.user_id}`
 			);
 		});
 	}
