@@ -7,43 +7,43 @@ import {
 import { Bot } from 'grammy';
 import { getIncomingMessage } from './incoming.ts';
 import { getOutgoingMessage } from './outgoing.ts';
+import { type InferOutput, number, object, string } from '@valibot/valibot';
 
-/** options for the telegram plugin */
-export interface telegram_config {
-	/** the token for the bot */
-	token: string;
-	/** the port the plugins proxy will run on */
-	proxy_port: number;
-	/** the publically accessible url of the plugin */
-	proxy_url: string;
-}
+/** Options for the Revolt plugin */
+export const config = object({
+	/** The token to use for the bot */
+	token: string(),
+	/** The port the file proxy should run on */
+	proxy_port: number(),
+	/** The publically accessible url of the plugin */
+	proxy_url: string(),
+});
 
-export default class TelegramPlugin extends plugin<telegram_config> {
+export default class TelegramPlugin extends plugin {
 	name = 'bolt-telegram';
-	support = ['0.8.0-alpha.1'];
 	private bot: Bot;
 
-	constructor(opts: telegram_config) {
-		super(opts);
+	constructor(opts: InferOutput<typeof config>) {
+		super();
 		this.bot = new Bot(opts.token);
 		this.bot.start();
 
 		this.bot.on(['message', 'edited_message'], async (ctx) => {
-			const msg = await getIncomingMessage(ctx, this.config.proxy_url);
+			const msg = await getIncomingMessage(ctx, opts.proxy_url);
 			if (msg) this.emit('create_message', msg);
 		});
 
 		Deno.serve({
-			port: this.config.proxy_port,
+			port: opts.proxy_port,
 			onListen: ({ port }) => {
 				console.log(
-					`[telegram] proxy available at localhost:${port} or ${this.config.proxy_url}`,
+					`[telegram] proxy available at localhost:${port} or ${opts.proxy_url}`,
 				);
 			},
 		}, (req: Request) => {
 			const { pathname } = new URL(req.url);
 			return fetch(
-				`https://api.telegram.org/file/bot${this.config.token}/${
+				`https://api.telegram.org/file/bot${opts.token}/${
 					pathname.replace('/telegram/', '')
 				}`,
 			);
@@ -54,7 +54,7 @@ export default class TelegramPlugin extends plugin<telegram_config> {
 		return channel;
 	}
 
-	async send_message(
+	async create_message(
 		message: message,
 		data?: bridge_message_opts,
 	): Promise<string[]> {

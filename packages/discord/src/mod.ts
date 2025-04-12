@@ -17,29 +17,29 @@ import {
 	plugin,
 } from '@jersey/lightning';
 import { setup_commands } from './commands.ts';
+import { type InferOutput, object, string } from '@valibot/valibot';
 
-/** Options to use for the Discord plugin */
-export interface DiscordOptions {
+/** Options for the Discord plugin */
+export const config = object({
 	/** The token to use for the bot */
-	token: string;
-}
+	token: string(),
+});
 
-export default class DiscordPlugin extends plugin<DiscordOptions> {
+export default class DiscordPlugin extends plugin {
 	name = 'bolt-discord';
-	support = ['0.8.0-alpha.1'];
 	private client: Client;
 
-	constructor(config: DiscordOptions) {
-		super(config);
+	constructor(cfg: InferOutput<typeof config>) {
+		super();
 
 		const rest = new REST({
 			makeRequest: fetch as RESTOptions['makeRequest'],
 			userAgentAppendix: `${navigator.userAgent} lightningplugindiscord/0.8.0`,
 			version: '10',
-		}).setToken(config.token);
+		}).setToken(cfg.token);
 
 		const gateway = new WebSocketManager({
-			token: config.token,
+			token: cfg.token,
 			intents: 0 | 16813601,
 			rest,
 		});
@@ -67,8 +67,8 @@ export default class DiscordPlugin extends plugin<DiscordOptions> {
 			if (cmd) this.emit('create_command', cmd);
 		}).on(GatewayDispatchEvents.Ready, async ({ data }) => {
 			console.log(
-				`[discord] ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length}`,
-				`[discord] invite me at https://discord.com/oauth2/authorize?client_id=${
+				`[discord] ready as ${data.user.username}#${data.user.discriminator} in ${data.guilds.length} servers`,
+				`\n[discord] invite me at https://discord.com/oauth2/authorize?client_id=${
 					(await this.client.api.applications.getCurrent()).id
 				}&scope=bot&permissions=8`,
 			);
@@ -92,7 +92,7 @@ export default class DiscordPlugin extends plugin<DiscordOptions> {
 		}
 	}
 
-	async send_message(
+	async create_message(
 		message: message,
 		data?: bridge_message_opts,
 	): Promise<string[]> {

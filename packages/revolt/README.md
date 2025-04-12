@@ -6,15 +6,13 @@ telegram
 
 ## example config
 
-```ts
-import type { config } from 'jsr:@jersey/lightning@0.7.4';
-import { revolt_plugin } from 'jsr:@jersey/lightning-plugin-revolt@0.7.4';
+```toml
+# lightning.toml
+# ...
 
-export default {
-	plugins: [
-		revolt_plugin.new({
-			token: 'your_token',
-		}),
-	],
-} as config;
+[[plugins]]
+plugin = "jsr:@jersey/lightning-plugin-revolt@0.8.0"
+config = { token = "YOUR_REVOLT_TOKEN", user_id = "YOUR_BOT_USER_ID" }
+
+# ...
 ```

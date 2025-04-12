@@ -1,6 +1,5 @@
-import type { bridge_data } from '../database/mod.ts';
-import type { plugin } from './plugins.ts';
 import type { message } from './messages.ts';
+import type { plugin } from './plugins.ts';
 
 /** representation of a command */
 export interface command {
@@ -28,39 +27,32 @@ export interface command_argument {
 	required: boolean;
 }
 
-/** options passed to command#execute */
+/** options given to a command */
 export interface command_opts {
+	/** arguments to use */
+	args: Record<string, string | undefined>;
 	/** the channel the command was run in */
 	channel_id: string;
 	/** the plugin the command was run with */
-	plugin: string;
-	/** the time the command was sent */
-	timestamp: Temporal.Instant;
-	/** arguments for the command */
-	args: Record<string, string>;
+	plugin: plugin;
 	/** the command prefix used */
 	prefix: string;
-	/** bridge data (for bridge commands) */
-	bridge_data: bridge_data;
-	/** plugin data */
-	plugins: Map<string, plugin<unknown>>;
+	/** the time the command was sent */
+	timestamp: Temporal.Instant;
 }
 
-/** command execution event */
-export interface create_command
-	extends Pick<command_opts, 'channel_id' | 'plugin' | 'timestamp'> {
+/** options used for a command event */
+export interface create_command extends Omit<command_opts, 'plugin'> {
 	/** the command to run */
 	command: string;
-	/** the subcommand, if any, to use */
-	subcommand?: string;
-	/** arguments, if any, to use */
-	args?: Record<string, string | undefined>;
-	/** the command prefix used */
-	prefix?: string;
-	/** extra string options */
+	/** id of the associated event */
+	message_id: string;
+	/** the plugin id used to run this with */
+	plugin: string;
+	/** other, additional, options */
 	rest?: string[];
 	/** event reply function */
 	reply: (message: message) => Promise<void>;
-	/** id of the associated event */
-	message_id: string;
+	/** the subcommand, if any, to use */
+	subcommand?: string;
 }

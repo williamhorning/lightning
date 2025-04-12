@@ -1,7 +1,7 @@
 import { EventEmitter } from '@denosaurs/event';
 import type { bridge_message_opts } from './bridge.ts';
-import type { deleted_message, message } from './messages.ts';
 import type { command, create_command } from './commands.ts';
+import type { deleted_message, message } from './messages.ts';
 
 /** the events emitted by a plugin */
 export type plugin_events = {
@@ -16,28 +16,19 @@ export type plugin_events = {
 };
 
 /** a plugin for lightning */
-export interface plugin<cfg> {
+export interface plugin {
 	/** set commands on the platform, if available */
 	set_commands?(commands: command[]): Promise<void> | void;
 }
 
 /** a plugin for lightning */
-export abstract class plugin<cfg> extends EventEmitter<plugin_events> {
-	/** access the config passed to you by lightning */
-	config: cfg;
+export abstract class plugin extends EventEmitter<plugin_events> {
 	/** the name of your plugin */
 	abstract name: string;
-	/** the versions supported by your plugin */
-	abstract support: string[];
-	/** initialize a plugin with the given lightning instance and config */
-	constructor(config: cfg) {
-		super();
-		this.config = config;
-	}
 	/** setup a channel to be used in a bridge */
 	abstract setup_channel(channel: string): Promise<unknown> | unknown;
 	/** send a message to a given channel */
-	abstract send_message(
+	abstract create_message(
 		message: message,
 		opts?: bridge_message_opts,
 	): Promise<string[]>;
@@ -50,4 +41,14 @@ export abstract class plugin<cfg> extends EventEmitter<plugin_events> {
 	abstract delete_messages(
 		messages: deleted_message[],
 	): Promise<string[]>;
+}
+
+/** the type core uses to load a module */
+export interface plugin_module {
+	/** the plugin constructor */
+	// deno-lint-ignore no-explicit-any
+	default?: { new (cfg: any): plugin };
+	/** the config to validate use */
+	// deno-lint-ignore no-explicit-any
+	config?: any;
 }

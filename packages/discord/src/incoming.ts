@@ -5,8 +5,18 @@ import {
 	MessageReferenceType,
 	MessageType,
 } from 'discord-api-types';
-import type { attachment, create_command, deleted_message, message } from '@jersey/lightning';
-import type { API, APIInteraction, APIStickerItem, ToEventProps } from '@discordjs/core';
+import type {
+	attachment,
+	create_command,
+	deleted_message,
+	message,
+} from '@jersey/lightning';
+import type {
+	API,
+	APIInteraction,
+	APIStickerItem,
+	ToEventProps,
+} from '@discordjs/core';
 import { calculateUserDefaultAvatarIndex } from '@discordjs/rest';
 import { getOutgoingMessage } from './outgoing.ts';
 
@@ -161,6 +171,7 @@ export function getIncomingCommand(
 		channel_id: interaction.data.channel.id,
 		command: interaction.data.data.name,
 		message_id: interaction.data.id,
+		prefix: '/',
 		plugin: 'bolt-discord',
 		reply: async (msg) =>
 			await interaction.api.interactions.reply(

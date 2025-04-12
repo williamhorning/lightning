@@ -1,6 +1,6 @@
 /** representation of a bridge */
 export interface bridge {
-	/** ulid secret used as primary key */
+	/** primary key */
 	id: string;
 	/** user-facing name of the bridge */
 	name: string;
@@ -34,17 +34,11 @@ export const bridge_settings_list = [
 ];
 
 /** representation of a bridged message collection */
-export interface bridge_message {
-	/** original message id */
-	id: string;
+export interface bridge_message extends bridge {
 	/** original bridge id */
 	bridge_id: string;
-	/** channels in the bridge */
-	channels: bridge_channel[];
 	/** messages bridged */
 	messages: bridged_message[];
-	/** settings for the bridge */
-	settings: bridge_settings;
 }
 
 /** representation of an individual bridged message */

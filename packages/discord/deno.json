@@ -8,6 +8,7 @@
 		"@discordjs/core": "npm:@discordjs/core@^2.0.1",
 		"@discordjs/rest": "npm:@discordjs/rest@^2.4.3",
 		"@discordjs/ws": "npm:@discordjs/ws@^2.0.1",
-		"discord-api-types": "npm:discord-api-types@0.37.119/v10"
+		"discord-api-types": "npm:discord-api-types@0.37.119/v10",
+		"@valibot/valibot": "jsr:@valibot/valibot@^1.0.0"
 	}
 }

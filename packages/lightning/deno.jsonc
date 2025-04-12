@@ -11,6 +11,8 @@
 		"@iuioiua/redis": "jsr:@iuioiua/redis@^1.0.1",
 		"@std/cli/parse-args": "jsr:@std/cli@^1.0.14/parse-args",
 		"@std/path": "jsr:@std/path@^1.0.8",
-		"@std/ulid": "jsr:@std/ulid@^1.0.0"
+		"@std/ulid": "jsr:@std/ulid@^1.0.0",
+		"@std/toml": "jsr:@std/toml@^1.0.4",
+		"@valibot/valibot": "jsr:@valibot/valibot@^1.0.0"
 	}
 }

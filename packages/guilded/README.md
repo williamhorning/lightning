@@ -6,14 +6,13 @@ guilded
 
 ## example config
 
-```ts
-import { guilded_plugin } from 'jsr:@jersey/lightning-plugin-guilded@0.8.0';
+```toml
+# lightning.toml
+# ...
 
-export default {
-	plugins: [
-		guilded_plugin.new({
-			token: 'your_token',
-		}),
-	],
-};
+[[plugins]]
+plugin = "jsr:@jersey/lightning-plugin-guilded@0.8.0"
+config = { token = "YOUR_GUILDED_TOKEN" }
+
+# ...
 ```

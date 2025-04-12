@@ -11,20 +11,25 @@ import {
 	type message,
 	plugin,
 } from '@jersey/lightning';
+import { type InferOutput, object, string } from '@valibot/valibot';
 
-export interface RevoltOptions {
-	token: string;
-	user_id: string;
-}
+/** Options for the Revolt plugin */
+export const config = object({
+	/** The token to use for the bot plugin */
+	token: string(),
+	/** The bot's user ID */
+	user_id: string(),
+});
 
-export default class RevoltPlugin extends plugin<RevoltOptions> {
+export default class RevoltPlugin extends plugin {
 	name = 'bolt-revolt';
-	support = ['0.8.0-alpha.1'];
 	private client: Client;
+	private user_id: string;
 
-	constructor(opts: RevoltOptions) {
-		super(opts);
+	constructor(opts: InferOutput<typeof config>) {
+		super();
 		this.client = createClient({ token: opts.token });
+		this.user_id = opts.user_id;
 		this.setupEvents();
 	}
 
@@ -57,18 +62,18 @@ export default class RevoltPlugin extends plugin<RevoltOptions> {
 		}).on('Ready', (data) => {
 			console.log(
 				`[revolt] ready as ${
-					data.users.find((i) => i._id === this.config.user_id)?.username
-				} in ${data.servers.length}`,
-				`[revolt] invite me at https://app.revolt.chat/bot/${this.config.user_id}`
+					data.users.find((i) => i._id === this.user_id)?.username
+				} in ${data.servers.length} servers`,
+				`\n[revolt] invite me at https://app.revolt.chat/bot/${this.user_id}`,
 			);
 		});
 	}
 
 	async setup_channel(channelID: string): Promise<unknown> {
-		return await check_permissions(channelID, this.config.user_id, this.client);
+		return await check_permissions(channelID, this.user_id, this.client);
 	}
 
-	async send_message(
+	async create_message(
 		message: message,
 		data?: bridge_message_opts,
 	): Promise<string[]> {

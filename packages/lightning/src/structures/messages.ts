@@ -6,7 +6,8 @@ export function create_message(text: string): message {
 	return {
 		author: {
 			username: 'lightning',
-			profile: 'https://williamhorning.eu.org/assets/lightning.png',
+			profile:
+				'https://williamhorning.eu.org/assets/lightning/logo_monocolor_dark.svg',
 			rawname: 'lightning',
 			id: 'lightning',
 		},

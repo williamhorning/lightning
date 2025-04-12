@@ -9,20 +9,20 @@ import { getIncomingMessage } from './incoming.ts';
 import { handle_error } from './errors.ts';
 import type { ServerChannel } from '@jersey/guilded-api-types';
 import { getOutgoingMessage } from './outgoing.ts';
+import { type InferOutput, object, string } from '@valibot/valibot';
 
-/** options for the guilded plugin */
-export interface GuildedOptions {
-	/** the token to use */
-	token: string;
-}
+/** Options for the Guilded plugin */
+export const config = object({
+	/** The token to use for the bot */
+	token: string(),
+});
 
-export default class GuildedPlugin extends plugin<GuildedOptions> {
+export default class GuildedPlugin extends plugin {
 	name = 'bolt-guilded';
-	support = ['0.8.0-alpha.1'];
 	private client: Client;
 
-	constructor(opts: GuildedOptions) {
-		super(opts);
+	constructor(opts: InferOutput<typeof config>) {
+		super();
 		this.client = createClient(opts.token);
 		this.setup_events();
 		this.client.socket.connect();
@@ -74,7 +74,7 @@ export default class GuildedPlugin extends plugin<GuildedOptions> {
 		}
 	}
 
-	async send_message(
+	async create_message(
 		message: message,
 		data?: bridge_message_opts,
 	): Promise<string[]> {

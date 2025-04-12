@@ -6,8 +6,8 @@ import type { bridge_data } from './mod.ts';
 export type { ClientOptions as postgres_config };
 
 export class postgres implements bridge_data {
-	static async create(pg_options: ClientOptions): Promise<bridge_data> {
-		const pg = new Client(pg_options);
+	static async create(pg_url: string): Promise<bridge_data> {
+		const pg = new Client(pg_url);
 
 		await pg.connect();
 		await postgres.setup_schema(pg);
@@ -36,6 +36,7 @@ export class postgres implements bridge_data {
 
             CREATE TABLE IF NOT EXISTS bridge_messages (
                 id        TEXT PRIMARY KEY,
+				name      TEXT NOT NULL,
                 bridge_id TEXT NOT NULL,
                 channels  JSONB NOT NULL,
                 messages  JSONB NOT NULL,
@@ -89,10 +90,10 @@ export class postgres implements bridge_data {
 
 	async create_message(msg: bridge_message): Promise<void> {
 		await this.pg.queryArray`INSERT INTO bridge_messages
-            (id, bridge_id, channels, messages, settings) VALUES
-            (${msg.id}, ${msg.bridge_id}, ${JSON.stringify(msg.channels)}, ${
-			JSON.stringify(msg.messages)
-		}, ${JSON.stringify(msg.settings)})`;
+            (id, name, bridge_id, channels, messages, settings) VALUES
+            (${msg.id}, ${msg.name}, ${msg.bridge_id}, ${
+			JSON.stringify(msg.channels)
+		}, ${JSON.stringify(msg.messages)}, ${JSON.stringify(msg.settings)})`;
 	}
 
 	async edit_message(msg: bridge_message): Promise<void> {
@@ -111,7 +112,6 @@ export class postgres implements bridge_data {
         `;
 	}
 
-	// FIXME(jersey): this is horendously wrong somewhere
 	async get_message(id: string): Promise<bridge_message | undefined> {
 		const res = await this.pg.queryObject<bridge_message>(`
             SELECT * FROM bridge_messages
@@ -163,23 +163,11 @@ export class postgres implements bridge_data {
 	}
 
 	static async migration_get_instance(): Promise<bridge_data> {
-		const pg_user = prompt('Please enter your Postgres username (server):') ||
-			'server';
-		const pg_password =
-			prompt('Please enter your Postgres password (password):') || 'password';
-		const pg_host = prompt('Please enter your Postgres host (localhost):') ||
-			'localhost';
-		const pg_port = prompt('Please enter your Postgres port (5432):') ||
-			'5432';
-		const pg_db = prompt('Please enter your Postgres database (lightning):') ||
-			'lightning';
+		const pg_url = prompt(
+			'Please enter your Postgres connection string (postgres://localhost):',
+		) ||
+			'postgres://localhost';
 
-		return await postgres.create({
-			user: pg_user,
-			password: pg_password,
-			hostname: pg_host,
-			port: parseInt(pg_port),
-			database: pg_db,
-		});
+		return await postgres.create(pg_url);
 	}
 }

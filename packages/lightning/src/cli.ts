@@ -1,8 +1,10 @@
 import { parseArgs } from '@std/cli/parse-args';
-import { join, toFileUrl } from '@std/path';
-import { type config, lightning } from './lightning.ts';
+import { join } from '@std/path';
+import { parse_config } from './cli_config.ts';
 import { log_error } from './structures/errors.ts';
 import { handle_migration } from './database/mod.ts';
+import { core } from './core.ts';
+import { setup_bridge } from './bridge/setup.ts';
 
 const version = '0.8.0';
 const _ = parseArgs(Deno.args);
@@ -12,26 +14,12 @@ if (_.v || _.version) {
 } else if (_.h || _.help) {
 	run_help();
 } else if (_._[0] === 'run') {
-	if (!_.config) _.config = join(Deno.cwd(), 'config.ts');
-
-	const config_url = toFileUrl(_.config).toString();
-
-	const config = (await import(config_url)).default as config;
-
-	if (config?.error_url) {
-		Deno.env.set('LIGHTNING_ERROR_WEBHOOK', config.error_url);
-	}
-
-	addEventListener('error', (ev) => {
-		log_error(ev.error, { extra: { type: 'global error' } });
-	});
-
-	addEventListener('unhandledrejection', (ev) => {
-		log_error(ev.reason, { extra: { type: 'global rejection' } });
-	});
+	if (!_.config) _.config = join(Deno.cwd(), 'lightning.toml');
 
 	try {
-		await lightning.create(config);
+		const config = await parse_config(_.config);
+		const lightning = new core(config);
+		setup_bridge(lightning, config.database);
 	} catch (e) {
 		log_error(e, { extra: { type: 'global class error' } });
 	}

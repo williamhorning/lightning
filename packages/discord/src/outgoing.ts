@@ -17,7 +17,7 @@ export interface DiscordPayload
 		RESTPostAPIWebhookWithTokenQuery {
 	embeds: APIEmbed[];
 	files?: RawFile[];
-	message_reference?: APIMessageReference & { message_id: string },
+	message_reference?: APIMessageReference & { message_id: string };
 	wait: true;
 }
 
@@ -96,13 +96,17 @@ export async function getOutgoingMessage(
 		content: (msg.content?.length || 0) > 2000
 			? `${msg.content?.substring(0, 1997)}...`
 			: msg.content,
-		components: button_reply ? await fetchReplyComponent(msg.channel_id, msg.reply_id, api) : undefined,
+		components: button_reply
+			? await fetchReplyComponent(msg.channel_id, msg.reply_id, api)
+			: undefined,
 		embeds: (msg.embeds ?? []).map((e) => ({
 			...e,
 			timestamp: e.timestamp?.toString(),
 		})),
 		files: await fetchFiles(msg.attachments),
-		message_reference: !button_reply && msg.reply_id ? { type: 0, channel_id: msg.channel_id, message_id: msg.reply_id } : undefined,
+		message_reference: !button_reply && msg.reply_id
+			? { type: 0, channel_id: msg.channel_id, message_id: msg.reply_id }
+			: undefined,
 		username: msg.author.username,
 		wait: true,
 	};
