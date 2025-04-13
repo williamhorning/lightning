@@ -1,26 +1,20 @@
-import {
-	type GatewayMessageDeleteDispatchData,
-	type GatewayMessageUpdateDispatchData,
-	MessageFlags,
-	MessageReferenceType,
-	MessageType,
-} from 'discord-api-types';
+import type {
+	API,
+	APIInteraction,
+	APIStickerItem,
+	GatewayMessageDeleteDispatchData,
+	GatewayMessageUpdateDispatchData,
+	ToEventProps,
+} from '@discordjs/core';
 import type {
 	attachment,
 	create_command,
 	deleted_message,
 	message,
 } from '@jersey/lightning';
-import type {
-	API,
-	APIInteraction,
-	APIStickerItem,
-	ToEventProps,
-} from '@discordjs/core';
-import { calculateUserDefaultAvatarIndex } from '@discordjs/rest';
-import { getOutgoingMessage } from './outgoing.ts';
+import { get_outgoing_message } from './outgoing.ts';
 
-export function getDeletedMessage(
+export function get_deleted_message(
 	data: GatewayMessageDeleteDispatchData,
 ): deleted_message {
 	return {
@@ -31,11 +25,11 @@ export function getDeletedMessage(
 	};
 }
 
-async function fetchAuthor(api: API, data: GatewayMessageUpdateDispatchData) {
+async function fetch_author(api: API, data: GatewayMessageUpdateDispatchData) {
 	let profile = data.author.avatar !== null
 		? `https://cdn.discordapp.com/avatars/${data.author.id}/${data.author.avatar}.png`
 		: `https://cdn.discordapp.com/embed/avatars/${
-			calculateUserDefaultAvatarIndex(data.author.id)
+			Number(BigInt(data.author.id) >> 22n) % 6
 		}.png`;
 
 	let username = data.author.global_name || data.author.username;
@@ -61,7 +55,7 @@ async function fetchAuthor(api: API, data: GatewayMessageUpdateDispatchData) {
 	return { profile, username };
 }
 
-async function fetchStickers(
+async function fetch_stickers(
 	stickers: APIStickerItem[],
 ): Promise<attachment[]> {
 	return (await Promise.allSettled(stickers.map(async (sticker) => {
@@ -86,16 +80,16 @@ async function fetchStickers(
 	}))).flatMap((i) => i.status === 'fulfilled' ? i.value : []);
 }
 
-export async function getIncomingMessage(
+export async function get_incoming_message(
 	{ api, data }: { api: API; data: GatewayMessageUpdateDispatchData },
 ): Promise<message | undefined> {
 	// normal messages, replies, and user joins
 	if (
-		data.type !== MessageType.Default &&
-		data.type !== MessageType.Reply &&
-		data.type !== MessageType.UserJoin &&
-		data.type !== MessageType.ChatInputCommand &&
-		data.type !== MessageType.ContextMenuCommand
+		data.type !== 0 &&
+		data.type !== 7 &&
+		data.type !== 19 &&
+		data.type !== 20 &&
+		data.type !== 23
 	) {
 		return;
 	}
@@ -112,18 +106,18 @@ export async function getIncomingMessage(
 					};
 				},
 			),
-			...data.sticker_items ? await fetchStickers(data.sticker_items) : [],
+			...data.sticker_items ? await fetch_stickers(data.sticker_items) : [],
 		],
 		author: {
 			rawname: data.author.username,
 			id: data.author.id,
 			color: '#5865F2',
-			...await fetchAuthor(api, data),
+			...await fetch_author(api, data),
 		},
 		channel_id: data.channel_id,
-		content: data.type === MessageType.UserJoin
+		content: data.type === 7
 			? '*joined on discord*'
-			: (data.flags || 0) & MessageFlags.Loading
+			: (data.flags || 0) & 128
 			? '*loading...*'
 			: data.content,
 		embeds: data.embeds.map((i) => ({
@@ -134,7 +128,7 @@ export async function getIncomingMessage(
 		message_id: data.id,
 		plugin: 'bolt-discord',
 		reply_id: data.message_reference &&
-				data.message_reference.type === MessageReferenceType.Default
+				data.message_reference.type === 0
 			? data.message_reference.message_id
 			: undefined,
 		timestamp: Temporal.Instant.fromEpochMilliseconds(
@@ -145,7 +139,7 @@ export async function getIncomingMessage(
 	return message;
 }
 
-export function getIncomingCommand(
+export function get_incoming_command(
 	interaction: ToEventProps<APIInteraction>,
 ): create_command | undefined {
 	if (interaction.data.type !== 2 || interaction.data.data.type !== 1) return;
@@ -177,7 +171,7 @@ export function getIncomingCommand(
 			await interaction.api.interactions.reply(
 				interaction.data.id,
 				interaction.data.token,
-				await getOutgoingMessage(msg, interaction.api, false, false),
+				await get_outgoing_message(msg, interaction.api, false, false),
 			),
 		subcommand,
 		timestamp: Temporal.Instant.fromEpochMilliseconds(

@@ -1,35 +1,55 @@
 import {
 	type bridge_message_opts,
 	type deleted_message,
+	LightningError,
+	log_error,
 	type message,
 	plugin,
 } from '@jersey/lightning';
 import { Bot } from 'grammy';
-import { getIncomingMessage } from './incoming.ts';
-import { getOutgoingMessage } from './outgoing.ts';
-import { type InferOutput, number, object, string } from '@valibot/valibot';
+import { get_incoming } from './incoming.ts';
+import { get_outgoing } from './outgoing.ts';
 
-/** Options for the Revolt plugin */
-export const config = object({
-	/** The token to use for the bot */
-	token: string(),
-	/** The port the file proxy should run on */
-	proxy_port: number(),
-	/** The publically accessible url of the plugin */
-	proxy_url: string(),
-});
+/** options for telegram */
+export type telegram_config = {
+	/** the token for the bot */
+	token: string;
+	/** the port the file proxy will run on */
+	proxy_port: number;
+	/** the publicly accessible url of the file proxy */
+	proxy_url: string;
+};
 
-export default class TelegramPlugin extends plugin {
+/** check if something is actually a config object, return if it is */
+export function parse_config(v: unknown): telegram_config {
+	if (typeof v !== 'object' || v === null) {
+		log_error("telegram config isn't an object!", { without_cause: true });
+	}
+	if (!('token' in v) || typeof v.token !== 'string') {
+		log_error("telegram token isn't a string", { without_cause: true });
+	}
+	if (!('proxy_port' in v) || typeof v.proxy_port !== 'number') {
+		log_error("telegram proxy port isn't a number", { without_cause: true });
+	}
+	if (!('proxy_url' in v) || typeof v.proxy_url !== 'string') {
+		log_error("telegram proxy url isn't a string", { without_cause: true });
+	}
+	return { token: v.token, proxy_port: v.proxy_port, proxy_url: v.proxy_url };
+}
+
+/** telegram support for lightning */
+export default class telegram extends plugin {
 	name = 'bolt-telegram';
 	private bot: Bot;
 
-	constructor(opts: InferOutput<typeof config>) {
+	/** setup telegram and its file proxy */
+	constructor(opts: telegram_config) {
 		super();
 		this.bot = new Bot(opts.token);
 		this.bot.start();
 
 		this.bot.on(['message', 'edited_message'], async (ctx) => {
-			const msg = await getIncomingMessage(ctx, opts.proxy_url);
+			const msg = await get_incoming(ctx, opts.proxy_url);
 			if (msg) this.emit('create_message', msg);
 		});
 
@@ -40,6 +60,19 @@ export default class TelegramPlugin extends plugin {
 					`[telegram] proxy available at localhost:${port} or ${opts.proxy_url}`,
 				);
 			},
+			onError: (e) =>
+				new Response(
+					JSON.stringify(
+						new LightningError(e, {
+							message: `something went wrong with the telegram file proxy`,
+						}).msg,
+					),
+					{
+						status: 500,
+						statusText: 'internal server error',
+						headers: { 'Content-Type': 'application/json' },
+					},
+				),
 		}, (req: Request) => {
 			const { pathname } = new URL(req.url);
 			return fetch(
@@ -50,17 +83,19 @@ export default class TelegramPlugin extends plugin {
 		});
 	}
 
+	/** stub for setup_channel */
 	setup_channel(channel: string): unknown {
 		return channel;
 	}
 
+	/** send a message in a channel */
 	async create_message(
 		message: message,
-		data?: bridge_message_opts,
+		data: bridge_message_opts,
 	): Promise<string[]> {
 		const messages = [];
 
-		for (const msg of getOutgoingMessage(message, data !== undefined)) {
+		for (const msg of get_outgoing(message, data !== undefined)) {
 			const result = await this.bot.api[msg.function](
 				message.channel_id,
 				msg.value,
@@ -80,6 +115,7 @@ export default class TelegramPlugin extends plugin {
 		return messages;
 	}
 
+	/** edit a message in a channel */
 	async edit_message(
 		message: message,
 		opts: bridge_message_opts & { edit_ids: string[] },
@@ -87,7 +123,7 @@ export default class TelegramPlugin extends plugin {
 		await this.bot.api.editMessageText(
 			opts.channel.id,
 			Number(opts.edit_ids[0]),
-			getOutgoingMessage(message, true)[0].value,
+			get_outgoing(message, true)[0].value,
 			{
 				parse_mode: 'MarkdownV2',
 			},
@@ -96,14 +132,16 @@ export default class TelegramPlugin extends plugin {
 		return opts.edit_ids;
 	}
 
+	/** delete messages in a channel */
 	async delete_messages(messages: deleted_message[]): Promise<string[]> {
-		const successful: string[] = [];
-
-		for (const msg of messages) {
-			await this.bot.api.deleteMessage(msg.channel_id, Number(msg.message_id));
-			successful.push(msg.message_id);
-		}
-
-		return successful;
+		return await Promise.all(
+			messages.map(async (msg) => {
+				await this.bot.api.deleteMessage(
+					msg.channel_id,
+					Number(msg.message_id),
+				);
+				return msg.message_id;
+			}),
+		);
 	}
 }

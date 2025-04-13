@@ -1,64 +1,76 @@
-import { type Client, createClient } from '@jersey/rvapi';
-import { getIncomingMessage } from './incoming.ts';
-import type { Message as APIMessage } from '@jersey/revolt-api-types';
-import { handle_error } from './errors.ts';
-import { getOutgoingMessage } from './outgoing.ts';
-import { fetchMessage } from './cache.ts';
-import { check_permissions } from './permissions.ts';
 import {
 	type bridge_message_opts,
 	type deleted_message,
+	log_error,
 	type message,
 	plugin,
 } from '@jersey/lightning';
-import { type InferOutput, object, string } from '@valibot/valibot';
+import type { Message as APIMessage } from '@jersey/revolt-api-types';
+import { type Client, createClient } from '@jersey/rvapi';
+import { fetch_message } from './cache.ts';
+import { handle_error } from './errors.ts';
+import { get_incoming } from './incoming.ts';
+import { get_outgoing } from './outgoing.ts';
+import { check_permissions } from './permissions.ts';
 
-/** Options for the Revolt plugin */
-export const config = object({
-	/** The token to use for the bot plugin */
-	token: string(),
-	/** The bot's user ID */
-	user_id: string(),
-});
+/** the config for the revolt bot */
+export interface revolt_config {
+	/** the token for the revolt bot */
+	token: string;
+	/** the user id for the bot */
+	user_id: string;
+}
 
-export default class RevoltPlugin extends plugin {
+/** check if something is actually a config object, return if it is */
+export function parse_config(v: unknown): revolt_config {
+	if (typeof v !== 'object' || v === null) {
+		log_error("revolt config isn't an object!", { without_cause: true });
+	}
+	if (!('token' in v) || typeof v.token !== 'string') {
+		log_error("revolt token isn't a string", { without_cause: true });
+	}
+	if (!('user_id' in v) || typeof v.user_id !== 'string') {
+		log_error("revolt user ID isn't a string", { without_cause: true });
+	}
+	return { token: v.token, user_id: v.user_id };
+}
+
+/** revolt support for lightning */
+export default class revolt extends plugin {
 	name = 'bolt-revolt';
 	private client: Client;
 	private user_id: string;
 
-	constructor(opts: InferOutput<typeof config>) {
+	/** setup revolt using these options */
+	constructor(opts: revolt_config) {
 		super();
 		this.client = createClient({ token: opts.token });
 		this.user_id = opts.user_id;
-		this.setupEvents();
+		this.setup_events();
 	}
 
-	private setupEvents() {
+	private setup_events() {
 		this.client.bonfire.on('Message', async (data) => {
-			const msg = await getIncomingMessage(data, this.client);
+			const msg = await get_incoming(data, this.client);
 			if (msg) this.emit('create_message', msg);
 		}).on('MessageDelete', (data) => {
 			this.emit('delete_message', {
 				channel_id: data.channel,
 				message_id: data.id,
-				plugin: this.name,
+				plugin: "bolt-revolt",
 				timestamp: Temporal.Now.instant(),
 			});
 		}).on('MessageUpdate', async (data) => {
-			let oldMessage: APIMessage;
-
 			try {
-				oldMessage = await fetchMessage(this.client, data.channel, data.id);
+				const msg = await get_incoming({
+					...await fetch_message(this.client, data.channel, data.id),
+					...data,
+				}, this.client);
+
+				if (msg) this.emit('edit_message', msg);
 			} catch {
 				return;
 			}
-
-			const msg = await getIncomingMessage({
-				...oldMessage,
-				...data,
-			}, this.client);
-
-			if (msg) this.emit('edit_message', msg);
 		}).on('Ready', (data) => {
 			console.log(
 				`[revolt] ready as ${
@@ -69,10 +81,12 @@ export default class RevoltPlugin extends plugin {
 		});
 	}
 
-	async setup_channel(channelID: string): Promise<unknown> {
-		return await check_permissions(channelID, this.user_id, this.client);
+	/** ensure masquerading will work in that channel */
+	async setup_channel(channel_id: string): Promise<unknown> {
+		return await check_permissions(channel_id, this.user_id, this.client);
 	}
 
+	/** send a message to a channel */
 	async create_message(
 		message: message,
 		data?: bridge_message_opts,
@@ -82,7 +96,7 @@ export default class RevoltPlugin extends plugin {
 				(await this.client.request(
 					'post',
 					`/channels/${message.channel_id}/messages`,
-					await getOutgoingMessage(this.client, message, data !== undefined),
+					await get_outgoing(this.client, message, data !== undefined),
 				) as APIMessage)._id,
 			];
 		} catch (e) {
@@ -90,18 +104,17 @@ export default class RevoltPlugin extends plugin {
 		}
 	}
 
+	/** edit a message in a channel */
 	async edit_message(
 		message: message,
-		data?: bridge_message_opts & { edit_ids: string[] },
+		data: bridge_message_opts & { edit_ids: string[] },
 	): Promise<string[]> {
 		try {
 			return [
 				(await this.client.request(
 					'patch',
-					`/channels/${message.channel_id}/messages/${
-						data?.edit_ids[0] ?? message.message_id
-					}`,
-					await getOutgoingMessage(this.client, message, data !== undefined),
+					`/channels/${message.channel_id}/messages/${data.edit_ids[0]}`,
+					await get_outgoing(this.client, message, true),
 				) as APIMessage)._id,
 			];
 		} catch (e) {
@@ -109,22 +122,22 @@ export default class RevoltPlugin extends plugin {
 		}
 	}
 
+	/** delete messages in a channel */
 	async delete_messages(messages: deleted_message[]): Promise<string[]> {
-		const successful = [];
-
-		for (const msg of messages) {
-			try {
-				await this.client.request(
-					'delete',
-					`/channels/${msg.channel_id}/messages/${msg.message_id}`,
-					undefined,
-				);
-				successful.push(msg.message_id);
-			} catch (e) {
-				handle_error(e);
-			}
-		}
-
-		return successful;
+		return await Promise.all(
+			messages.map(async (msg) => {
+				try {
+					await this.client.request(
+						'delete',
+						`/channels/${msg.channel_id}/messages/${msg.message_id}`,
+						undefined,
+					);
+					return msg.message_id;
+				} catch (e) {
+					handle_error(e);
+					return msg.message_id;
+				}
+			})
+		);
 	}
 }

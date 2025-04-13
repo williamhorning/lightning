@@ -6,48 +6,51 @@ on:
     types: [published]
 
 permissions:
+  contents: read
   packages: write
+  id-token: write
 
 jobs:
-  publish:
+  publish_jsr:
+    name: publish to jsr
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # auth w/JSR
     steps:
       - name: checkout
         uses: actions/checkout@v4
       - name: setup deno
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v2.2.3
-      - name: setup qemu
-        uses: docker/setup-qemu-action@v3
-      - name: setup buildx
-        uses: docker/setup-buildx-action@v3
-      - name: login to docker hub
-        uses: docker/login-action@v3
-        with:
-          username: williamfromnj
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: go to the directory
-        run: cd packages/lightning
+          deno-version: v2.2.9
       - name: publish to jsr
-        run: |
-          deno publish
-          cd packages/lightning
-      - name: setup docker metadata
-        id: metadata
-        uses: docker/metadata-action@v5
+        run: deno publish
+  publish_docker:
+    name: publish to ghcr
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    needs: publish_jsr
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: login to ghcr
+        uses: redhat-actions/podman-login@v1
         with:
-          images: williamfromnj/bolt
-          tags: type=ref,event=tag
-      - name: build and push
-        uses: docker/build-push-action@v6
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+      - name: build image with podman
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
         with:
-          context: .
-          file: ./packages/lightning/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
+          image: ghcr.io/williamhorning/lightning
+          tags: latest ${{github.ref_name}}
+          containerfiles: ./containerfile
+      - name: push to ghcr.io
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{ secrets.GITHUB_TOKEN }}

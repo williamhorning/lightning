@@ -8,6 +8,8 @@ export interface error_options {
 	extra?: Record<string, unknown>;
 	/** whether to disable the associated channel (when bridging) */
 	disable?: boolean;
+	/** whether this should be logged without the cause */
+	without_cause?: boolean;
 }
 
 /** logs an error */
@@ -20,27 +22,30 @@ export class LightningError extends Error {
 	/** the id associated with the error */
 	id: string;
 	/** the cause of the error */
-	override cause: Error;
+	private error_cause: Error;
 	/** extra information associated with the error */
 	extra: Record<string, unknown>;
 	/** the user-facing error message */
 	msg: message;
 	/** whether to disable the associated channel (when bridging) */
 	disable_channel?: boolean;
+	/** whether to show the cause or not */
+	without_cause?: boolean;
 
 	/** create and log an error */
 	constructor(e: unknown, public options?: error_options) {
 		if (e instanceof LightningError) {
 			super(e.message, { cause: e.cause });
 			this.id = e.id;
-			this.cause = e.cause;
+			this.error_cause = e.error_cause;
 			this.extra = e.extra;
 			this.msg = e.msg;
 			this.disable_channel = e.disable_channel;
-			return;
+			this.without_cause = e.without_cause;
+			return e;
 		}
 
-		const cause = e instanceof Error
+		const cause_err = Error.isError(e)
 			? e
 			: e instanceof Object
 			? new Error(JSON.stringify(e))
@@ -48,13 +53,14 @@ export class LightningError extends Error {
 
 		const id = crypto.randomUUID();
 
-		super(options?.message ?? cause.message, { cause });
+		super(options?.message ?? cause_err.message, { cause: e });
 
 		this.name = 'LightningError';
 		this.id = id;
-		this.cause = cause;
+		this.error_cause = cause_err;
 		this.extra = options?.extra ?? {};
 		this.disable_channel = options?.disable;
+		this.without_cause = options?.without_cause;
 		this.msg = create_message(
 			`Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\`\`\`\n${this.message}\n${this.id}\n\`\`\``,
 		);
@@ -64,8 +70,16 @@ export class LightningError extends Error {
 
 	/** log the error */
 	private async log(): Promise<void> {
-		console.error(`%c[lightning] error ${this.id}`, 'color: red');
-		console.error(this.cause, this.options);
+		console.error(`%c[lightning] ${this.message}`, 'color: red');
+		console.error(`%c[lightning] ${this.id}`, 'color: red');
+		console.error(
+			`%c[lightning] this does${
+				this.disable_channel ? ' ' : ' not '
+			}disable a channel`,
+			'color: red',
+		);
+
+		if (!this.without_cause) console.error(this.error_cause, this.extra);
 
 		const webhook = Deno.env.get('LIGHTNING_ERROR_WEBHOOK');
 
@@ -95,7 +109,7 @@ export class LightningError extends Error {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					content: `# ${this.cause.message}\n*${this.id}*`,
+					content: `# ${this.error_cause.message}\n*${this.id}*`,
 					embeds: [
 						{
 							title: 'extra',

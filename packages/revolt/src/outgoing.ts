@@ -1,12 +1,12 @@
-import type { Client } from '@jersey/rvapi';
-import type { DataMessageSend, SendableEmbed } from '@jersey/revolt-api-types';
 import {
 	type attachment,
 	LightningError,
 	type message,
 } from '@jersey/lightning';
+import type { DataMessageSend, SendableEmbed } from '@jersey/revolt-api-types';
+import type { Client } from '@jersey/rvapi';
 
-async function uploadAttachments(
+async function upload_files(
 	api: Client,
 	attachments?: attachment[],
 ): Promise<string[] | undefined> {
@@ -31,12 +31,12 @@ async function uploadAttachments(
 	)).filter((i) => i !== undefined);
 }
 
-export async function getOutgoingMessage(
+export async function get_outgoing(
 	api: Client,
 	message: message,
 	masquerade = true,
 ): Promise<DataMessageSend> {
-	const attachments = await uploadAttachments(api, message.attachments);
+	const attachments = await upload_files(api, message.attachments);
 
 	if (
 		(!message.content || message.content.length < 1) &&

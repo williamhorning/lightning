@@ -1,9 +1,9 @@
 import type { Client } from '@jersey/guildapi';
-import type { message } from '@jersey/lightning';
 import type { ChatEmbed } from '@jersey/guilded-api-types';
-import { fetchAuthor } from './incoming.ts';
+import type { message } from '@jersey/lightning';
+import { fetch_author } from './incoming.ts';
 
-type GuildedPayload = {
+type guilded_payload = {
 	content?: string;
 	embeds?: ChatEmbed[];
 	replyMessageIds?: string[];
@@ -11,19 +11,19 @@ type GuildedPayload = {
 	username?: string;
 };
 
-const usernameRegex = /^[a-zA-Z0-9_ ()-]{1,25}$/ms;
+const username = /^[a-zA-Z0-9_ ()-]{1,25}$/ms;
 
-function getUsername(msg: message): string {
-	if (usernameRegex.test(msg.author.username)) {
+function get_name(msg: message): string {
+	if (username.test(msg.author.username)) {
 		return msg.author.username;
-	} else if (usernameRegex.test(msg.author.rawname)) {
+	} else if (username.test(msg.author.rawname)) {
 		return msg.author.rawname;
 	} else {
 		return `${msg.author.id}`;
 	}
 }
 
-async function fetchReplyEmbed(
+async function fetch_reply(
 	msg: message,
 	client: Client,
 ): Promise<ChatEmbed | undefined> {
@@ -36,7 +36,7 @@ async function fetchReplyEmbed(
 			undefined,
 		);
 
-		const author = await fetchAuthor(replied_to.message, client);
+		const author = await fetch_author(replied_to.message, client);
 
 		return {
 			author: {
@@ -50,15 +50,15 @@ async function fetchReplyEmbed(
 	}
 }
 
-export async function getOutgoingMessage(
+export async function get_outgoing(
 	msg: message,
 	client: Client,
 	limitMentions?: boolean,
-): Promise<GuildedPayload> {
-	const message: GuildedPayload = {
+): Promise<guilded_payload> {
+	const message: guilded_payload = {
 		content: msg.content,
 		avatar_url: msg.author.profile,
-		username: getUsername(msg),
+		username: get_name(msg),
 		embeds: msg.embeds?.map((i) => {
 			return {
 				...i,
@@ -70,13 +70,13 @@ export async function getOutgoingMessage(
 						};
 					})
 					: undefined,
-				timestamp: i.timestamp ? String(i.timestamp) : undefined,
+				timestamp: i.timestamp ? i.timestamp.toString() : undefined,
 			};
 		}),
 	};
 
 	if (msg.reply_id) {
-		const embed = await fetchReplyEmbed(msg, client);
+		const embed = await fetch_reply(msg, client);
 
 		if (embed) {
 			if (!message.embeds) message.embeds = [];
@@ -100,8 +100,8 @@ export async function getOutgoingMessage(
 	if (!message.content && !message.embeds) message.content = '\u2800';
 
 	if (limitMentions && message.content) {
-		message.content = message.content.replace(/@everyone/g, '(a)everyone');
-		message.content = message.content.replace(/@here/g, '(a)here');
+		message.content = message.content.replace(/@everyone/gi, '(a)everyone');
+		message.content = message.content.replace(/@here/gi, '(a)here');
 	}
 
 	return message;

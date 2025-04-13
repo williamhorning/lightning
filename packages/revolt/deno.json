@@ -1,13 +1,12 @@
 {
 	"name": "@jersey/lightning-plugin-revolt",
-	"version": "0.8.0-alpha.1",
+	"version": "0.8.0",
 	"license": "MIT",
 	"exports": "./src/mod.ts",
 	"imports": {
 		"@jersey/lightning": "jsr:@jersey/lightning@^0.8.0",
 		"@jersey/rvapi": "jsr:@jersey/rvapi@^0.0.7",
 		"@jersey/revolt-api-types": "jsr:@jersey/revolt-api-types@^0.8.3",
-		"@std/ulid": "jsr:@std/ulid@^1.0.0",
-		"@valibot/valibot": "jsr:@valibot/valibot@^1.0.0"
+		"@std/ulid": "jsr:@std/ulid@^1.0.0"
 	}
 }

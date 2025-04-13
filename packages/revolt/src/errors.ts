@@ -1,5 +1,5 @@
-import { MediaError, RequestError } from '@jersey/rvapi';
 import { log_error } from '@jersey/lightning';
+import { MediaError, RequestError } from '@jersey/rvapi';
 
 export function handle_error(err: unknown, edit?: boolean) {
 	if (err instanceof MediaError) {
@@ -21,12 +21,12 @@ export function handle_error(err: unknown, edit?: boolean) {
 			});
 		} else {
 			log_error(err, {
-				message: 'unknown error',
+				message: 'unknown revolt request error',
 			});
 		}
 	} else {
 		log_error(err, {
-			message: 'unknown error',
+			message: 'unknown revolt error',
 		});
 	}
 }

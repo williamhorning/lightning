@@ -1,5 +1,5 @@
-import type { Context } from 'grammy';
 import type { message } from '@jersey/lightning';
+import type { Context } from 'grammy';
 
 const types = [
 	'text',
@@ -16,7 +16,7 @@ const types = [
 	'unsupported',
 ] as const;
 
-export async function getIncomingMessage(
+export async function get_incoming(
 	ctx: Context,
 	proxy: string,
 ): Promise<message | undefined> {
@@ -71,9 +71,12 @@ export async function getIncomingMessage(
 		case 'unsupported':
 			return;
 		default: {
-			const fileObj = type === 'photo' ? msg.photo!.slice(-1)[0] : msg[type]!;
-			const file = await ctx.api.getFile(fileObj.file_id);
+			const file = await ctx.api.getFile(
+				(type === 'photo' ? msg.photo!.slice(-1)[0] : msg[type]!).file_id,
+			);
+
 			if (!file.file_path) return;
+
 			return {
 				...base,
 				attachments: [{

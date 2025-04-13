@@ -1,11 +1,10 @@
 import { EventEmitter } from '@denosaurs/event';
 import type {
 	plugin,
-	plugin_events,
+	events,
 	plugin_module,
 } from './structures/plugins.ts';
-import { parse } from '@valibot/valibot';
-import { LightningError } from './structures/errors.ts';
+import { LightningError, log_error } from './structures/errors.ts';
 import type {
 	command,
 	command_opts,
@@ -21,7 +20,7 @@ export interface core_config {
 	}[];
 }
 
-export class core extends EventEmitter<plugin_events> {
+export class core extends EventEmitter<events> {
 	private commands = new Map<string, command>([
 		['help', {
 			name: 'help',
@@ -53,13 +52,14 @@ export class core extends EventEmitter<plugin_events> {
 		this.prefix = cfg.prefix || '!';
 
 		for (const { module, config } of cfg.plugins) {
-			if (!module.default || !module.config) {
-				throw new Error(`one or more of you plugins isn't actually a plugin!`);
+			if (!module.default || !module.parse_config) {
+				log_error({ ...module }, {
+					message: `one or more of you plugins isn't actually a plugin!`,
+					without_cause: true,
+				});
 			}
 
-			const plugin_config = parse(module.config, config);
-
-			const instance = new module.default(plugin_config);
+			const instance = new module.default(module.parse_config(config));
 
 			this.plugins.set(instance.name, instance);
 			this.handle_events(instance);
@@ -83,6 +83,7 @@ export class core extends EventEmitter<plugin_events> {
 			await new Promise((res) => setTimeout(res, 150));
 
 			if (this.handled.has(`${value[0].plugin}-${value[0].message_id}`)) {
+				this.handled.delete(`${value[0].plugin}-${value[0].message_id}`);
 				continue;
 			}
 
@@ -124,10 +125,11 @@ export class core extends EventEmitter<plugin_events> {
 		plugin: plugin,
 	): Promise<void> {
 		let command = this.commands.get(opts.command) ?? this.commands.get('help')!;
+		const subcommand_name = opts.subcommand ?? opts.rest?.shift();
 
-		if (command.subcommands && opts.subcommand) {
+		if (command.subcommands && subcommand_name) {
 			const subcommand = command.subcommands.find((i) =>
-				i.name === opts.subcommand
+				i.name === subcommand_name
 			);
 
 			if (subcommand) command = subcommand;

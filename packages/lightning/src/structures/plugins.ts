@@ -3,8 +3,8 @@ import type { bridge_message_opts } from './bridge.ts';
 import type { command, create_command } from './commands.ts';
 import type { deleted_message, message } from './messages.ts';
 
-/** the events emitted by a plugin */
-export type plugin_events = {
+/** the events emitted by core/plugins */
+export type events = {
 	/** when a message is created */
 	create_message: [message];
 	/** when a message is edited */
@@ -17,12 +17,12 @@ export type plugin_events = {
 
 /** a plugin for lightning */
 export interface plugin {
-	/** set commands on the platform, if available */
+	/** setup user-facing commands, if available */
 	set_commands?(commands: command[]): Promise<void> | void;
 }
 
 /** a plugin for lightning */
-export abstract class plugin extends EventEmitter<plugin_events> {
+export abstract class plugin extends EventEmitter<events> {
 	/** the name of your plugin */
 	abstract name: string;
 	/** setup a channel to be used in a bridge */
@@ -35,7 +35,7 @@ export abstract class plugin extends EventEmitter<plugin_events> {
 	/** edit a message in a given channel */
 	abstract edit_message(
 		message: message,
-		opts?: bridge_message_opts & { edit_ids: string[] },
+		opts: bridge_message_opts & { edit_ids: string[] },
 	): Promise<string[]>;
 	/** delete messages in a given channel */
 	abstract delete_messages(
@@ -49,6 +49,5 @@ export interface plugin_module {
 	// deno-lint-ignore no-explicit-any
 	default?: { new (cfg: any): plugin };
 	/** the config to validate use */
-	// deno-lint-ignore no-explicit-any
-	config?: any;
+	parse_config?: (data: unknown) => unknown;
 }

@@ -12,7 +12,7 @@ discord
 
 [[plugins]]
 plugin = "jsr:@jersey/lightning-plugin-discord@0.8.0"
-config = { token = "YOUR_DISCORD_TOKEN" }
+config.token = "YOUR_DISCORD_TOKEN"
 
 # ...
 ```

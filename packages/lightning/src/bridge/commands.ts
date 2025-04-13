@@ -129,7 +129,9 @@ export async function status(
 	let str = `Name: \`${bridge.name}\`\n\nChannels:\n`;
 
 	for (const [i, value] of bridge.channels.entries()) {
-		str += `${i + 1}. \`${value.id}\` on \`${value.plugin}\`\n`;
+		str += `${i + 1}. \`${value.id}\` on \`${value.plugin}\`${
+			value.disabled ? ' (disabled)' : ''
+		}\n`;
 	}
 
 	str += `\nSettings:\n`;

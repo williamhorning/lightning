@@ -1,8 +1,8 @@
-import type { ChatMessage, ServerMember } from '@jersey/guilded-api-types';
 import type { Client } from '@jersey/guildapi';
+import type { ChatMessage, ServerMember } from '@jersey/guilded-api-types';
 import type { attachment, message } from '@jersey/lightning';
 
-export async function fetchAuthor(msg: ChatMessage, client: Client) {
+export async function fetch_author(msg: ChatMessage, client: Client) {
 	try {
 		if (!msg.createdByWebhookId) {
 			const { member: author } = await client.request(
@@ -40,7 +40,7 @@ export async function fetchAuthor(msg: ChatMessage, client: Client) {
 	}
 }
 
-async function fetchAttachments(urls: string[], client: Client) {
+async function fetch_attachments(urls: string[], client: Client) {
 	const attachments: attachment[] = [];
 
 	try {
@@ -70,7 +70,7 @@ async function fetchAttachments(urls: string[], client: Client) {
 	return attachments;
 }
 
-export async function getIncomingMessage(
+export async function get_incoming(
 	msg: ChatMessage,
 	client: Client,
 ): Promise<message | undefined> {
@@ -88,9 +88,9 @@ export async function getIncomingMessage(
 	);
 
 	return {
-		attachments: await fetchAttachments(urls, client),
+		attachments: await fetch_attachments(urls, client),
 		author: {
-			...await fetchAuthor(msg, client),
+			...await fetch_author(msg, client),
 			color: '#F5C400',
 		},
 		channel_id: msg.channelId,

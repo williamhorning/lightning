@@ -12,7 +12,8 @@ telegram
 
 [[plugins]]
 plugin = "jsr:@jersey/lightning-plugin-revolt@0.8.0"
-config = { token = "YOUR_REVOLT_TOKEN", user_id = "YOUR_BOT_USER_ID" }
+config.token = "YOUR_REVOLT_TOKEN"
+config.user_id = "YOUR_BOT_USER_ID"
 
 # ...
 ```

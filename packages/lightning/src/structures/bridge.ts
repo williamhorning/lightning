@@ -12,7 +12,7 @@ export interface bridge {
 
 /** a channel within a bridge */
 export interface bridge_channel {
-	/** from the platform */
+	/** the channel's cannonical id */
 	id: string;
 	/** data needed to bridge this channel */
 	data: unknown;

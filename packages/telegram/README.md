@@ -12,7 +12,9 @@ telegram (including attachments via the included file proxy)
 
 [[plugins]]
 plugin = "jsr:@jersey/lightning-plugin-telegram@0.8.0"
-config = { token = "YOUR_TELEGRAM_TOKEN", proxy_port = 9090, proxy_url = "http://localhost:9090" }
+config.token = "YOUR_TELEGRAM_TOKEN"
+config.proxy_port = 9090
+config.proxy_url = "http://localhost:9090"
 
 # ...
 ```

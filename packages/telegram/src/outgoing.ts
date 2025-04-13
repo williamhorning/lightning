@@ -1,7 +1,7 @@
-import convert_markdown from 'telegramify-markdown';
 import type { message } from '@jersey/lightning';
+import convert_markdown from 'telegramify-markdown';
 
-export function getOutgoingMessage(
+export function get_outgoing(
 	msg: message,
 	bridged: boolean,
 ): { function: 'sendMessage' | 'sendDocument'; value: string }[] {

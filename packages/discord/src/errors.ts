@@ -5,7 +5,7 @@ export function handle_error(
 	err: unknown,
 	channel: string,
 	edit?: boolean,
-): never[] {
+) {
 	if (err instanceof DiscordAPIError) {
 		if (err.code === 30007 || err.code === 30058) {
 			log_error(err, {
@@ -33,7 +33,7 @@ export function handle_error(
 		}
 	} else {
 		log_error(err, {
-			message: `unknown discord plugin error`,
+			message: `unknown discord error`,
 			extra: { channel },
 		});
 	}

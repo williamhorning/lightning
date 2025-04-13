@@ -1,10 +1,10 @@
-import type { Client } from '@jersey/rvapi';
-import type { Message as APIMessage } from '@jersey/revolt-api-types';
-import { decodeTime } from '@std/ulid';
 import type { embed, message } from '@jersey/lightning';
-import { fetchAuthor } from './cache.ts';
+import type { Message as APIMessage } from '@jersey/revolt-api-types';
+import type { Client } from '@jersey/rvapi';
+import { decodeTime } from '@std/ulid';
+import { fetch_author } from './cache.ts';
 
-export async function getIncomingMessage(
+export async function get_incoming(
 	message: APIMessage,
 	api: Client,
 ): Promise<message> {
@@ -16,7 +16,7 @@ export async function getIncomingMessage(
 				size: i.size / 1048576,
 			};
 		}),
-		author: await fetchAuthor(api, message.author, message.channel),
+		author: await fetch_author(api, message.author, message.channel),
 		channel_id: message.channel,
 		content: message.content ?? undefined,
 		embeds: message.embeds?.map((i) => {

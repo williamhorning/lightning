@@ -1,5 +1,4 @@
 import { RedisClient } from '@iuioiua/redis';
-import { ulid } from '@std/ulid';
 import type { bridge, bridge_message } from '../structures/bridge.ts';
 import type { bridge_data } from './mod.ts';
 import { log_error } from '../structures/errors.ts';
@@ -110,7 +109,7 @@ export class redis implements bridge_data {
 	}
 
 	async create_bridge(br: Omit<bridge, 'id'>): Promise<bridge> {
-		const id = ulid();
+		const id = crypto.randomUUID();
 
 		await this.edit_bridge({ id, ...br });
 

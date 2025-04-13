@@ -1,3 +1,4 @@
+import type { message_author } from '@jersey/lightning';
 import type {
 	Channel,
 	Masquerade,
@@ -8,9 +9,8 @@ import type {
 	User,
 } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
-import type { message_author } from '@jersey/lightning';
 
-class RevoltCacher<K extends string, V> {
+class cacher<K extends string, V> {
 	private map = new Map<K, {
 		value: V;
 		expiry: number;
@@ -28,27 +28,27 @@ class RevoltCacher<K extends string, V> {
 	}
 }
 
-const authorCache = new RevoltCacher<`${string}/${string}`, message_author>();
-const channelCache = new RevoltCacher<string, Channel>();
-const memberCache = new RevoltCacher<`${string}/${string}`, Member>();
-const messageCache = new RevoltCacher<`${string}/${string}`, Message>();
-const roleCache = new RevoltCacher<`${string}/${string}`, Role>();
-const serverCache = new RevoltCacher<string, Server>();
-const userCache = new RevoltCacher<string, User>();
+const author_cache = new cacher<`${string}/${string}`, message_author>();
+const channel_cache = new cacher<string, Channel>();
+const member_cache = new cacher<`${string}/${string}`, Member>();
+const message_cache = new cacher<`${string}/${string}`, Message>();
+const role_cache = new cacher<`${string}/${string}`, Role>();
+const server_cache = new cacher<string, Server>();
+const user_cache = new cacher<string, User>();
 
-export async function fetchAuthor(
+export async function fetch_author(
 	api: Client,
 	authorID: string,
 	channelID: string,
 	masquerade?: Masquerade,
 ): Promise<message_author> {
 	try {
-		const cached = authorCache.get(`${authorID}/${channelID}`);
+		const cached = author_cache.get(`${authorID}/${channelID}`);
 
 		if (cached) return cached;
 
-		const channel = await fetchChannel(api, channelID);
-		const author = await fetchUser(api, authorID);
+		const channel = await fetch_channel(api, channelID);
+		const author = await fetch_user(api, authorID);
 
 		const data = {
 			id: authorID,
@@ -64,9 +64,9 @@ export async function fetchAuthor(
 		if (channel.channel_type !== 'TextChannel') return data;
 
 		try {
-			const member = await fetchMember(api, channel.server, authorID);
+			const member = await fetch_member(api, channel.server, authorID);
 
-			return authorCache.set(`${authorID}/${channelID}`, {
+			return author_cache.set(`${authorID}/${channelID}`, {
 				...data,
 				username: masquerade?.name ?? member.nickname ?? data.username,
 				profile: masquerade?.avatar ??
@@ -75,7 +75,7 @@ export async function fetchAuthor(
 						: data.profile),
 			});
 		} catch {
-			return authorCache.set(`${authorID}/${channelID}`, data);
+			return author_cache.set(`${authorID}/${channelID}`, data);
 		}
 	} catch {
 		return {
@@ -88,11 +88,11 @@ export async function fetchAuthor(
 	}
 }
 
-export async function fetchChannel(
+export async function fetch_channel(
 	api: Client,
 	channelID: string,
 ): Promise<Channel> {
-	const cached = channelCache.get(channelID);
+	const cached = channel_cache.get(channelID);
 
 	if (cached) return cached;
 
@@ -102,15 +102,15 @@ export async function fetchChannel(
 		undefined,
 	) as Channel;
 
-	return channelCache.set(channelID, channel);
+	return channel_cache.set(channelID, channel);
 }
 
-export async function fetchMember(
+export async function fetch_member(
 	client: Client,
 	serverID: string,
 	userID: string,
 ): Promise<Member> {
-	const member = memberCache.get(`${serverID}/${userID}`);
+	const member = member_cache.get(`${serverID}/${userID}`);
 
 	if (member) return member;
 
@@ -120,15 +120,15 @@ export async function fetchMember(
 		undefined,
 	) as Member;
 
-	return memberCache.set(`${serverID}/${userID}`, response);
+	return member_cache.set(`${serverID}/${userID}`, response);
 }
 
-export async function fetchMessage(
+export async function fetch_message(
 	client: Client,
 	channelID: string,
 	messageID: string,
 ): Promise<Message> {
-	const message = messageCache.get(`${channelID}/${messageID}`);
+	const message = message_cache.get(`${channelID}/${messageID}`);
 
 	if (message) return message;
 
@@ -138,15 +138,15 @@ export async function fetchMessage(
 		undefined,
 	) as Message;
 
-	return messageCache.set(`${channelID}/${messageID}`, response);
+	return message_cache.set(`${channelID}/${messageID}`, response);
 }
 
-export async function fetchRole(
+export async function fetch_role(
 	client: Client,
 	serverID: string,
 	roleID: string,
 ): Promise<Role> {
-	const role = roleCache.get(`${serverID}/${roleID}`);
+	const role = role_cache.get(`${serverID}/${roleID}`);
 
 	if (role) return role;
 
@@ -156,14 +156,14 @@ export async function fetchRole(
 		undefined,
 	) as Role;
 
-	return roleCache.set(`${serverID}/${roleID}`, response);
+	return role_cache.set(`${serverID}/${roleID}`, response);
 }
 
-export async function fetchServer(
+export async function fetch_server(
 	client: Client,
 	serverID: string,
 ): Promise<Server> {
-	const server = serverCache.get(serverID);
+	const server = server_cache.get(serverID);
 
 	if (server) return server;
 
@@ -173,14 +173,14 @@ export async function fetchServer(
 		undefined,
 	) as Server;
 
-	return serverCache.set(serverID, response);
+	return server_cache.set(serverID, response);
 }
 
-export async function fetchUser(
+export async function fetch_user(
 	api: Client,
 	userID: string,
 ): Promise<User> {
-	const cached = userCache.get(userID);
+	const cached = user_cache.get(userID);
 
 	if (cached) return cached;
 
@@ -190,5 +190,5 @@ export async function fetchUser(
 		undefined,
 	) as User;
 
-	return userCache.set(userID, user);
+	return user_cache.set(userID, user);
 }

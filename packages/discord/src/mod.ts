@@ -1,40 +1,51 @@
+import { Client, GatewayDispatchEvents } from '@discordjs/core';
 import { REST, type RESTOptions } from '@discordjs/rest';
 import { WebSocketManager } from '@discordjs/ws';
-import { Client } from '@discordjs/core';
-import { GatewayDispatchEvents } from 'discord-api-types';
-import {
-	getDeletedMessage,
-	getIncomingCommand,
-	getIncomingMessage,
-} from './incoming.ts';
-import { handle_error } from './errors.ts';
-import { getOutgoingMessage } from './outgoing.ts';
 import {
 	type bridge_message_opts,
 	type command,
 	type deleted_message,
+	log_error,
 	type message,
 	plugin,
 } from '@jersey/lightning';
 import { setup_commands } from './commands.ts';
-import { type InferOutput, object, string } from '@valibot/valibot';
+import { handle_error } from './errors.ts';
+import {
+	get_deleted_message,
+	get_incoming_command,
+	get_incoming_message,
+} from './incoming.ts';
+import { get_outgoing_message } from './outgoing.ts';
 
-/** Options for the Discord plugin */
-export const config = object({
-	/** The token to use for the bot */
-	token: string(),
-});
+/** options for the discord bot */
+export type discord_config = {
+	/** the token for your bot */
+	token: string;
+};
 
-export default class DiscordPlugin extends plugin {
+/** check if something is actually a config object, return if it is */
+export function parse_config(v: unknown): discord_config {
+	if (typeof v !== 'object' || v === null) {
+		log_error("discord config isn't an object!", { without_cause: true });
+	}
+	if (!('token' in v) || typeof v.token !== 'string') {
+		log_error("discord token isn't a string", { without_cause: true });
+	}
+	return { token: v.token };
+}
+
+/** discord support for lightning */
+export default class discord extends plugin {
 	name = 'bolt-discord';
 	private client: Client;
 
-	constructor(cfg: InferOutput<typeof config>) {
+	/** create the plugin */
+	constructor(cfg: discord_config) {
 		super();
 
 		const rest = new REST({
 			makeRequest: fetch as RESTOptions['makeRequest'],
-			userAgentAppendix: `${navigator.userAgent} lightningplugindiscord/0.8.0`,
 			version: '10',
 		}).setToken(cfg.token);
 
@@ -51,19 +62,19 @@ export default class DiscordPlugin extends plugin {
 
 	private setup_events() {
 		this.client.on(GatewayDispatchEvents.MessageCreate, async (data) => {
-			const msg = await getIncomingMessage(data);
+			const msg = await get_incoming_message(data);
 			if (msg) this.emit('create_message', msg);
 		}).on(GatewayDispatchEvents.MessageDelete, ({ data }) => {
-			this.emit('delete_message', getDeletedMessage(data));
+			this.emit('delete_message', get_deleted_message(data));
 		}).on(GatewayDispatchEvents.MessageDeleteBulk, ({ data }) => {
 			for (const id of data.ids) {
-				this.emit('delete_message', getDeletedMessage({ id, ...data }));
+				this.emit('delete_message', get_deleted_message({ id, ...data }));
 			}
 		}).on(GatewayDispatchEvents.MessageUpdate, async (data) => {
-			const msg = await getIncomingMessage(data);
+			const msg = await get_incoming_message(data);
 			if (msg) this.emit('edit_message', msg);
 		}).on(GatewayDispatchEvents.InteractionCreate, (data) => {
-			const cmd = getIncomingCommand(data);
+			const cmd = get_incoming_command(data);
 			if (cmd) this.emit('create_command', cmd);
 		}).on(GatewayDispatchEvents.Ready, async ({ data }) => {
 			console.log(
@@ -75,10 +86,12 @@ export default class DiscordPlugin extends plugin {
 		});
 	}
 
+	/** setup slash commands */
 	override async set_commands(commands: command[]): Promise<void> {
 		await setup_commands(this.client.api, commands);
 	}
 
+	/** create a webhook */
 	async setup_channel(channelID: string): Promise<unknown> {
 		try {
 			const { id, token } = await this.client.api.channels.createWebhook(
@@ -92,12 +105,13 @@ export default class DiscordPlugin extends plugin {
 		}
 	}
 
+	/** send a message using the bot itself or a webhook */
 	async create_message(
 		message: message,
 		data?: bridge_message_opts,
 	): Promise<string[]> {
 		try {
-			const msg = await getOutgoingMessage(
+			const msg = await get_outgoing_message(
 				message,
 				this.client.api,
 				data !== undefined,
@@ -127,6 +141,7 @@ export default class DiscordPlugin extends plugin {
 		}
 	}
 
+	/** edut a message sent by webhook */
 	async edit_message(
 		message: message,
 		data: bridge_message_opts & { edit_ids: string[] },
@@ -138,10 +153,10 @@ export default class DiscordPlugin extends plugin {
 				webhook.id,
 				webhook.token,
 				data.edit_ids[0],
-				await getOutgoingMessage(
+				await get_outgoing_message(
 					message,
 					this.client.api,
-					data !== undefined,
+					true,
 					data?.settings?.allow_everyone ?? false,
 				),
 			);
@@ -151,22 +166,22 @@ export default class DiscordPlugin extends plugin {
 		}
 	}
 
+	/** delete messages */
 	async delete_messages(msgs: deleted_message[]): Promise<string[]> {
-		const successful = [];
-
-		for (const msg of msgs) {
-			try {
-				await this.client.api.channels.deleteMessage(
-					msg.channel_id,
-					msg.message_id,
-				);
-				successful.push(msg.message_id);
-			} catch (e) {
-				// if this doesn't throw, it's fine
-				handle_error(e, msg.channel_id, true);
-			}
-		}
-
-		return successful;
+		return await Promise.all(
+			msgs.map(async (msg) => {
+				try {
+					await this.client.api.channels.deleteMessage(
+						msg.channel_id,
+						msg.message_id,
+					);
+					return msg.message_id;
+				} catch (e) {
+					// if this doesn't throw, it's fine
+					handle_error(e, msg.channel_id, true);
+					return msg.message_id;
+				}
+			}),
+		);
 	}
 }

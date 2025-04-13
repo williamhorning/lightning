@@ -1,5 +1,4 @@
 import { Client, type ClientOptions } from '@db/postgres';
-import { ulid } from '@std/ulid';
 import type { bridge, bridge_message } from '../structures/bridge.ts';
 import type { bridge_data } from './mod.ts';
 
@@ -48,7 +47,7 @@ export class postgres implements bridge_data {
 	private constructor(private pg: Client) {}
 
 	async create_bridge(br: Omit<bridge, 'id'>): Promise<bridge> {
-		const id = ulid();
+		const id = crypto.randomUUID();
 
 		await this.pg.queryArray`
             INSERT INTO bridges (id, name, channels, settings)

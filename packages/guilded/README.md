@@ -12,7 +12,7 @@ guilded
 
 [[plugins]]
 plugin = "jsr:@jersey/lightning-plugin-guilded@0.8.0"
-config = { token = "YOUR_GUILDED_TOKEN" }
+config.token = "YOUR_GUILDED_TOKEN"
 
 # ...
 ```
