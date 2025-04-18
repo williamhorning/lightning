@@ -1,6 +1,6 @@
 import { parse as parse_toml } from '@std/toml';
-import type { database_config } from './database/mod.ts';
 import type { core_config } from './core.ts';
+import type { database_config } from './database/mod.ts';
 import { log_error } from './structures/errors.ts';
 
 interface cli_plugin {

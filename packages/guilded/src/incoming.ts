@@ -1,15 +1,47 @@
 import type { Client } from '@jersey/guildapi';
-import type { ChatMessage, ServerMember } from '@jersey/guilded-api-types';
+import type {
+	ChatMessage,
+	ServerMember,
+	Webhook,
+} from '@jersey/guilded-api-types';
 import type { attachment, message } from '@jersey/lightning';
+
+class cacher<K extends string, V> {
+	private map = new Map<K, {
+		value: V;
+		expiry: number;
+	}>();
+	public expiry = 30000;
+	get(key: K): V | undefined {
+		const time = Temporal.Now.instant().epochMilliseconds;
+		const v = this.map.get(key);
+
+		if (v && v.expiry >= time) return v.value;
+	}
+	set(key: K, val: V): V {
+		const time = Temporal.Now.instant().epochMilliseconds;
+		this.map.set(key, { value: val, expiry: time + this.expiry });
+		return val;
+	}
+}
+
+const member_cache = new cacher<`${string}/${string}`, ServerMember>();
+const webhook_cache = new cacher<`${string}/${string}`, Webhook>();
+const asset_cache = new cacher<string, attachment>();
+asset_cache.expiry = 86400000; // 1 day!
 
 export async function fetch_author(msg: ChatMessage, client: Client) {
 	try {
 		if (!msg.createdByWebhookId) {
-			const { member: author } = await client.request(
-				'get',
-				`/servers/${msg.serverId}/members/${msg.createdBy}`,
-				undefined,
-			) as { member: ServerMember };
+			const author = member_cache.get(`${msg.serverId}/${msg.createdBy}`) ??
+				member_cache.set(
+					`${msg.serverId}/${msg.createdBy}`,
+					(await client.request(
+						'get',
+						`/servers/${msg.serverId}/members/${msg.createdBy}`,
+						undefined,
+					) as { member: ServerMember }).member,
+				);
 
 			return {
 				username: author.nickname || author.user.name,
@@ -18,11 +50,17 @@ export async function fetch_author(msg: ChatMessage, client: Client) {
 				profile: author.user.avatar || undefined,
 			};
 		} else {
-			const { webhook } = await client.request(
-				'get',
-				`/servers/${msg.serverId}/webhooks/${msg.createdByWebhookId}`,
-				undefined,
-			);
+			const webhook = webhook_cache.get(
+				`${msg.serverId}/${msg.createdByWebhookId}`,
+			) ??
+				webhook_cache.set(
+					`${msg.serverId}/${msg.createdByWebhookId}`,
+					(await client.request(
+						'get',
+						`/servers/${msg.serverId}/webhooks/${msg.createdByWebhookId}`,
+						undefined,
+					)).webhook,
+				);
 
 			return {
 				username: webhook.name,
@@ -40,31 +78,39 @@ export async function fetch_author(msg: ChatMessage, client: Client) {
 	}
 }
 
-async function fetch_attachments(urls: string[], client: Client) {
+async function fetch_attachments(markdown: string[], client: Client) {
+	const urls = markdown.map(
+		(url) => (url.split('(').pop())?.split(')')[0],
+	).filter((i) => i !== undefined);
+
 	const attachments: attachment[] = [];
 
-	try {
-		const signed = await client.request('post', '/url-signatures', {
-			urls: urls.map(
-				(url) => (url.split('(').pop())?.split(')')[0],
-			).filter((i) => i !== undefined),
-		});
+	for (const url of urls) {
+		const cached = asset_cache.get(url);
 
-		for (const url of signed.urlSignatures) {
-			if (url.signature) {
-				const resp = await fetch(url.signature, {
-					method: 'HEAD',
-				});
+		if (cached) {
+			attachments.push(cached);
+		} else {
+			try {
+				const signed = (await client.request('post', '/url-signatures', {
+					urls: [url],
+				})).urlSignatures[0];
 
-				attachments.push({
-					name: url.signature.split('/').pop()?.split('?')[0] || 'unknown',
-					file: url.signature,
-					size: parseInt(resp.headers.get('Content-Length') || '0') / 1048576,
-				});
+				if (signed.retryAfter || !signed.signature) continue;
+
+				attachments.push(asset_cache.set(signed.url, {
+					name: signed.signature.split('/').pop()?.split('?')[0] || 'unknown',
+					file: signed.signature,
+					size: parseInt(
+						(await fetch(signed.signature, {
+							method: 'HEAD',
+						})).headers.get('Content-Length') || '0',
+					) / 1048576,
+				}));
+			} catch {
+				continue;
 			}
 		}
-	} catch {
-		// ignore
 	}
 
 	return attachments;

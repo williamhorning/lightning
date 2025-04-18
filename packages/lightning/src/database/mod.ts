@@ -1,3 +1,4 @@
+import { promptSelect } from '@std/cli/unstable-prompt-select';
 import type { bridge, bridge_message } from '../structures/bridge.ts';
 import { postgres } from './postgres.ts';
 import { redis, type redis_config } from './redis.ts';
@@ -34,33 +35,29 @@ export async function create_database(
 		case 'redis':
 			return await redis.create(config.config);
 		default:
-			throw new Error('invalid database type');
+			throw new Error('invalid database type', { cause: config });
 	}
 }
 
-function get_database(
-	type: string,
-): typeof postgres | typeof redis {
+function get_database(message: string): typeof postgres | typeof redis {
+	const type = promptSelect(message, ['redis', 'postgres']);
+
 	switch (type) {
 		case 'postgres':
 			return postgres;
 		case 'redis':
 			return redis;
 		default:
-			throw new Error('invalid database type');
+			throw new Error('invalid database type!');
 	}
 }
 
 export async function handle_migration() {
-	const start_type = prompt(
-		'Please enter your starting database type (postgres, redis):',
-	) ?? '';
-	const start = await get_database(start_type).migration_get_instance();
+	const start = await get_database('Please enter your starting database type: ')
+		.migration_get_instance();
 
-	const end_type = prompt(
-		'Please enter your ending database type (postgres, redis):',
-	) ?? '';
-	const end = await get_database(end_type).migration_get_instance();
+	const end = await get_database('Please enter your ending database type: ')
+		.migration_get_instance();
 
 	console.log('Downloading bridges...');
 	let bridges = await start.migration_get_bridges();

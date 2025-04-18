@@ -7,34 +7,21 @@ apps via plugins
 
 ## [docs](https://williamhorning.eu.org/lightning)
 
-## example config
+## `lightning.toml` example
 
-```ts
-import { discord_plugin } from 'jsr:@jersey/lightning-plugin-discord@0.8.0';
-import { revolt_plugin } from 'jsr:@jersey/lightning-plugin-revolt@0.8.0';
+```toml
+prefix = "!"
 
-export default {
-	prefix: '!',
-	database: {
-		type: 'postgres',
-		config: {
-			user: 'server',
-			database: 'lightning',
-			hostname: 'postgres',
-			port: 5432,
-			host_type: 'tcp',
-		},
-	},
-	plugins: [
-		discord_plugin.new({
-			token: 'your_token',
-			application_id: 'your_application_id',
-			slash_commands: true,
-		}),
-		revolt_plugin.new({
-			token: 'your_token',
-			user_id: 'your_bot_user_id',
-		}),
-	],
-};
+[database]
+type = "postgres"
+config = "postgresql://server:password@postgres:5432/lightning"
+
+[[plugins]]
+plugin = "jsr:@jersey/lightning-plugin-discord@0.8.0"
+config.token = "your_token"
+
+[[plugins]]
+plugin = "jsr:@jersey/lightning-plugin-revolt@0.8.0"
+config.token = "your_token"
+config.user_id = "your_bot_user_id"
 ```

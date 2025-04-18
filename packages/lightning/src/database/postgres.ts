@@ -1,8 +1,14 @@
-import { Client, type ClientOptions } from '@db/postgres';
+import { Client } from '@db/postgres';
+import {
+	ProgressBar,
+	type ProgressBarFormatter,
+} from '@std/cli/unstable-progress-bar';
+import { Spinner } from '@std/cli/unstable-spinner';
 import type { bridge, bridge_message } from '../structures/bridge.ts';
 import type { bridge_data } from './mod.ts';
 
-export type { ClientOptions as postgres_config };
+const fmt = (fmt: ProgressBarFormatter) =>
+	`[postgres] ${fmt.progressBar} ${fmt.styledTime()} [${fmt.value}/${fmt.max}]\n`;
 
 export class postgres implements bridge_data {
 	static async create(pg_url: string): Promise<bridge_data> {
@@ -125,33 +131,61 @@ export class postgres implements bridge_data {
 	}
 
 	async migration_get_bridges(): Promise<bridge[]> {
+		const spinner = new Spinner({ message: 'getting bridges from postgres' });
+
+		spinner.start();
+
 		const res = await this.pg.queryObject<bridge>(`
             SELECT * FROM bridges
         `);
+
+		spinner.stop();
 
 		return res.rows;
 	}
 
 	async migration_get_messages(): Promise<bridge_message[]> {
+		const spinner = new Spinner({ message: 'getting messages from postgres' });
+
+		spinner.start();
+
 		const res = await this.pg.queryObject<bridge_message>(`
             SELECT * FROM bridge_messages
         `);
+
+		spinner.stop();
 
 		return res.rows;
 	}
 
 	async migration_set_messages(messages: bridge_message[]): Promise<void> {
+		const progress = new ProgressBar(Deno.stdout.writable, {
+			max: messages.length,
+			fmt: fmt,
+		});
+
 		for (const msg of messages) {
+			progress.add(1);
+
 			try {
 				await this.create_message(msg);
 			} catch {
 				console.warn(`failed to insert message ${msg.id}`);
 			}
 		}
+
+		progress.end();
 	}
 
 	async migration_set_bridges(bridges: bridge[]): Promise<void> {
+		const progress = new ProgressBar(Deno.stdout.writable, {
+			max: bridges.length,
+			fmt: fmt,
+		});
+
 		for (const br of bridges) {
+			progress.add(1);
+
 			await this.pg.queryArray`
                 INSERT INTO bridges (id, name, channels, settings)
                 VALUES (${br.id}, ${br.name}, ${JSON.stringify(br.channels)}, ${
@@ -159,14 +193,19 @@ export class postgres implements bridge_data {
 			})
             `;
 		}
+
+		progress.end();
 	}
 
 	static async migration_get_instance(): Promise<bridge_data> {
-		const pg_url = prompt(
-			'Please enter your Postgres connection string (postgres://localhost):',
-		) ||
-			'postgres://localhost';
+		const default_url = `postgres://${
+			Deno.env.get('USER') ?? Deno.env.get('USERNAME')
+		}@localhost/lightning`;
 
-		return await postgres.create(pg_url);
+		const pg_url = prompt(
+			`Please enter your Postgres connection string (${default_url}):`,
+		);
+
+		return await postgres.create(pg_url || default_url);
 	}
 }

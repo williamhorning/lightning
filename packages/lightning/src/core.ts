@@ -1,16 +1,16 @@
 import { EventEmitter } from '@denosaurs/event';
 import type {
-	plugin,
-	events,
-	plugin_module,
-} from './structures/plugins.ts';
-import { LightningError, log_error } from './structures/errors.ts';
-import type {
 	command,
 	command_opts,
 	create_command,
 } from './structures/commands.ts';
+import { LightningError, log_error } from './structures/errors.ts';
 import { create_message, type message } from './structures/messages.ts';
+import type {
+	events,
+	plugin,
+	plugin_module,
+} from './structures/plugins.ts';
 
 export interface core_config {
 	prefix?: string;

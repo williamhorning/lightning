@@ -1,8 +1,8 @@
-import { parse_config } from './cli_config.ts';
-import { log_error } from './structures/errors.ts';
-import { handle_migration } from './database/mod.ts';
-import { core } from './core.ts';
 import { setup_bridge } from './bridge/setup.ts';
+import { parse_config } from './cli_config.ts';
+import { core } from './core.ts';
+import { handle_migration } from './database/mod.ts';
+import { log_error } from './structures/errors.ts';
 
 if (Deno.args[0] === 'migrate') {
 	handle_migration();

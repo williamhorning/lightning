@@ -1,21 +1,30 @@
 import { RedisClient } from '@iuioiua/redis';
-import type { bridge, bridge_message } from '../structures/bridge.ts';
-import type { bridge_data } from './mod.ts';
+import {
+	ProgressBar,
+	type ProgressBarFormatter,
+} from '@std/cli/unstable-progress-bar';
+import type {
+	bridge,
+	bridge_channel,
+	bridge_message,
+	bridged_message,
+} from '../structures/bridge.ts';
 import { log_error } from '../structures/errors.ts';
+import type { bridge_data } from './mod.ts';
 
 export type redis_config = Deno.ConnectOptions;
 
+const fmt = (fmt: ProgressBarFormatter) =>
+	`[redis] ${fmt.progressBar} ${fmt.styledTime()} [${fmt.value}/${fmt.max}]\n`;
+
 export class redis implements bridge_data {
-	static async create(rd_options: Deno.ConnectOptions): Promise<bridge_data> {
+	static async create(
+		rd_options: Deno.ConnectOptions,
+		_do_not_use = false,
+	): Promise<bridge_data> {
 		const conn = await Deno.connect(rd_options);
-		const client = new RedisClient(conn);
+		const rd = new RedisClient(conn);
 
-		await this.migrate(client);
-
-		return new this(client);
-	}
-
-	static async migrate(rd: RedisClient): Promise<void> {
 		let db_data_version = await rd.sendCommand([
 			'GET',
 			'lightning-db-version',
@@ -27,80 +36,58 @@ export class redis implements bridge_data {
 			if (number_keys === 0) db_data_version = '0.8.0';
 		}
 
-		if (db_data_version !== '0.8.0') {
+		if (db_data_version !== '0.8.0' && !_do_not_use) {
 			console.warn(
 				`[lightning-redis] migrating database from ${db_data_version} to 0.8.0`,
 			);
 
-			console.log('[lightning-redis] getting keys');
+			const instance = new this(rd, true);
 
-			const all_keys = await rd.sendCommand([
-				'KEYS',
-				'lightning-*',
-			]) as string[];
+			console.log('[lightning-redis] getting bridges...');
 
-			console.log('[lightning-redis] got keys');
+			const bridges = await instance.migration_get_bridges();
 
-			const new_data = await Promise.all(all_keys.map(async (key: string) => {
-				console.log(`[lightning-redis] migrating key ${key}`);
-				const type = await rd.sendCommand(['TYPE', key]) as string;
-				const value = await rd.sendCommand([
-					type === 'string' ? 'GET' : 'JSON.GET',
-					key,
-				]) as string;
+			console.log('[lightning-redis] got bridges!');
 
-				try {
-					const parsed = JSON.parse(value);
-					return [
-						key,
-						JSON.stringify(
-							{
-								id: key.split('-')[2],
-								bridge_id: parsed.id,
-								channels: parsed.channels,
-								messages: parsed.messages,
-								name: parsed.id,
-								settings: {
-									allow_everyone: false,
-								},
-							} as bridge | bridge_message,
-						),
-					];
-				} catch {
-					return [key, value];
-				}
-			}));
-
-			Deno.writeTextFileSync(
+			await Deno.writeTextFile(
 				'lightning-redis-migration.json',
-				JSON.stringify(new_data, null, 2),
+				JSON.stringify(bridges, null, 2),
 			);
 
-			console.warn('[lightning-redis] do you want to continue?');
-
-			const write = confirm('write the data to the database?');
+			const write = confirm(
+				'[lightning-redis] write the data to the database? see \`lightning-redis-migration.json\` for the data',
+			);
 			const env_confirm = Deno.env.get('LIGHTNING_MIGRATE_CONFIRM');
 
 			if (write || env_confirm === 'true') {
-				await rd.sendCommand(['DEL', ...all_keys]);
-				await rd.sendCommand([
-					'MSET',
-					'lightning-db-version',
-					'0.8.0',
-					...new_data.flat(1),
-				]);
+				await instance.migration_set_bridges(bridges);
+
+				const former_messages = await rd.sendCommand([
+					'KEYS',
+					'lightning-bridged-*',
+				]) as string[];
+
+				for (const key of former_messages) {
+					await rd.sendCommand(['DEL', key]);
+				}
 
 				console.warn('[lightning-redis] data written to database');
+
+				return instance;
 			} else {
-				console.warn('[lightning-redis] data not written to database');
-				log_error('migration cancelled');
+				log_error('[lightning-redis] data not written to database', {
+					without_cause: true,
+				});
 			}
+		} else {
+			return new this(rd, _do_not_use);
 		}
 	}
 
-	private constructor(public redis: RedisClient) {
-		this.redis = redis;
-	}
+	private constructor(
+		public redis: RedisClient,
+		private seven = false,
+	) {}
 
 	async get_json<T>(key: string): Promise<T | undefined> {
 		const reply = await this.redis.sendCommand(['GET', key]);
@@ -151,13 +138,13 @@ export class redis implements bridge_data {
 			`lightning-bchannel-${ch}`,
 		]);
 		if (!channel || channel === 'OK') return;
-		return await this.get_json<bridge>(`lightning-bridge-${channel}`);
+		return await this.get_bridge_by_id(channel as string);
 	}
 
 	async create_message(msg: bridge_message): Promise<void> {
 		await this.redis.sendCommand([
 			'SET',
-			'lightning-message-${msg.id}',
+			`lightning-message-${msg.id}`,
 			JSON.stringify(msg),
 		]);
 
@@ -192,19 +179,81 @@ export class redis implements bridge_data {
 
 		const bridges = [] as bridge[];
 
-		for (const key of keys) {
-			const bridge = await this.get_bridge_by_id(
-				key.replace('lightning-bridge-', ''),
-			);
+		const progress = new ProgressBar(Deno.stdout.writable, {
+			max: keys.length,
+			fmt,
+		});
 
-			if (bridge) bridges.push(bridge);
+		for (const key of keys) {
+			progress.add(1);
+			if (!this.seven) {
+				const bridge = await this.get_bridge_by_id(
+					key.replace('lightning-bridge-', ''),
+				);
+
+				if (bridge) bridges.push(bridge);
+			} else {
+				// ignore UUIDs and ULIDs
+				if (
+					key.replace('lightning-bridge-', '').match(
+						/[0-7][0-9A-HJKMNP-TV-Z]{25}/gm,
+					) ||
+					key.replace('lightning-bridge-', '').match(
+						/^[0-9A-F]{8}-[0-9A-F]{4}-[4][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i,
+					)
+				) {
+					continue;
+				}
+
+				const bridge = await this.get_json<{
+					allow_editing: boolean;
+					channels: bridge_channel[];
+					id: string;
+					messages?: bridged_message[];
+					use_rawname: boolean;
+				}>(key);
+
+				if (bridge && bridge.channels) {
+					bridges.push({
+						id: key.replace('lightning-bridge-', ''),
+						name: bridge.id,
+						channels: bridge.channels,
+						settings: {
+							allow_everyone: false,
+						},
+					});
+				}
+			}
 		}
+
+		progress.end();
 
 		return bridges;
 	}
 
 	async migration_set_bridges(bridges: bridge[]): Promise<void> {
+		const progress = new ProgressBar(Deno.stdout.writable, {
+			max: bridges.length,
+			fmt,
+		});
+
 		for (const bridge of bridges) {
+			progress.add(1);
+
+			await this.redis.sendCommand([
+				'DEL',
+				`lightning-bridge-${bridge.id}`,
+			]);
+
+			for (const channel of bridge.channels) {
+				await this.redis.sendCommand([
+					'DEL',
+					`lightning-bchannel-${channel.id}`,
+				]);
+			}
+
+			if (bridge.channels.length < 2) continue;
+
 			await this.redis.sendCommand([
 				'SET',
 				`lightning-bridge-${bridge.id}`,
@@ -219,6 +268,10 @@ export class redis implements bridge_data {
 				]);
 			}
 		}
+
+		progress.end();
+
+		await this.redis.sendCommand(['SET', 'lightning-db-version', '0.8.0']);
 	}
 
 	async migration_get_messages(): Promise<bridge_message[]> {
@@ -229,18 +282,34 @@ export class redis implements bridge_data {
 
 		const messages = [] as bridge_message[];
 
+		const progress = new ProgressBar(Deno.stdout.writable, {
+			max: keys.length,
+			fmt,
+		});
+
 		for (const key of keys) {
+			progress.add(1);
 			const message = await this.get_json<bridge_message>(key);
 			if (message) messages.push(message);
 		}
+
+		progress.end();
 
 		return messages;
 	}
 
 	async migration_set_messages(messages: bridge_message[]): Promise<void> {
+		const progress = new ProgressBar(Deno.stdout.writable, {
+			max: messages.length,
+			fmt,
+		});
+
 		for (const message of messages) {
+			progress.add(1);
 			await this.create_message(message);
 		}
+
+		progress.end();
 
 		await this.redis.sendCommand(['SET', 'lightning-db-version', '0.8.0']);
 	}
@@ -254,6 +323,6 @@ export class redis implements bridge_data {
 			hostname,
 			port: parseInt(port),
 			transport: 'tcp',
-		});
+		}, true);
 	}
 }

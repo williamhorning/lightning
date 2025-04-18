@@ -1,7 +1,7 @@
-import type { bridge_data } from '../database/mod.ts';
 import type { core } from '../core.ts';
-import { LightningError } from '../structures/errors.ts';
+import type { bridge_data } from '../database/mod.ts';
 import type { bridge_message, bridged_message } from '../structures/bridge.ts';
+import { LightningError } from '../structures/errors.ts';
 import type { deleted_message, message } from '../structures/messages.ts';
 
 export async function bridge_message(
@@ -106,7 +106,11 @@ export async function bridge_message(
 
 			if (!err.disable_channel) {
 				try {
-					const result_ids = await plugin.create_message(err.msg);
+					const result_ids = await plugin.create_message({
+						...err.msg,
+						message_id: prior_bridged_ids?.id[0] ?? '',
+						channel_id: channel.id,
+					});
 					result_ids.forEach((id) => core.set_handled(channel.plugin, id));
 				} catch (e) {
 					new LightningError(e, {
