@@ -57,7 +57,7 @@ export default class revolt extends plugin {
 			this.emit('delete_message', {
 				channel_id: data.channel,
 				message_id: data.id,
-				plugin: "bolt-revolt",
+				plugin: 'bolt-revolt',
 				timestamp: Temporal.Now.instant(),
 			});
 		}).on('MessageUpdate', async (data) => {
@@ -137,7 +137,7 @@ export default class revolt extends plugin {
 					handle_error(e);
 					return msg.message_id;
 				}
-			})
+			}),
 		);
 	}
 }

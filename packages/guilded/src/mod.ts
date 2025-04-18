@@ -149,6 +149,6 @@ export default class guilded extends plugin {
 				handle_error(e, msg.channel_id, true);
 				return msg.message_id;
 			}
-		}))
+		}));
 	}
 }

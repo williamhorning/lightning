@@ -6,7 +6,7 @@
 	"imports": {
 		"@db/postgres": "jsr:@jersey/test@0.8.6",
 		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",
-		"@iuioiua/redis": "jsr:@iuioiua/redis@^1.0.1",
+		"@iuioiua/redis": "jsr:@iuioiua/redis@^1.1.1",
 		"@std/toml": "jsr:@std/toml@^1.0.4",
 		"@std/cli": "jsr:@std/cli@^1.0.16"
 	}

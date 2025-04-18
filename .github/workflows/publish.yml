@@ -20,7 +20,7 @@ jobs:
       - name: setup deno
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v2.2.9
+          deno-version: v2.2.11
       - name: publish to jsr
         run: deno publish
   publish_docker:
