@@ -14,7 +14,7 @@ RUN ["mkdir", "/deno_dir"]
 ENV DENO_DIR=/deno_dir
 
 # install lightning
-RUN ["deno", "install", "-L", "debug", "--global", "--name", "lightning", "--allow-all", "--unstable-temporal", "--unstable-net", "jsr:@lightning/lightning@0.8.0-alpha.1"]
+RUN ["deno", "install", "--global", "--name", "lightning", "--allow-all", "--unstable-temporal", "--unstable-net", "jsr:@lightning/lightning@0.8.0-alpha.1"]
 RUN ["chown", "--recursive", "1001:1001", "/deno_dir"]
 
 # run as user instead of root
