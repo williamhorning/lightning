@@ -9,6 +9,6 @@ you do that, you will need to add the following to your `lightning.toml` file:
 
 ```toml
 [[plugins]]
-plugin = "jsr:@lightning/discord@0.8.0"
+plugin = "jsr:@lightning/discord@0.8.0-alpha.1"
 config.token = "your_bot_token"
 ```

@@ -45,9 +45,9 @@ export class redis implements bridge_data {
 				host: rd_options.hostname,
 				port: rd_options.port,
 			});
-			streams = { 
-				readable: Readable.toWeb(conn) as ReadableStream<Uint8Array>, 
-				writable: Writable.toWeb(conn)
+			streams = {
+				readable: Readable.toWeb(conn) as ReadableStream<Uint8Array>,
+				writable: Writable.toWeb(conn),
 			};
 		}
 

@@ -14,7 +14,7 @@ const fmt = (fmt: ProgressBarFormatter) =>
 
 export class postgres implements bridge_data {
 	private pg: Client;
-	
+
 	static async create(pg_url: string): Promise<bridge_data> {
 		const { Client } = await import('@db/postgres');
 		const pg = new Client(pg_url);

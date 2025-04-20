@@ -46,8 +46,8 @@ export class LightningError extends Error {
 			return e;
 		}
 
-		const cause_err = ("isError" in Error ? Error.isError(e) : e instanceof Error)
-			? e as Error
+		const cause_err = e instanceof Error
+			? e
 			: e instanceof Object
 			? new Error(JSON.stringify(e))
 			: new Error(String(e));

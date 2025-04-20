@@ -1,4 +1,0 @@
-{
-	"type": "module",
-	"exports": "./src/mod.ts"
-}

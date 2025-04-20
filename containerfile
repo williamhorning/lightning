@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.authors Jersey
 LABEL org.opencontainers.image.url https://github.com/williamhorning/lightning
 LABEL org.opencontainers.image.source https://github.com/williamhorning/lightning
 LABEL org.opencontainers.image.documentation https://williamhorning.eu.org/lightning
-LABEL org.opencontainers.image.version 0.8.0
+LABEL org.opencontainers.image.version 0.8.0-alpha.1
 LABEL org.opencontainers.image.licenses MIT
 LABEL org.opencontainers.image.title lightning
 

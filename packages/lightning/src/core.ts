@@ -36,7 +36,7 @@ export class core extends EventEmitter<events> {
 		['version', {
 			name: 'version',
 			description: 'get the bots version',
-			execute: () => 'hello from v0.8.0!',
+			execute: () => 'hello from v0.8.0-alpha.1!',
 		}],
 	]);
 	private plugins = new Map<string, plugin>();

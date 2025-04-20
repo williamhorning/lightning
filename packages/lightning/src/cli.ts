@@ -29,10 +29,10 @@ if (args[0] === 'migrate') {
 		});
 	}
 } else if (args[0] === 'version') {
-	console.log('0.8.0');
+	console.log('0.8.0-alpha.1');
 } else {
 	console.log(
-		`lightning v0.8.0 - extensible chatbot connecting communities`,
+		`lightning v0.8.0-alpha.1 - extensible chatbot connecting communities`,
 	);
 	console.log('  Usage: lightning [subcommand]');
 	console.log('  Subcommands:');

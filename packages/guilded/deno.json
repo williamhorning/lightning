@@ -1,10 +1,10 @@
 {
 	"name": "@lightning/guilded",
-	"version": "0.8.0",
+	"version": "0.8.0-alpha.1",
 	"license": "MIT",
 	"exports": "./src/mod.ts",
 	"imports": {
-		"@lightning/lightning": "jsr:@lightning/lightning@^0.8.0",
+		"@lightning/lightning": "jsr:@lightning/lightning@^0.8.0-alpha.1",
 		"@jersey/guildapi": "jsr:@jersey/guildapi@^0.0.4",
 		"@jersey/guilded-api-types": "jsr:@jersey/guilded-api-types@^0.0.2"
 	}
