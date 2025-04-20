@@ -99,6 +99,10 @@ export async function leave(
 
 	if (!bridge) return `You are not in a bridge`;
 
+	if (opts.args.id !== bridge.id) {
+		return `You must provide the bridge id in order to leave this bridge`;
+	}
+
 	bridge.channels = bridge.channels.filter((
 		ch,
 	) => ch.id !== opts.channel_id);

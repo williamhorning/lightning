@@ -47,6 +47,11 @@ export async function setup_bridge(core: core, config: database_config) {
 			{
 				name: 'leave',
 				description: 'leave the current bridge',
+				arguments: [{
+					name: 'id',
+					description: 'id of the current bridge',
+					required: true,
+				}],
 				execute: (o) => leave(database, o),
 			},
 			{
