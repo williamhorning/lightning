@@ -1,11 +1,12 @@
 import {
 	type bridge_message_opts,
 	type deleted_message,
-	LightningError,
 	log_error,
 	type message,
 	plugin,
 } from '@lightning/lightning';
+import { Application } from '@oak/oak/application';
+import { proxy } from '@oak/oak/proxy';
 import { Bot } from 'grammy';
 import { get_incoming } from './incoming.ts';
 import { get_outgoing } from './outgoing.ts';
@@ -53,34 +54,17 @@ export default class telegram extends plugin {
 			if (msg) this.emit('create_message', msg);
 		});
 
-		Deno.serve({
-			port: opts.proxy_port,
-			onListen: ({ port }) => {
-				console.log(
-					`[telegram] proxy available at localhost:${port} or ${opts.proxy_url}`,
-				);
-			},
-			onError: (e) =>
-				new Response(
-					JSON.stringify(
-						new LightningError(e, {
-							message: `something went wrong with the telegram file proxy`,
-						}).msg,
-					),
-					{
-						status: 500,
-						statusText: 'internal server error',
-						headers: { 'Content-Type': 'application/json' },
-					},
-				),
-		}, (req: Request) => {
-			const { pathname } = new URL(req.url);
-			return fetch(
-				`https://api.telegram.org/file/bot${opts.token}/${
-					pathname.replace('/telegram/', '')
-				}`,
-			);
-		});
+		const app = new Application().use(
+			proxy(`https://api.telegram.org/file/bot${opts.token}/`, {
+				map: (path) => path.replace('/telegram/', ''),
+			}),
+		);
+
+		app.listen({ port: opts.proxy_port });
+
+		console.log(
+			`[telegram] proxy available at localhost:${opts.proxy_port} or ${opts.proxy_url}`,
+		);
 	}
 
 	/** stub for setup_channel */
