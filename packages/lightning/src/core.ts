@@ -68,6 +68,12 @@ export class core extends EventEmitter<events> {
 
 	set_command(opts: command): void {
 		this.commands.set(opts.name, opts);
+
+		for (const [_, plugin] of this.plugins) {
+			if (plugin.set_commands) {
+				plugin.set_commands(this.commands.values().toArray());
+			}
+		}
 	}
 
 	get_plugin(name: string): plugin | undefined {
