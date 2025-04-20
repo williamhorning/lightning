@@ -1,8 +1,11 @@
+import { getEnv } from '@cross/env';
+import { stdout } from '@cross/utils';
 import { RedisClient } from '@iuioiua/redis';
 import {
 	ProgressBar,
 	type ProgressBarFormatter,
 } from '@std/cli/unstable-progress-bar';
+import { writeTextFile } from '@std/fs/unstable-write-text-file';
 import type {
 	bridge,
 	bridge_channel,
@@ -12,18 +15,40 @@ import type {
 import { log_error } from '../structures/errors.ts';
 import type { bridge_data } from './mod.ts';
 
-export type redis_config = Deno.ConnectOptions;
+export interface redis_config {
+	hostname: string;
+	port: number;
+}
 
 const fmt = (fmt: ProgressBarFormatter) =>
 	`[redis] ${fmt.progressBar} ${fmt.styledTime()} [${fmt.value}/${fmt.max}]\n`;
 
 export class redis implements bridge_data {
 	static async create(
-		rd_options: Deno.ConnectOptions,
+		rd_options: redis_config,
 		_do_not_use = false,
 	): Promise<bridge_data> {
-		const conn = await Deno.connect(rd_options);
-		const rd = new RedisClient(conn);
+		let streams: {
+			readable: ReadableStream<Uint8Array>;
+			writable: WritableStream<Uint8Array>;
+		};
+
+		if ('Deno' in globalThis) {
+			streams = await Deno.connect(rd_options);
+		} else {
+			const { createConnection } = await import('node:net');
+			const { Readable, Writable } = await import('node:stream');
+			const conn = createConnection({
+				host: rd_options.hostname,
+				port: rd_options.port,
+			});
+			streams = { 
+				readable: Readable.toWeb(conn) as ReadableStream<Uint8Array>, 
+				writable: Writable.toWeb(conn)
+			};
+		}
+
+		const rd = new RedisClient(streams);
 
 		let db_data_version = await rd.sendCommand([
 			'GET',
@@ -49,7 +74,7 @@ export class redis implements bridge_data {
 
 			console.log('[lightning-redis] got bridges!');
 
-			await Deno.writeTextFile(
+			await writeTextFile(
 				'lightning-redis-migration.json',
 				JSON.stringify(bridges, null, 2),
 			);
@@ -57,7 +82,7 @@ export class redis implements bridge_data {
 			const write = confirm(
 				'[lightning-redis] write the data to the database? see \`lightning-redis-migration.json\` for the data',
 			);
-			const env_confirm = Deno.env.get('LIGHTNING_MIGRATE_CONFIRM');
+			const env_confirm = getEnv('LIGHTNING_MIGRATE_CONFIRM');
 
 			if (write || env_confirm === 'true') {
 				await instance.migration_set_bridges(bridges);
@@ -179,7 +204,7 @@ export class redis implements bridge_data {
 
 		const bridges = [] as bridge[];
 
-		const progress = new ProgressBar(Deno.stdout.writable, {
+		const progress = new ProgressBar(stdout(), {
 			max: keys.length,
 			fmt,
 		});
@@ -232,7 +257,7 @@ export class redis implements bridge_data {
 	}
 
 	async migration_set_bridges(bridges: bridge[]): Promise<void> {
-		const progress = new ProgressBar(Deno.stdout.writable, {
+		const progress = new ProgressBar(stdout(), {
 			max: bridges.length,
 			fmt,
 		});
@@ -282,7 +307,7 @@ export class redis implements bridge_data {
 
 		const messages = [] as bridge_message[];
 
-		const progress = new ProgressBar(Deno.stdout.writable, {
+		const progress = new ProgressBar(stdout(), {
 			max: keys.length,
 			fmt,
 		});
@@ -299,7 +324,7 @@ export class redis implements bridge_data {
 	}
 
 	async migration_set_messages(messages: bridge_message[]): Promise<void> {
-		const progress = new ProgressBar(Deno.stdout.writable, {
+		const progress = new ProgressBar(stdout(), {
 			max: messages.length,
 			fmt,
 		});
@@ -322,7 +347,6 @@ export class redis implements bridge_data {
 		return await redis.create({
 			hostname,
 			port: parseInt(port),
-			transport: 'tcp',
 		}, true);
 	}
 }

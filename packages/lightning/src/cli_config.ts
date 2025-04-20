@@ -1,3 +1,5 @@
+import { setEnv } from '@cross/env';
+import { readTextFile } from '@std/fs/unstable-read-text-file';
 import { parse as parse_toml } from '@std/toml';
 import type { core_config } from './core.ts';
 import type { database_config } from './database/mod.ts';
@@ -15,7 +17,7 @@ interface config extends core_config {
 
 export async function parse_config(path: URL): Promise<config> {
 	try {
-		const file = await Deno.readTextFile(path);
+		const file = await readTextFile(path);
 		const raw = parse_toml(file) as Record<string, unknown>;
 
 		if (
@@ -75,28 +77,14 @@ export async function parse_config(path: URL): Promise<config> {
 			});
 		}
 
-		Deno.env.set('LIGHTNING_ERROR_WEBHOOK', validated.error_url ?? '');
+		setEnv('LIGHTNING_ERROR_WEBHOOK', validated.error_url ?? '');
 
 		return { ...validated, plugins };
 	} catch (e) {
-		if (
-			e instanceof Deno.errors.NotFound ||
-			e instanceof Deno.errors.PermissionDenied
-		) {
-			log_error(e, {
-				message: `could not open your \`lightning.toml\` at \`${path}\``,
-				without_cause: true,
-			});
-		} else if (e instanceof SyntaxError) {
-			log_error(e, {
-				message: `could not parse your \`lightning.toml\` file at ${path}`,
-				without_cause: true,
-			});
-		} else {
-			log_error(e, {
-				message: `unknown issue with your \`lightning.toml\` file at ${path}`,
-				without_cause: true,
-			});
-		}
+		log_error(e, {
+			message:
+				`could not open or parse your \`lightning.toml\` file at ${path}`,
+			without_cause: true,
+		});
 	}
 }

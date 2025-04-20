@@ -1,15 +1,19 @@
+import { cwd } from '@cross/fs';
+import { args as getArgs } from '@cross/utils';
 import { setup_bridge } from './bridge/setup.ts';
 import { parse_config } from './cli_config.ts';
 import { core } from './core.ts';
 import { handle_migration } from './database/mod.ts';
 import { log_error } from './structures/errors.ts';
 
-if (Deno.args[0] === 'migrate') {
+const args = getArgs();
+
+if (args[0] === 'migrate') {
 	handle_migration();
-} else if (Deno.args[0] === 'run') {
+} else if (args[0] === 'run') {
 	try {
 		const config = await parse_config(
-			new URL(Deno.args[1] ?? 'lightning.toml', `file://${Deno.cwd()}/`),
+			new URL(args[1] ?? 'lightning.toml', `file://${cwd()}/`),
 		);
 		const lightning = new core(config);
 		await setup_bridge(lightning, config.database);
@@ -19,7 +23,7 @@ if (Deno.args[0] === 'migrate') {
 			without_cause: true,
 		});
 	}
-} else if (Deno.args[0] === 'version') {
+} else if (args[0] === 'version') {
 	console.log('0.8.0');
 } else {
 	console.log(

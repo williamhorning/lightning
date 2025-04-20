@@ -4,10 +4,14 @@
 	"license": "MIT",
 	"exports": "./src/mod.ts",
 	"imports": {
+		"@cross/env": "jsr:@cross/env@^1.0.2",
+		"@cross/fs": "jsr:@cross/fs@^0.1.12",
+		"@cross/utils": "jsr:@cross/utils@^0.16.0",
 		"@db/postgres": "jsr:@jersey/test@0.8.6",
 		"@denosaurs/event": "jsr:@denosaurs/event@^2.0.2",
 		"@iuioiua/redis": "jsr:@iuioiua/redis@^1.1.1",
-		"@std/toml": "jsr:@std/toml@^1.0.4",
-		"@std/cli": "jsr:@std/cli@^1.0.16"
+		"@std/cli": "jsr:@std/cli@^1.0.16",
+		"@std/fs": "jsr:@std/fs@^1.0.16",
+		"@std/toml": "jsr:@std/toml@^1.0.4"
 	}
 }

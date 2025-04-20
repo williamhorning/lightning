@@ -1,3 +1,4 @@
+import { getEnv } from '@cross/env';
 import { create_message, type message } from './messages.ts';
 
 /** options used to create an error */
@@ -81,7 +82,7 @@ export class LightningError extends Error {
 
 		if (!this.without_cause) console.error(this.error_cause, this.extra);
 
-		const webhook = Deno.env.get('LIGHTNING_ERROR_WEBHOOK');
+		const webhook = getEnv('LIGHTNING_ERROR_WEBHOOK');
 
 		for (const key in this.options?.extra) {
 			if (key === 'lightning') {

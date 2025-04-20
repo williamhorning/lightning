@@ -1,3 +1,5 @@
+import { getEnv } from '@cross/env';
+import { stdout } from '@cross/utils';
 import { Client } from '@db/postgres';
 import {
 	ProgressBar,
@@ -159,7 +161,7 @@ export class postgres implements bridge_data {
 	}
 
 	async migration_set_messages(messages: bridge_message[]): Promise<void> {
-		const progress = new ProgressBar(Deno.stdout.writable, {
+		const progress = new ProgressBar(stdout(), {
 			max: messages.length,
 			fmt: fmt,
 		});
@@ -178,7 +180,7 @@ export class postgres implements bridge_data {
 	}
 
 	async migration_set_bridges(bridges: bridge[]): Promise<void> {
-		const progress = new ProgressBar(Deno.stdout.writable, {
+		const progress = new ProgressBar(stdout(), {
 			max: bridges.length,
 			fmt: fmt,
 		});
@@ -199,7 +201,7 @@ export class postgres implements bridge_data {
 
 	static async migration_get_instance(): Promise<bridge_data> {
 		const default_url = `postgres://${
-			Deno.env.get('USER') ?? Deno.env.get('USERNAME')
+			getEnv('USER') ?? getEnv('USERNAME')
 		}@localhost/lightning`;
 
 		const pg_url = prompt(
