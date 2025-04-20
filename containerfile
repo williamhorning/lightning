@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.licenses MIT
 LABEL org.opencontainers.image.title lightning
 
 # install lightning
-RUN ["deno", "install", "--global", "--name", "lightning", "--allow-all", "--unstable-temporal", "--unstable-net", "jsr:@lightning/test@0.9.0"]
+RUN ["deno", "install", "--global", "--name", "lightning", "--allow-all", "--unstable-temporal", "--unstable-net", "jsr:@lightning/lightning@0.8.0-alpha.1"]
 
 # run as nobody instead of root
 USER nobody
