@@ -1,19 +1,13 @@
-# lightning-plugin-revolt
+# @lightning/revolt
 
-lightning-plugin-revolt is a plugin for
-[lightning](https://williamhorning.eu.org/lightning) that adds support for
-telegram
+[![JSR](https://jsr.io/badges/@lightning/revolt)](https://jsr.io/@lightning/revolt)
 
-## example config
+@lightning/telegram adds support for Revolt. To use it, you'll need to create a
+Revolt bot first. After that, you need to add the following to your config file:
 
 ```toml
-# lightning.toml
-# ...
-
 [[plugins]]
-plugin = "jsr:@jersey/lightning-plugin-revolt@0.8.0"
-config.token = "YOUR_REVOLT_TOKEN"
-config.user_id = "YOUR_BOT_USER_ID"
-
-# ...
+plugin = "jsr:@lightning/revolt@0.8.0"
+config.token = "your_bot_token"
+config.user_id = "your_bot_user_id"
 ```

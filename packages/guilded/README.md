@@ -1,18 +1,13 @@
-# lightning-plugin-guilded
+# @lightning/guilded
 
-lightning-plugin-guilded is a plugin for
-[lightning](https://williamhorning.eu.org/lightning) that adds support for
-guilded
+[![JSR](https://jsr.io/badges/@lightning/guilded)](https://jsr.io/@lightning/guilded)
 
-## example config
+@lightning/guilded adds support for Guilded. To use it, you'll first need to
+create a Guilded bot. After you do that, you'll need to add the following to
+your `lightning.toml` file:
 
 ```toml
-# lightning.toml
-# ...
-
 [[plugins]]
-plugin = "jsr:@jersey/lightning-plugin-guilded@0.8.0"
-config.token = "YOUR_GUILDED_TOKEN"
-
-# ...
+plugin = "jsr:@lightning/guilded@0.8.0"
+config.token = "your_bot_token"
 ```

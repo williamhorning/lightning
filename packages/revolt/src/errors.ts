@@ -1,4 +1,4 @@
-import { log_error } from '@jersey/lightning';
+import { log_error } from '@lightning/lightning';
 import { MediaError, RequestError } from '@jersey/rvapi';
 
 export function handle_error(err: unknown, edit?: boolean) {

@@ -4,7 +4,7 @@ import type {
 	ServerMember,
 	Webhook,
 } from '@jersey/guilded-api-types';
-import type { attachment, message } from '@jersey/lightning';
+import type { attachment, message } from '@lightning/lightning';
 
 class cacher<K extends string, V> {
 	private map = new Map<K, {

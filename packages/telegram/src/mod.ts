@@ -5,7 +5,7 @@ import {
 	log_error,
 	type message,
 	plugin,
-} from '@jersey/lightning';
+} from '@lightning/lightning';
 import { Bot } from 'grammy';
 import { get_incoming } from './incoming.ts';
 import { get_outgoing } from './outgoing.ts';

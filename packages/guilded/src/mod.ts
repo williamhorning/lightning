@@ -6,7 +6,7 @@ import {
 	log_error,
 	type message,
 	plugin,
-} from '@jersey/lightning';
+} from '@lightning/lightning';
 import { handle_error } from './errors.ts';
 import { get_incoming } from './incoming.ts';
 import { get_outgoing } from './outgoing.ts';

@@ -32,15 +32,15 @@ messaging apps in your community, and it becomes a mess.
 Now, you could just say "_X is the only chat app we're using from now on_", but
 that risks alienating your community.
 
-What other options are there? Bridging! Everyone gets to use their prefered app
+What other options are there? Bridging! Everyone gets to use their preferred app
 of choice, gets the same messages, and is on the same page.
 
 ## prior art
 
-Many bridges have existed before the existance of lightning, however, many of
+Many bridges have existed before the existence of lightning, however, many of
 these solutions have had issues. Some bridges didn't play well with others,
-others didn't handle attachments, others refused to handle embeded media, and it
-was a mess. With lightning, part of the goal was to solve these issues by
+others didn't handle attachments, others refused to handle embedded media, and
+it was a mess. With lightning, part of the goal was to solve these issues by
 bringing many platforms into one tool, having it become the handler of truth.
 
 ## supported platforms

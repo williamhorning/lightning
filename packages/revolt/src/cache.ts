@@ -1,4 +1,4 @@
-import type { message_author } from '@jersey/lightning';
+import type { message_author } from '@lightning/lightning';
 import type {
 	Channel,
 	Masquerade,

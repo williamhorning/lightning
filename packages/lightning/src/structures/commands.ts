@@ -9,7 +9,7 @@ export interface command {
 	description: string;
 	/** possible arguments */
 	arguments?: command_argument[];
-	/** possible subcommands (use `${prefix}${cmd} ${subcmd}` if run as text command) */
+	/** possible subcommands (use `${prefix}${cmd} ${subcommand}` if run as text command) */
 	subcommands?: Omit<command, 'subcommands'>[];
 	/** the functionality of the command, returning text */
 	execute: (

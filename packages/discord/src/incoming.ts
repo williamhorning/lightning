@@ -11,7 +11,7 @@ import type {
 	create_command,
 	deleted_message,
 	message,
-} from '@jersey/lightning';
+} from '@lightning/lightning';
 import { get_outgoing_message } from './outgoing.ts';
 
 export function get_deleted_message(

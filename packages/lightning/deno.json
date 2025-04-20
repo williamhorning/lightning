@@ -1,5 +1,5 @@
 {
-	"name": "@jersey/lightning",
+	"name": "@lightning/lightning",
 	"version": "0.8.0",
 	"license": "MIT",
 	"exports": "./src/mod.ts",

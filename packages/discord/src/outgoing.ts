@@ -6,7 +6,7 @@ import {
 	type RESTPostAPIWebhookWithTokenJSONBody,
 	type RESTPostAPIWebhookWithTokenQuery,
 } from '@discordjs/core';
-import type { attachment, message } from '@jersey/lightning';
+import type { attachment, message } from '@lightning/lightning';
 
 export interface discord_payload
 	extends

@@ -1,6 +1,6 @@
 import type { Client } from '@jersey/guildapi';
 import type { ChatEmbed } from '@jersey/guilded-api-types';
-import type { message } from '@jersey/lightning';
+import type { message } from '@lightning/lightning';
 import { fetch_author } from './incoming.ts';
 
 type guilded_payload = {

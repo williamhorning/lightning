@@ -4,7 +4,7 @@ import {
 	log_error,
 	type message,
 	plugin,
-} from '@jersey/lightning';
+} from '@lightning/lightning';
 import type { Message as APIMessage } from '@jersey/revolt-api-types';
 import { type Client, createClient } from '@jersey/rvapi';
 import { fetch_message } from './cache.ts';

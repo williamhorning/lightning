@@ -1,4 +1,4 @@
-import type { message } from '@jersey/lightning';
+import type { message } from '@lightning/lightning';
 import convert_markdown from 'telegramify-markdown';
 
 export function get_outgoing(

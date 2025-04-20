@@ -2,7 +2,7 @@ import {
 	type attachment,
 	LightningError,
 	type message,
-} from '@jersey/lightning';
+} from '@lightning/lightning';
 import type { DataMessageSend, SendableEmbed } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
 

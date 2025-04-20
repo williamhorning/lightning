@@ -1,20 +1,18 @@
-# lightning-plugin-telegram
+# @lightning/telegram
 
-lightning-plugin-telegram is a plugin for
-[lightning](https://williamhorning.eu.org/lightning) that adds support for
-telegram (including attachments via the included file proxy)
+[![JSR](https://jsr.io/badges/@lightning/telegram)](https://jsr.io/@lightning/telegram)
 
-## example config
+@lightning/telegram adds support for Telegram. Before using it, you'll need to
+talk with @BotFather to create a bot. After that, you need to add the following
+to your config:
 
 ```toml
-# lightning.toml
-# ...
-
 [[plugins]]
-plugin = "jsr:@jersey/lightning-plugin-telegram@0.8.0"
-config.token = "YOUR_TELEGRAM_TOKEN"
+plugin = "jsr:@lightning/telegram"
+config.token = "your_bot_token"
 config.proxy_port = 9090
-config.proxy_url = "http://localhost:9090"
-
-# ...
+config.proxy_url = "https://example.com:9090"
 ```
+
+Additionally, you will need to expose the port provided at the URL provided for
+attachments sent from Telegram to work properly

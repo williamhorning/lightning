@@ -8,7 +8,7 @@ import {
 	log_error,
 	type message,
 	plugin,
-} from '@jersey/lightning';
+} from '@lightning/lightning';
 import { setup_commands } from './commands.ts';
 import { handle_error } from './errors.ts';
 import {
@@ -141,7 +141,7 @@ export default class discord extends plugin {
 		}
 	}
 
-	/** edut a message sent by webhook */
+	/** edit a message sent by webhook */
 	async edit_message(
 		message: message,
 		data: bridge_message_opts & { edit_ids: string[] },

@@ -1,5 +1,5 @@
 import type { API } from '@discordjs/core';
-import type { command } from '@jersey/lightning';
+import type { command } from '@lightning/lightning';
 
 export async function setup_commands(
 	api: API,

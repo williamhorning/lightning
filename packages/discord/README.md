@@ -1,18 +1,14 @@
-# lightning-plugin-discord
+# @lightning/discord
 
-lightning-plugin-discord is a plugin for
-[lightning](https://williamhorning.eu.org/lightning) that adds support for
-discord
+[![JSR](https://jsr.io/badges/@lightning/discord)](https://jsr.io/@lightning/discord)
 
-## example config
+@lightning/discord adds support for Discord to Lightning. To use it, you'll
+first need to create a Discord bot at the
+[Discord Developer Portal](https://discord.com/developers/applications). After
+you do that, you will need to add the following to your `lightning.toml` file:
 
 ```toml
-# lightning.toml
-# ...
-
 [[plugins]]
-plugin = "jsr:@jersey/lightning-plugin-discord@0.8.0"
-config.token = "YOUR_DISCORD_TOKEN"
-
-# ...
+plugin = "jsr:@lightning/discord@0.8.0"
+config.token = "your_bot_token"
 ```

@@ -39,7 +39,7 @@ export interface deleted_message {
 	message_id: string;
 	/** the channel the message was sent in */
 	channel_id: string;
-	/** the plugin that recieved the message */
+	/** the plugin that received the message */
 	plugin: string;
 	/** the time the message was sent/edited as a temporal instant */
 	timestamp: Temporal.Instant;
@@ -100,7 +100,7 @@ export interface media {
 	width?: number;
 }
 
-/** a message recieved by a plugin */
+/** a message received by a plugin */
 export interface message extends deleted_message {
 	/** the attachments sent with the message */
 	attachments?: attachment[];

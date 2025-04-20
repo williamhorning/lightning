@@ -1,5 +1,5 @@
 import { DiscordAPIError } from '@discordjs/rest';
-import { log_error } from '@jersey/lightning';
+import { log_error } from '@lightning/lightning';
 
 export function handle_error(
 	err: unknown,

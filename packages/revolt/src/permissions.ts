@@ -1,4 +1,4 @@
-import { LightningError, log_error } from '@jersey/lightning';
+import { LightningError, log_error } from '@lightning/lightning';
 import type { Client } from '@jersey/rvapi';
 import {
 	fetch_channel,

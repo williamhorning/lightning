@@ -1,5 +1,5 @@
 import { RequestError } from '@jersey/guilded-api-types';
-import { log_error } from '@jersey/lightning';
+import { log_error } from '@lightning/lightning';
 
 export function handle_error(err: unknown, channel: string, edit?: boolean) {
 	if (err instanceof RequestError) {

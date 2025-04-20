@@ -1,4 +1,4 @@
-import type { message } from '@jersey/lightning';
+import type { message } from '@lightning/lightning';
 import type { Context } from 'grammy';
 
 const types = [
@@ -23,7 +23,7 @@ export async function get_incoming(
 	const msg = ctx.editedMessage || ctx.msg;
 	if (!msg) return;
 	const author = await ctx.getAuthor();
-	const pfps = await ctx.getUserProfilePhotos({ limit: 1 });
+	const profile = await ctx.getUserProfilePhotos({ limit: 1 });
 	const type = types.find((type) => type in msg) ?? 'unsupported';
 	const base: message = {
 		author: {
@@ -32,9 +32,9 @@ export async function get_incoming(
 				: author.user.first_name,
 			rawname: author.user.username || author.user.first_name,
 			color: '#24A1DE',
-			profile: pfps.total_count
+			profile: profile.total_count
 				? `${proxy}/${
-					(await ctx.api.getFile(pfps.photos[0][0].file_id)).file_path
+					(await ctx.api.getFile(profile.photos[0][0].file_id)).file_path
 				}`
 				: undefined,
 			id: author.user.id.toString(),
