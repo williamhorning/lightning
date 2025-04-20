@@ -6,6 +6,11 @@ import { core } from './core.ts';
 import { handle_migration } from './database/mod.ts';
 import { log_error } from './structures/errors.ts';
 
+/**
+ * This module provides the Lightning CLI, which you can use to run the bot
+ * @module
+ */
+
 const args = getArgs();
 
 if (args[0] === 'migrate') {

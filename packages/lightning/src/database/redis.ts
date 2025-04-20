@@ -24,6 +24,9 @@ const fmt = (fmt: ProgressBarFormatter) =>
 	`[redis] ${fmt.progressBar} ${fmt.styledTime()} [${fmt.value}/${fmt.max}]\n`;
 
 export class redis implements bridge_data {
+	private redis: RedisClient;
+	private seven: boolean;
+
 	static async create(
 		rd_options: redis_config,
 		_do_not_use = false,
@@ -110,9 +113,12 @@ export class redis implements bridge_data {
 	}
 
 	private constructor(
-		public redis: RedisClient,
-		private seven = false,
-	) {}
+		redis: RedisClient,
+		seven = false,
+	) {
+		this.redis = redis;
+		this.seven = seven;
+	}
 
 	async get_json<T>(key: string): Promise<T | undefined> {
 		const reply = await this.redis.sendCommand(['GET', key]);

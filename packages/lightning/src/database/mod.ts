@@ -1,4 +1,3 @@
-import { promptSelect } from '@std/cli/unstable-prompt-select';
 import type { bridge, bridge_message } from '../structures/bridge.ts';
 import { postgres } from './postgres.ts';
 import { redis, type redis_config } from './redis.ts';
@@ -40,7 +39,7 @@ export async function create_database(
 }
 
 function get_database(message: string): typeof postgres | typeof redis {
-	const type = promptSelect(message, ['redis', 'postgres']);
+	const type = prompt(`${message} (redis,postgres)`);
 
 	switch (type) {
 		case 'postgres':

@@ -1,6 +1,6 @@
 import { getEnv } from '@cross/env';
 import { stdout } from '@cross/utils';
-import { Client } from '@db/postgres';
+import type { Client } from '@db/postgres';
 import {
 	ProgressBar,
 	type ProgressBarFormatter,
@@ -13,7 +13,10 @@ const fmt = (fmt: ProgressBarFormatter) =>
 	`[postgres] ${fmt.progressBar} ${fmt.styledTime()} [${fmt.value}/${fmt.max}]\n`;
 
 export class postgres implements bridge_data {
+	private pg: Client;
+	
 	static async create(pg_url: string): Promise<bridge_data> {
+		const { Client } = await import('@db/postgres');
 		const pg = new Client(pg_url);
 
 		await pg.connect();
@@ -52,7 +55,9 @@ export class postgres implements bridge_data {
         `;
 	}
 
-	private constructor(private pg: Client) {}
+	private constructor(pg: Client) {
+		this.pg = pg;
+	}
 
 	async create_bridge(br: Omit<bridge, 'id'>): Promise<bridge> {
 		const id = crypto.randomUUID();

@@ -34,7 +34,7 @@ export class LightningError extends Error {
 	without_cause?: boolean;
 
 	/** create and log an error */
-	constructor(e: unknown, public options?: error_options) {
+	constructor(e: unknown, options?: error_options) {
 		if (e instanceof LightningError) {
 			super(e.message, { cause: e.cause });
 			this.id = e.id;
@@ -46,8 +46,8 @@ export class LightningError extends Error {
 			return e;
 		}
 
-		const cause_err = Error.isError(e)
-			? e
+		const cause_err = ("isError" in Error ? Error.isError(e) : e instanceof Error)
+			? e as Error
 			: e instanceof Object
 			? new Error(JSON.stringify(e))
 			: new Error(String(e));
@@ -84,24 +84,24 @@ export class LightningError extends Error {
 
 		const webhook = getEnv('LIGHTNING_ERROR_WEBHOOK');
 
-		for (const key in this.options?.extra) {
+		for (const key in this.extra) {
 			if (key === 'lightning') {
-				delete this.options.extra[key];
+				delete this.extra[key];
 			}
 
 			if (
-				typeof this.options.extra[key] === 'object' &&
-				this.options.extra[key] !== null
+				typeof this.extra[key] === 'object' &&
+				this.extra[key] !== null
 			) {
-				if ('lightning' in this.options.extra[key]) {
-					delete this.options.extra[key].lightning;
+				if ('lightning' in this.extra[key]) {
+					delete this.extra[key].lightning;
 				}
 			}
 		}
 
 		if (webhook && webhook.length > 0) {
 			let json_str = `\`\`\`json\n${
-				JSON.stringify(this.options?.extra, null, 2)
+				JSON.stringify(this.extra, null, 2)
 			}\n\`\`\``;
 
 			if (json_str.length > 2000) json_str = '*see console*';
