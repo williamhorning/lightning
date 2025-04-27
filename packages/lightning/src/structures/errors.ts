@@ -66,11 +66,6 @@ export class LightningError extends Error {
 			`Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\`\`\`\n${this.message}\n${this.id}\n\`\`\``,
 		);
 
-		this.log();
-	}
-
-	/** log the error */
-	private async log(): Promise<void> {
 		console.error(`%c[lightning] ${this.message}`, 'color: red');
 		console.error(`%c[lightning] ${this.id}`, 'color: red');
 		console.error(
@@ -80,43 +75,21 @@ export class LightningError extends Error {
 			'color: red',
 		);
 
+		if (!this.without_cause) this.log();
+	}
+
+	/** log the error, automatically called in most cases */
+	async log(): Promise<void> {
 		if (!this.without_cause) console.error(this.error_cause, this.extra);
 
 		const webhook = getEnv('LIGHTNING_ERROR_WEBHOOK');
 
-		for (const key in this.extra) {
-			if (key === 'lightning') {
-				delete this.extra[key];
-			}
-
-			if (
-				typeof this.extra[key] === 'object' &&
-				this.extra[key] !== null
-			) {
-				if ('lightning' in this.extra[key]) {
-					delete this.extra[key].lightning;
-				}
-			}
-		}
-
 		if (webhook && webhook.length > 0) {
-			let json_str = `\`\`\`json\n${
-				JSON.stringify(this.extra, null, 2)
-			}\n\`\`\``;
-
-			if (json_str.length > 2000) json_str = '*see console*';
-
 			await fetch(webhook, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					content: `# ${this.error_cause.message}\n*${this.id}*`,
-					embeds: [
-						{
-							title: 'extra',
-							description: json_str,
-						},
-					],
 				}),
 			});
 		}

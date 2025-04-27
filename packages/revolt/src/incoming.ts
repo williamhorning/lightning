@@ -11,7 +11,8 @@ export async function get_incoming(
 	return {
 		attachments: message.attachments?.map((i) => {
 			return {
-				file: `https://autumn.revolt.chat/attachments/${i._id}/${i.filename}`,
+				file:
+					`https://cdn.revoltusercontent.com/attachments/${i._id}/${i.filename}`,
 				name: i.filename,
 				size: i.size / 1048576,
 			};

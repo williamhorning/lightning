@@ -1,11 +1,9 @@
 import { RequestError } from '@jersey/guilded-api-types';
 import { log_error } from '@lightning/lightning';
 
-export function handle_error(err: unknown, channel: string, edit?: boolean) {
+export function handle_error(err: unknown, channel: string): never {
 	if (err instanceof RequestError) {
 		if (err.cause.status === 404) {
-			if (edit) return [];
-
 			log_error(err, {
 				message:
 					"resource not found! if you're trying to make a bridge, this is likely an issue with Guilded",

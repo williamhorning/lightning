@@ -1,5 +1,6 @@
 import { log_error } from '@lightning/lightning';
-import { MediaError, RequestError } from '@jersey/rvapi';
+import { MediaError } from '@jersey/rvapi';
+import { RequestError } from '@jersey/revolt-api-types';
 
 export function handle_error(err: unknown, edit?: boolean) {
 	if (err instanceof MediaError) {

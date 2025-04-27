@@ -1,10 +1,10 @@
 import { cwd } from '@cross/fs';
-import { args as getArgs } from '@cross/utils';
+import { args as getArgs, exit } from '@cross/utils';
 import { setup_bridge } from './bridge/setup.ts';
 import { parse_config } from './cli_config.ts';
 import { core } from './core.ts';
 import { handle_migration } from './database/mod.ts';
-import { log_error } from './structures/errors.ts';
+import { LightningError } from './structures/errors.ts';
 
 /**
  * This module provides the Lightning CLI, which you can use to run the bot
@@ -23,10 +23,12 @@ if (args[0] === 'migrate') {
 		const lightning = new core(config);
 		await setup_bridge(lightning, config.database);
 	} catch (e) {
-		log_error(e, {
+		await new LightningError(e, {
 			extra: { type: 'global class error' },
 			without_cause: true,
-		});
+		}).log();
+
+		exit(1);
 	}
 } else if (args[0] === 'version') {
 	console.log('0.8.0-alpha.1');

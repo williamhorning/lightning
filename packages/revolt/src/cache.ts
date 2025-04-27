@@ -57,7 +57,7 @@ export async function fetch_author(
 			color: masquerade?.colour ?? '#FF4654',
 			profile: masquerade?.avatar ??
 				(author.avatar
-					? `https://autumn.revolt.chat/avatars/${author.avatar._id}`
+					? `https://cdn.revoltusercontent.com/avatars/${author.avatar._id}`
 					: undefined),
 		};
 
@@ -71,7 +71,7 @@ export async function fetch_author(
 				username: masquerade?.name ?? member.nickname ?? data.username,
 				profile: masquerade?.avatar ??
 					(member.avatar
-						? `https://autumn.revolt.chat/avatars/${member.avatar._id}`
+						? `https://cdn.revoltusercontent.com/avatars/${member.avatar._id}`
 						: data.profile),
 			});
 		} catch {

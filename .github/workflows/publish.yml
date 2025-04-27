@@ -29,7 +29,7 @@ jobs:
     needs: publish_jsr
     steps:
       - name: checkout
-        uses: actions/checkout@v4  
+        uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: login to ghcr

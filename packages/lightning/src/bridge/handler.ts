@@ -104,21 +104,7 @@ export async function bridge_message(
 				message: `An error occurred while processing a message in the bridge`,
 			});
 
-			if (!err.disable_channel) {
-				try {
-					const result_ids = await plugin.create_message({
-						...err.msg,
-						message_id: prior_bridged_ids?.id[0] ?? '',
-						channel_id: channel.id,
-					});
-					result_ids.forEach((id) => core.set_handled(channel.plugin, id));
-				} catch (e) {
-					new LightningError(e, {
-						message: `Failed to log error message in bridge`,
-						extra: { channel, original_error: err.id },
-					});
-				}
-			} else {
+			if (err.disable_channel) {
 				new LightningError(
 					`disabling channel ${channel.id} in bridge ${bridge.id}`,
 					{

@@ -32,10 +32,12 @@ export function parse_config(v: unknown): guilded_config {
 export default class guilded extends plugin {
 	name = 'bolt-guilded';
 	private client: Client;
+	private token: string;
 
 	constructor(opts: guilded_config) {
 		super();
 		this.client = createClient(opts.token);
+		this.token = opts.token;
 		this.setup_events();
 		this.client.socket.connect();
 	}
@@ -139,14 +141,15 @@ export default class guilded extends plugin {
 	async delete_messages(messages: deleted_message[]): Promise<string[]> {
 		return await Promise.all(messages.map(async (msg) => {
 			try {
-				await this.client.request(
-					'delete', // @ts-expect-error: this is typed wrong
-					`/channels/${msg.channel_id}/messages/${msg.message_id}`,
-					undefined,
+				await fetch(
+					`https://www.guilded.gg/api/v1/channels/${msg.channel_id}/messages/${msg.message_id}`,
+					{
+						method: 'DELETE',
+						headers: { Authorization: `Bearer ${this.token}` },
+					},
 				);
 				return msg.message_id;
-			} catch (e) {
-				handle_error(e, msg.channel_id, true);
+			} catch {
 				return msg.message_id;
 			}
 		}));

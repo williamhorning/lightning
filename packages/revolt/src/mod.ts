@@ -118,7 +118,7 @@ export default class revolt extends plugin {
 				) as APIMessage)._id,
 			];
 		} catch (e) {
-			return handle_error(e);
+			return handle_error(e, true);
 		}
 	}
 
@@ -134,7 +134,7 @@ export default class revolt extends plugin {
 					);
 					return msg.message_id;
 				} catch (e) {
-					handle_error(e);
+					handle_error(e, true);
 					return msg.message_id;
 				}
 			}),

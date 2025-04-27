@@ -82,7 +82,7 @@ export class core extends EventEmitter<events> {
 
 	private async handle_events(plugin: plugin): Promise<void> {
 		for await (const { name, value } of plugin) {
-			await new Promise((res) => setTimeout(res, 150));
+			await new Promise((res) => setTimeout(res, 200));
 
 			if (this.handled.has(`${value[0].plugin}-${value[0].message_id}`)) {
 				this.handled.delete(`${value[0].plugin}-${value[0].message_id}`);
