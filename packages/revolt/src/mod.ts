@@ -78,10 +78,10 @@ export default class revolt extends plugin {
 				} in ${data.servers.length} servers`,
 				`\n[revolt] invite me at https://app.revolt.chat/bot/${this.user_id}`,
 			);
-		}).on("socket_close", () => {
+		}).on('socket_close', () => {
 			this.client.bonfire = new Bonfire({
 				token: opts.token,
-				url: 'wss://ws.revolt.chat'
+				url: 'wss://ws.revolt.chat',
 			});
 			this.setup_events(opts);
 		});
