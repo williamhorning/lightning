@@ -6,7 +6,7 @@ import {
 	plugin,
 } from '@lightning/lightning';
 import type { Message as APIMessage } from '@jersey/revolt-api-types';
-import { type Client, createClient } from '@jersey/rvapi';
+import { Bonfire, type Client, createClient } from '@jersey/rvapi';
 import { fetch_message } from './cache.ts';
 import { handle_error } from './errors.ts';
 import { get_incoming } from './incoming.ts';
@@ -46,10 +46,10 @@ export default class revolt extends plugin {
 		super();
 		this.client = createClient({ token: opts.token });
 		this.user_id = opts.user_id;
-		this.setup_events();
+		this.setup_events(opts);
 	}
 
-	private setup_events() {
+	private setup_events(opts: revolt_config) {
 		this.client.bonfire.on('Message', async (data) => {
 			const msg = await get_incoming(data, this.client);
 			if (msg) this.emit('create_message', msg);
@@ -78,6 +78,12 @@ export default class revolt extends plugin {
 				} in ${data.servers.length} servers`,
 				`\n[revolt] invite me at https://app.revolt.chat/bot/${this.user_id}`,
 			);
+		}).on("socket_close", () => {
+			this.client.bonfire = new Bonfire({
+				token: opts.token,
+				url: 'wss://ws.revolt.chat'
+			});
+			this.setup_events(opts);
 		});
 	}
 
