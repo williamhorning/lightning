@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.authors=Jersey
 LABEL org.opencontainers.image.url=https://github.com/williamhorning/lightning
 LABEL org.opencontainers.image.source=https://github.com/williamhorning/lightning
 LABEL org.opencontainers.image.documentation=https://williamhorning.eu.org/lightning
-LABEL org.opencontainers.image.version=0.8.0-alpha.1
+LABEL org.opencontainers.image.version=0.8.0-alpha.2
 LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.title=lightning
 
@@ -14,7 +14,7 @@ RUN ["mkdir", "/deno_dir"]
 ENV DENO_DIR=/deno_dir
 
 # install lightning
-RUN ["deno", "install", "--global", "--name", "lightning", "--allow-all", "--unstable-temporal", "--unstable-net", "jsr:@lightning/lightning@0.8.0-alpha.1"]
+RUN ["deno", "install", "--global", "--name", "lightning", "--allow-all", "--unstable-temporal", "--unstable-net", "jsr:@lightning/lightning@0.8.0-alpha.2"]
 RUN ["chown", "--recursive", "1001:1001", "/deno_dir"]
 
 # run as user instead of root

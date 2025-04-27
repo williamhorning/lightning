@@ -1,12 +1,12 @@
 {
 	"name": "@lightning/discord",
-	"version": "0.8.0-alpha.1",
+	"version": "0.8.0-alpha.2",
 	"license": "MIT",
 	"exports": "./src/mod.ts",
 	"imports": {
-		"@discordjs/core": "npm:@discordjs/core@^2.0.1",
-		"@discordjs/rest": "npm:@discordjs/rest@^2.4.3",
-		"@discordjs/ws": "npm:@discordjs/ws@^2.0.1",
-		"@lightning/lightning": "jsr:@lightning/lightning@^0.8.0-alpha.1"
+		"@discordjs/core": "npm:@discordjs/core@^2.1.0",
+		"@discordjs/rest": "npm:@discordjs/rest@^2.5.0",
+		"@discordjs/ws": "npm:@discordjs/ws@^2.0.2",
+		"@lightning/lightning": "jsr:@lightning/lightning@0.8.0-alpha.2"
 	}
 }
