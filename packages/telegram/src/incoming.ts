@@ -50,41 +50,35 @@ export async function get_incoming(
 			: undefined,
 	};
 
-	switch (type) {
-		case 'text':
-			return {
-				...base,
-				content: msg.text,
-			};
-		case 'dice':
-			return {
-				...base,
-				content: `${msg.dice!.emoji} ${msg.dice!.value}`,
-			};
-		case 'location':
-			return {
-				...base,
-				content: `https://www.openstreetmap.com/#map=18/${
-					msg.location!.latitude
-				}/${msg.location!.longitude}`,
-			};
-		case 'unsupported':
-			return;
-		default: {
-			const file = await ctx.api.getFile(
-				(type === 'photo' ? msg.photo!.slice(-1)[0] : msg[type]!).file_id,
-			);
-
-			if (!file.file_path) return;
-
-			return {
-				...base,
-				attachments: [{
-					file: `${proxy}/${file.file_path}`,
-					name: file.file_path,
-					size: (file.file_size ?? 0) / 1048576,
-				}],
-			};
-		}
+	if (type === 'unsupported') return;
+	if (type === 'text') return { ...base, content: msg.text };
+	if (type === 'dice') {
+		return {
+			...base,
+			content: `${msg.dice!.emoji} ${msg.dice!.value}`,
+		};
 	}
+	if (type === 'location') {
+		return {
+			...base,
+			content: `https://www.openstreetmap.com/#map=18/${
+				msg.location!.latitude
+			}/${msg.location!.longitude}`,
+		};
+	}
+
+	const file = await ctx.api.getFile(
+		(type === 'photo' ? msg.photo!.slice(-1)[0] : msg[type]!).file_id,
+	);
+
+	if (!file.file_path) return;
+
+	return {
+		...base,
+		attachments: [{
+			file: `${proxy}/${file.file_path}`,
+			name: file.file_path,
+			size: (file.file_size ?? 0) / 1048576,
+		}],
+	};
 }

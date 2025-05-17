@@ -14,11 +14,7 @@ export async function create(
 	const data = {
 		name: opts.args.name!,
 		channels: [result],
-		settings: {
-			allow_editing: true,
-			allow_everyone: false,
-			use_rawname: false,
-		},
+		settings: { allow_everyone: false },
 	};
 
 	try {

@@ -56,7 +56,7 @@ export async function bridge_message(
 
 				reply_id = bridged?.messages?.find((message) =>
 					message.channel === channel.id && message.plugin === channel.plugin
-				)?.id[0];
+				)?.id[0] ?? bridged?.id;
 			} catch {
 				reply_id = undefined;
 			}
@@ -101,7 +101,7 @@ export async function bridge_message(
 			});
 		} catch (e) {
 			const err = new LightningError(e, {
-				message: `An error occurred while processing a message in the bridge`,
+				message: `An error occurred while handling a message in the bridge`,
 			});
 
 			if (err.disable_channel) {

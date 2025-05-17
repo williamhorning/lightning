@@ -1,6 +1,6 @@
-import type { embed, message } from '@lightning/lightning';
 import type { Message as APIMessage } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
+import type { embed, message } from '@lightning/lightning';
 import { decodeTime } from '@std/ulid';
 import { fetch_author } from './cache.ts';
 

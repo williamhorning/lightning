@@ -1,24 +1,18 @@
-import {
-	type attachment,
-	LightningError,
-	type message,
-} from '@lightning/lightning';
 import type { DataMessageSend, SendableEmbed } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
+import { LightningError, type message } from '@lightning/lightning';
 
-async function upload_files(
+export async function get_outgoing(
 	api: Client,
-	attachments?: attachment[],
-): Promise<string[] | undefined> {
-	if (!attachments) return undefined;
-
-	return (await Promise.all(
-		attachments.map(async (attachment) => {
+	message: message,
+	masquerade = true,
+): Promise<DataMessageSend> {
+	const attachments = (await Promise.all(
+		message.attachments?.map(async (attachment) => {
 			try {
-				return await api.media.upload_file(
-					'attachments',
-					await (await fetch(attachment.file)).blob(),
-				);
+				const file = await (await fetch(attachment.file)).blob();
+				if (file.size < 1) return;
+				return await api.media.upload_file('attachments', file);
 			} catch (e) {
 				new LightningError(e, {
 					message: 'Failed to upload attachment',
@@ -27,16 +21,8 @@ async function upload_files(
 
 				return;
 			}
-		}),
+		}) ?? [],
 	)).filter((i) => i !== undefined);
-}
-
-export async function get_outgoing(
-	api: Client,
-	message: message,
-	masquerade = true,
-): Promise<DataMessageSend> {
-	const attachments = await upload_files(api, message.attachments);
 
 	if (
 		(!message.content || message.content.length < 1) &&
@@ -58,18 +44,16 @@ export async function get_outgoing(
 				title: embed.title,
 				description: embed.description ?? '',
 				media: embed.image?.url,
-				colour: embed.color ? `#${embed.color.toString(16)}` : null,
+				colour: embed.color
+					? `#${embed.color.toString(16).padStart(6, '0')}`
+					: undefined,
 			};
 
-			if (embed.fields) {
-				for (const field of embed.fields) {
-					data.description += `\n\n**${field.name}**\n${field.value}`;
-				}
+			for (const field of embed.fields ?? []) {
+				data.description += `\n\n**${field.name}**\n${field.value}`;
 			}
 
-			if (data.description?.length === 0) {
-				data.description = null;
-			}
+			if (data.description?.length === 0) data.description = undefined;
 
 			return data;
 		}),

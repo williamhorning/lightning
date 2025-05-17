@@ -12,9 +12,7 @@ export interface command {
 	/** possible subcommands (use `${prefix}${cmd} ${subcommand}` if run as text command) */
 	subcommands?: Omit<command, 'subcommands'>[];
 	/** the functionality of the command, returning text */
-	execute: (
-		opts: command_opts,
-	) => Promise<string> | string;
+	execute: (opts: command_opts) => Promise<string> | string;
 }
 
 /** argument for a command */

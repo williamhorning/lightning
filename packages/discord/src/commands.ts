@@ -5,44 +5,32 @@ export async function setup_commands(
 	api: API,
 	commands: command[],
 ): Promise<void> {
+	const format_arguments = (args: command['arguments']) =>
+		args?.map((arg) => ({
+			name: arg.name,
+			description: arg.description,
+			type: 3,
+			required: arg.required,
+		})) || [];
+
+	const format_subcommands = (subcommands: command['subcommands']) =>
+		subcommands?.map((subcommand) => ({
+			name: subcommand.name,
+			description: subcommand.description,
+			type: 1,
+			options: format_arguments(subcommand.arguments),
+		})) || [];
+
 	await api.applicationCommands.bulkOverwriteGlobalCommands(
 		(await api.applications.getCurrent()).id,
-		commands.map((command) => {
-			const opts = [];
-
-			if (command.arguments) {
-				for (const argument of command.arguments) {
-					opts.push({
-						name: argument.name,
-						description: argument.description,
-						type: 3,
-						required: argument.required,
-					});
-				}
-			}
-
-			if (command.subcommands) {
-				for (const subcommand of command.subcommands) {
-					opts.push({
-						name: subcommand.name,
-						description: subcommand.description,
-						type: 1,
-						options: subcommand.arguments?.map((opt) => ({
-							name: opt.name,
-							description: opt.description,
-							type: 3,
-							required: opt.required,
-						})),
-					});
-				}
-			}
-
-			return {
-				name: command.name,
-				type: 1,
-				description: command.description,
-				options: opts,
-			};
-		}),
+		commands.map((cmd) => ({
+			name: cmd.name,
+			type: 1,
+			description: cmd.description,
+			options: [
+				...format_arguments(cmd.arguments),
+				...format_subcommands(cmd.subcommands),
+			],
+		})),
 	);
 }

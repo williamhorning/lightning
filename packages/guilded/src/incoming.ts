@@ -4,44 +4,24 @@ import type {
 	ServerMember,
 	Webhook,
 } from '@jersey/guilded-api-types';
-import type { attachment, message } from '@lightning/lightning';
-
-class cacher<K extends string, V> {
-	private map = new Map<K, {
-		value: V;
-		expiry: number;
-	}>();
-	public expiry = 30000;
-	get(key: K): V | undefined {
-		const time = Temporal.Now.instant().epochMilliseconds;
-		const v = this.map.get(key);
-
-		if (v && v.expiry >= time) return v.value;
-	}
-	set(key: K, val: V): V {
-		const time = Temporal.Now.instant().epochMilliseconds;
-		this.map.set(key, { value: val, expiry: time + this.expiry });
-		return val;
-	}
-}
+import { type attachment, cacher, type message } from '@lightning/lightning';
 
 const member_cache = new cacher<`${string}/${string}`, ServerMember>();
 const webhook_cache = new cacher<`${string}/${string}`, Webhook>();
-const asset_cache = new cacher<string, attachment>();
-asset_cache.expiry = 86400000; // 1 day!
+const asset_cache = new cacher<string, attachment>(86400000);
 
 export async function fetch_author(msg: ChatMessage, client: Client) {
 	try {
 		if (!msg.createdByWebhookId) {
-			const author = member_cache.get(`${msg.serverId}/${msg.createdBy}`) ??
-				member_cache.set(
-					`${msg.serverId}/${msg.createdBy}`,
-					(await client.request(
-						'get',
-						`/servers/${msg.serverId}/members/${msg.createdBy}`,
-						undefined,
-					) as { member: ServerMember }).member,
-				);
+			const key = `${msg.serverId}/${msg.createdBy}` as const;
+			const author = member_cache.get(key) ?? member_cache.set(
+				key,
+				(await client.request(
+					'get',
+					`/servers/${msg.serverId}/members/${msg.createdBy}`,
+					undefined,
+				) as { member: ServerMember }).member,
+			);
 
 			return {
 				username: author.nickname || author.user.name,
@@ -50,17 +30,15 @@ export async function fetch_author(msg: ChatMessage, client: Client) {
 				profile: author.user.avatar || undefined,
 			};
 		} else {
-			const webhook = webhook_cache.get(
-				`${msg.serverId}/${msg.createdByWebhookId}`,
-			) ??
-				webhook_cache.set(
-					`${msg.serverId}/${msg.createdByWebhookId}`,
-					(await client.request(
-						'get',
-						`/servers/${msg.serverId}/webhooks/${msg.createdByWebhookId}`,
-						undefined,
-					)).webhook,
-				);
+			const key = `${msg.serverId}/${msg.createdByWebhookId}` as const;
+			const webhook = webhook_cache.get(key) ?? webhook_cache.set(
+				key,
+				(await client.request(
+					'get',
+					`/servers/${msg.serverId}/webhooks/${msg.createdByWebhookId}`,
+					undefined,
+				)).webhook,
+			);
 
 			return {
 				username: webhook.name,

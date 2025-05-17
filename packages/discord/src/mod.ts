@@ -4,8 +4,8 @@ import { WebSocketManager } from '@discordjs/ws';
 import {
 	type bridge_message_opts,
 	type command,
+	type config_schema,
 	type deleted_message,
-	log_error,
 	type message,
 	plugin,
 } from '@lightning/lightning';
@@ -24,16 +24,11 @@ export type discord_config = {
 	token: string;
 };
 
-/** check if something is actually a config object, return if it is */
-export function parse_config(v: unknown): discord_config {
-	if (typeof v !== 'object' || v === null) {
-		log_error("discord config isn't an object!", { without_cause: true });
-	}
-	if (!('token' in v) || typeof v.token !== 'string') {
-		log_error("discord token isn't a string", { without_cause: true });
-	}
-	return { token: v.token };
-}
+/** the config schema for the class */
+export const schema: config_schema = {
+	name: 'bolt-discord',
+	keys: { token: { type: 'string', required: true } },
+};
 
 /** discord support for lightning */
 export default class discord extends plugin {

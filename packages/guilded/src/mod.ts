@@ -2,8 +2,8 @@ import { type Client, createClient } from '@jersey/guildapi';
 import type { ServerChannel } from '@jersey/guilded-api-types';
 import {
 	type bridge_message_opts,
+	type config_schema,
 	type deleted_message,
-	log_error,
 	type message,
 	plugin,
 } from '@lightning/lightning';
@@ -13,20 +13,20 @@ import { get_outgoing } from './outgoing.ts';
 
 /** options for the guilded bot */
 export interface guilded_config {
+	/** enable debug logging */
+	debug?: boolean;
 	/** the token to use */
 	token: string;
 }
 
-/** check if something is actually a config object, return if it is */
-export function parse_config(v: unknown): guilded_config {
-	if (typeof v !== 'object' || v === null) {
-		log_error("guilded config isn't an object!", { without_cause: true });
-	}
-	if (!('token' in v) || typeof v.token !== 'string') {
-		log_error("guilded token isn't a string", { without_cause: true });
-	}
-	return { token: v.token };
-}
+/** the config schema for the plugin */
+export const schema: config_schema = {
+	name: 'bolt-guilded',
+	keys: {
+		debug: { type: 'boolean', required: false },
+		token: { type: 'string', required: true },
+	},
+};
 
 /** guilded support for lightning */
 export default class guilded extends plugin {
@@ -38,11 +38,11 @@ export default class guilded extends plugin {
 		super();
 		this.client = createClient(opts.token);
 		this.token = opts.token;
-		this.setup_events();
+		this.setup_events(opts.debug);
 		this.client.socket.connect();
 	}
 
-	private setup_events() {
+	private setup_events(debug?: boolean) {
 		this.client.socket.on('ChatMessageCreated', async (data) => {
 			const msg = await get_incoming(data.d.message, this.client);
 			if (msg) this.emit('create_message', msg);
@@ -58,7 +58,12 @@ export default class guilded extends plugin {
 			if (msg) this.emit('edit_message', msg);
 		}).on('ready', (data) => {
 			console.log(`[guilded] ready as ${data.name} (${data.id})`);
-		});
+		}).on('reconnect', () => {
+			console.log(`[guilded] reconnected`);
+		}).on(
+			'debug',
+			(data) => debug && console.log(`[guilded] guildapi debug:`, data),
+		);
 	}
 
 	/** create a webhook in a channel */

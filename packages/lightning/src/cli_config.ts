@@ -1,9 +1,10 @@
-import { setEnv } from '@cross/env';
 import { readTextFile } from '@std/fs/unstable-read-text-file';
 import { parse as parse_toml } from '@std/toml';
 import type { core_config } from './core.ts';
 import type { database_config } from './database/mod.ts';
+import { set_env } from './structures/cross.ts';
 import { log_error } from './structures/errors.ts';
+import { validate_config } from './structures/validate.ts';
 
 interface cli_plugin {
 	plugin: string;
@@ -20,19 +21,24 @@ export async function parse_config(path: URL): Promise<config> {
 		const file = await readTextFile(path);
 		const raw = parse_toml(file) as Record<string, unknown>;
 
+		const validated = validate_config(raw, {
+			name: 'lightning',
+			keys: {
+				error_url: { type: 'string', required: false },
+				prefix: { type: 'string', required: false },
+			},
+		}) as Omit<config, 'plugins'> & { plugins: cli_plugin[] };
+
 		if (
-			!('database' in raw) ||
-			typeof raw.database !== 'object' ||
-			raw.database === null ||
-			!('type' in raw.database) ||
-			typeof raw.database.type !== 'string' ||
-			!('config' in raw.database) ||
-			raw.database.config === null ||
-			(raw.database.type === 'postgres' &&
-				typeof raw.database.config !== 'string') ||
-			(raw.database.type === 'redis' &&
-				(typeof raw.database.config !== 'object' ||
-					raw.database.config === null))
+			!('type' in validated.database) ||
+			typeof validated.database.type !== 'string' ||
+			!('config' in validated.database) ||
+			validated.database.config === null ||
+			(validated.database.type === 'postgres' &&
+				typeof validated.database.config !== 'string') ||
+			(validated.database.type === 'redis' &&
+				(typeof validated.database.config !== 'object' ||
+					validated.database.config === null))
 		) {
 			return log_error('your config has an invalid `database` field', {
 				without_cause: true,
@@ -40,9 +46,7 @@ export async function parse_config(path: URL): Promise<config> {
 		}
 
 		if (
-			!('plugins' in raw) ||
-			!Array.isArray(raw.plugins) ||
-			!raw.plugins.every(
+			!validated.plugins.every(
 				(p): p is cli_plugin =>
 					typeof p.plugin === 'string' &&
 					typeof p.config === 'object' &&
@@ -54,20 +58,6 @@ export async function parse_config(path: URL): Promise<config> {
 			});
 		}
 
-		if ('error_url' in raw && typeof raw.error_url !== 'string') {
-			return log_error('the `error_url` field is not a valid string', {
-				without_cause: true,
-			});
-		}
-
-		if ('prefix' in raw && typeof raw.prefix !== 'string') {
-			return log_error('the `prefix` field is not a valid string', {
-				without_cause: true,
-			});
-		}
-
-		const validated = raw as unknown as config & { plugins: cli_plugin[] };
-
 		const plugins = [];
 
 		for (const plugin of validated.plugins) {
@@ -77,7 +67,7 @@ export async function parse_config(path: URL): Promise<config> {
 			});
 		}
 
-		setEnv('LIGHTNING_ERROR_WEBHOOK', validated.error_url ?? '');
+		set_env('LIGHTNING_ERROR_WEBHOOK', validated.error_url ?? '');
 
 		return { ...validated, plugins };
 	} catch (e) {

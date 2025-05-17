@@ -30,20 +30,17 @@ async function fetch_reply(
 	if (!msg.reply_id) return;
 
 	try {
-		const replied_to = await client.request(
+		const { message } = await client.request(
 			'get',
 			`/channels/${msg.channel_id}/messages/${msg.reply_id}`,
 			undefined,
 		);
 
-		const author = await fetch_author(replied_to.message, client);
+		const { profile, username } = await fetch_author(message, client);
 
 		return {
-			author: {
-				name: `reply to ${author.username}`,
-				icon_url: author.profile,
-			},
-			description: replied_to.message.content,
+			author: { name: `reply to ${username}`, icon_url: profile },
+			description: message.content,
 		};
 	} catch {
 		return;
@@ -62,26 +59,17 @@ export async function get_outgoing(
 		embeds: msg.embeds?.map((i) => {
 			return {
 				...i,
-				fields: i.fields
-					? i.fields.map((j) => {
-						return {
-							...j,
-							inline: j.inline ?? false,
-						};
-					})
-					: undefined,
-				timestamp: i.timestamp ? i.timestamp.toString() : undefined,
+				fields: i.fields?.map((j) => ({ ...j, inline: j.inline ?? false })),
+				timestamp: i.timestamp?.toString(),
 			};
 		}),
 	};
 
-	if (msg.reply_id) {
-		const embed = await fetch_reply(msg, client);
+	const embed = await fetch_reply(msg, client);
 
-		if (embed) {
-			if (!message.embeds) message.embeds = [];
-			message.embeds.push(embed);
-		}
+	if (embed) {
+		if (!message.embeds) message.embeds = [];
+		message.embeds.push(embed);
 	}
 
 	if (msg.attachments?.length) {

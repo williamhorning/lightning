@@ -28,27 +28,17 @@ export type database_config = {
 export async function create_database(
 	config: database_config,
 ): Promise<bridge_data> {
-	switch (config.type) {
-		case 'postgres':
-			return await postgres.create(config.config);
-		case 'redis':
-			return await redis.create(config.config);
-		default:
-			throw new Error('invalid database type', { cause: config });
-	}
+	if (config.type === 'postgres') return await postgres.create(config.config);
+	if (config.type === 'redis') return await redis.create(config.config);
+	throw new Error('invalid database type', { cause: config });
 }
 
 function get_database(message: string): typeof postgres | typeof redis {
 	const type = prompt(`${message} (redis,postgres)`);
 
-	switch (type) {
-		case 'postgres':
-			return postgres;
-		case 'redis':
-			return redis;
-		default:
-			throw new Error('invalid database type!');
-	}
+	if (type === 'postgres') return postgres;
+	if (type === 'redis') return redis;
+	throw new Error('invalid database type!');
 }
 
 export async function handle_migration() {

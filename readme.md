@@ -1,9 +1,9 @@
-![lightning logo](./packages/lightning/logo.svg)
+![lightning logo](./logo.svg)
 
 # lightning - a chatbot
 
 > [!NOTE]
-> This branch contains the next version of lightning, currently `0.8.0-alpha.2`,
+> This branch contains the next version of lightning, currently `0.8.0-alpha.3`,
 > and reflects active development. To see the latest stable version, go to the
 > `main` branch.
 
@@ -56,9 +56,9 @@ to platform limitations.
 The Matrix Specification is really difficult to correctly handle, especially
 with the current state of JavaScript libraries. Solutions that work without a
 reliance on `matrix-appservice-bridge` but still use JavaScript and are
-_consistently reliable_ aren't easy to implement and currently I don't have time
-to work on implementing this. If you would like to implement Matrix support,
-please take a look at #66 for a prior attempt of mine.
+_consistently reliable_ aren't easy to implement, and currently I don't have
+time to work on implementing this. If you would like to implement Matrix
+support, please take a look at #66 for a prior attempt of mine.
 
 ### requesting another platform
 

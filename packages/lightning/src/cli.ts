@@ -1,9 +1,8 @@
-import { cwd } from '@cross/fs';
-import { args as getArgs, exit } from '@cross/utils';
 import { setup_bridge } from './bridge/setup.ts';
 import { parse_config } from './cli_config.ts';
 import { core } from './core.ts';
 import { handle_migration } from './database/mod.ts';
+import { cwd, exit, get_args } from './structures/cross.ts';
 import { LightningError } from './structures/errors.ts';
 
 /**
@@ -11,7 +10,7 @@ import { LightningError } from './structures/errors.ts';
  * @module
  */
 
-const args = getArgs();
+const args = get_args();
 
 if (args[0] === 'migrate') {
 	handle_migration();
@@ -31,10 +30,10 @@ if (args[0] === 'migrate') {
 		exit(1);
 	}
 } else if (args[0] === 'version') {
-	console.log('0.8.0-alpha.2');
+	console.log('0.8.0-alpha.3');
 } else {
 	console.log(
-		`lightning v0.8.0-alpha.2 - extensible chatbot connecting communities`,
+		`lightning v0.8.0-alpha.3 - extensible chatbot connecting communities`,
 	);
 	console.log('  Usage: lightning [subcommand]');
 	console.log('  Subcommands:');

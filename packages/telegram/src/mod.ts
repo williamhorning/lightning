@@ -1,12 +1,10 @@
 import {
 	type bridge_message_opts,
+	type config_schema,
 	type deleted_message,
-	log_error,
 	type message,
 	plugin,
 } from '@lightning/lightning';
-import { Application } from '@oak/oak/application';
-import { proxy } from '@oak/oak/proxy';
 import { Bot } from 'grammy';
 import { get_incoming } from './incoming.ts';
 import { get_outgoing } from './outgoing.ts';
@@ -21,22 +19,15 @@ export type telegram_config = {
 	proxy_url: string;
 };
 
-/** check if something is actually a config object, return if it is */
-export function parse_config(v: unknown): telegram_config {
-	if (typeof v !== 'object' || v === null) {
-		log_error("telegram config isn't an object!", { without_cause: true });
-	}
-	if (!('token' in v) || typeof v.token !== 'string') {
-		log_error("telegram token isn't a string", { without_cause: true });
-	}
-	if (!('proxy_port' in v) || typeof v.proxy_port !== 'number') {
-		log_error("telegram proxy port isn't a number", { without_cause: true });
-	}
-	if (!('proxy_url' in v) || typeof v.proxy_url !== 'string') {
-		log_error("telegram proxy url isn't a string", { without_cause: true });
-	}
-	return { token: v.token, proxy_port: v.proxy_port, proxy_url: v.proxy_url };
-}
+/** the config schema for the plugin */
+export const schema: config_schema = {
+	name: 'bolt-telegram',
+	keys: {
+		token: { type: 'string', required: true },
+		proxy_port: { type: 'number', required: true },
+		proxy_url: { type: 'string', required: true },
+	},
+};
 
 /** telegram support for lightning */
 export default class telegram extends plugin {
@@ -54,13 +45,32 @@ export default class telegram extends plugin {
 			if (msg) this.emit('create_message', msg);
 		});
 
-		const app = new Application().use(
-			proxy(`https://api.telegram.org/file/bot${opts.token}/`, {
-				map: (path) => path.replace('/telegram/', ''),
-			}),
-		);
+		const handler = async ({ url }: { url: string }) =>
+			await fetch(
+				`https://api.telegram.org/file/bot${opts.token}/${
+					url.replace('/telegram', '/')
+				}`,
+			);
 
-		app.listen({ port: opts.proxy_port });
+		if ('Deno' in globalThis) {
+			Deno.serve({ port: opts.proxy_port }, handler);
+		} else if ('Bun' in globalThis) {
+			// @ts-ignore: Bun.serve is not typed
+			Bun.serve({
+				fetch: handler,
+				port: opts.proxy_port,
+			});
+		} else if ('process' in globalThis) {
+			// deno-lint-ignore no-process-global
+			process.getBuiltinModule('node:http').createServer(async (req, res) => {
+				const resp = await handler(req as { url: string });
+				res.writeHead(resp.status, Array.from(resp.headers.entries()));
+				res.write(new Uint8Array(await resp.arrayBuffer()));
+				res.end();
+			});
+		} else {
+			throw new Error('Unsupported environment for file proxy!');
+		}
 
 		console.log(
 			`[telegram] proxy available at localhost:${opts.proxy_port} or ${opts.proxy_url}`,

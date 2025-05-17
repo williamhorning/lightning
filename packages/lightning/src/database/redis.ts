@@ -1,5 +1,3 @@
-import { getEnv } from '@cross/env';
-import { stdout } from '@cross/utils';
 import { RedisClient } from '@iuioiua/redis';
 import {
 	ProgressBar,
@@ -12,6 +10,7 @@ import type {
 	bridge_message,
 	bridged_message,
 } from '../structures/bridge.ts';
+import { get_env, stdout, tcp_connect } from '../structures/cross.ts';
 import { log_error } from '../structures/errors.ts';
 import type { bridge_data } from './mod.ts';
 
@@ -31,27 +30,7 @@ export class redis implements bridge_data {
 		rd_options: redis_config,
 		_do_not_use = false,
 	): Promise<bridge_data> {
-		let streams: {
-			readable: ReadableStream<Uint8Array>;
-			writable: WritableStream<Uint8Array>;
-		};
-
-		if ('Deno' in globalThis) {
-			streams = await Deno.connect(rd_options);
-		} else {
-			const { createConnection } = await import('node:net');
-			const { Readable, Writable } = await import('node:stream');
-			const conn = createConnection({
-				host: rd_options.hostname,
-				port: rd_options.port,
-			});
-			streams = {
-				readable: Readable.toWeb(conn) as ReadableStream<Uint8Array>,
-				writable: Writable.toWeb(conn),
-			};
-		}
-
-		const rd = new RedisClient(streams);
+		const rd = new RedisClient(await tcp_connect(rd_options));
 
 		let db_data_version = await rd.sendCommand([
 			'GET',
@@ -61,7 +40,10 @@ export class redis implements bridge_data {
 		if (db_data_version === null) {
 			const number_keys = await rd.sendCommand(['DBSIZE']) as number;
 
-			if (number_keys === 0) db_data_version = '0.8.0';
+			if (number_keys === 0) {
+				await rd.sendCommand(['SET', 'lightning-db-version', '0.8.0']);
+				db_data_version = '0.8.0';
+			}
 		}
 
 		if (db_data_version !== '0.8.0' && !_do_not_use) {
@@ -85,7 +67,7 @@ export class redis implements bridge_data {
 			const write = confirm(
 				'[lightning-redis] write the data to the database? see \`lightning-redis-migration.json\` for the data',
 			);
-			const env_confirm = getEnv('LIGHTNING_MIGRATE_CONFIRM');
+			const env_confirm = get_env('LIGHTNING_MIGRATE_CONFIRM');
 
 			if (write || env_confirm === 'true') {
 				await instance.migration_set_bridges(bridges);
@@ -237,11 +219,9 @@ export class redis implements bridge_data {
 				}
 
 				const bridge = await this.get_json<{
-					allow_editing: boolean;
 					channels: bridge_channel[];
 					id: string;
 					messages?: bridged_message[];
-					use_rawname: boolean;
 				}>(key);
 
 				if (bridge && bridge.channels) {

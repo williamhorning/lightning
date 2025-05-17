@@ -26,7 +26,7 @@ export function get_deleted_message(
 }
 
 async function fetch_author(api: API, data: GatewayMessageUpdateDispatchData) {
-	let profile = data.author.avatar !== null
+	let profile = data.author.avatar
 		? `https://cdn.discordapp.com/avatars/${data.author.id}/${data.author.avatar}.png`
 		: `https://cdn.discordapp.com/embed/avatars/${
 			Number(BigInt(data.author.id) >> 22n) % 6
@@ -84,17 +84,9 @@ export async function get_incoming_message(
 	{ api, data }: { api: API; data: GatewayMessageUpdateDispatchData },
 ): Promise<message | undefined> {
 	// normal messages, replies, and user joins
-	if (
-		data.type !== 0 &&
-		data.type !== 7 &&
-		data.type !== 19 &&
-		data.type !== 20 &&
-		data.type !== 23
-	) {
-		return;
-	}
+	if (![0, 7, 19, 20, 23].includes(data.type)) return;
 
-	const message: message = {
+	return {
 		attachments: [
 			...data.attachments?.map(
 				(i: typeof data['attachments'][0]) => {
@@ -135,8 +127,6 @@ export async function get_incoming_message(
 			Number(BigInt(data.id) >> 22n) + 1420070400000,
 		),
 	};
-
-	return message;
 }
 
 export function get_incoming_command(

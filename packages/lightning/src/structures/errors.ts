@@ -1,4 +1,4 @@
-import { getEnv } from '@cross/env';
+import { get_env } from './cross.ts';
 import { create_message, type message } from './messages.ts';
 
 /** options used to create an error */
@@ -66,8 +66,7 @@ export class LightningError extends Error {
 			`Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\`\`\`\n${this.message}\n${this.id}\n\`\`\``,
 		);
 
-		console.error(`%c[lightning] ${this.message}`, 'color: red');
-		console.error(`%c[lightning] ${this.id}`, 'color: red');
+		console.error(`%c[lightning] ${this.message} - ${this.id}`, 'color: red');
 		console.error(
 			`%c[lightning] this does${
 				this.disable_channel ? ' ' : ' not '
@@ -82,7 +81,7 @@ export class LightningError extends Error {
 	async log(): Promise<void> {
 		if (!this.without_cause) console.error(this.error_cause, this.extra);
 
-		const webhook = getEnv('LIGHTNING_ERROR_WEBHOOK');
+		const webhook = get_env('LIGHTNING_ERROR_WEBHOOK');
 
 		if (webhook && webhook.length > 0) {
 			await fetch(webhook, {

@@ -7,7 +7,7 @@ Revolt bot first. After that, you need to add the following to your config file:
 
 ```toml
 [[plugins]]
-plugin = "jsr:@lightning/revolt@0.8.0-alpha.2"
+plugin = "jsr:@lightning/revolt@0.8.0-alpha.3"
 config.token = "your_bot_token"
 config.user_id = "your_bot_user_id"
 ```

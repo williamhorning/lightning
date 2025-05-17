@@ -2,6 +2,7 @@ import { EventEmitter } from '@denosaurs/event';
 import type { bridge_message_opts } from './bridge.ts';
 import type { command, create_command } from './commands.ts';
 import type { deleted_message, message } from './messages.ts';
+import type { config_schema } from './validate.ts';
 
 /** the events emitted by core/plugins */
 export type events = {
@@ -46,8 +47,7 @@ export abstract class plugin extends EventEmitter<events> {
 /** the type core uses to load a module */
 export interface plugin_module {
 	/** the plugin constructor */
-	// deno-lint-ignore no-explicit-any
-	default?: { new (cfg: any): plugin };
+	default?: { new (cfg: unknown): plugin };
 	/** the config to validate use */
-	parse_config?: (data: unknown) => unknown;
+	schema?: config_schema;
 }

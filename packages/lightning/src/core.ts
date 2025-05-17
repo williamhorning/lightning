@@ -7,6 +7,7 @@ import type {
 import { LightningError, log_error } from './structures/errors.ts';
 import { create_message, type message } from './structures/messages.ts';
 import type { events, plugin, plugin_module } from './structures/plugins.ts';
+import { validate_config } from './structures/validate.ts';
 
 export interface core_config {
 	prefix?: string;
@@ -22,7 +23,7 @@ export class core extends EventEmitter<events> {
 			name: 'help',
 			description: 'get help with the bot',
 			execute: () =>
-				'check out [the docs](https://williamhorning.eu.org/lightning/) for help.',
+				"hi! i'm lightning v0.8.0-alpha.3.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help.",
 		}],
 		['ping', {
 			name: 'ping',
@@ -32,11 +33,6 @@ export class core extends EventEmitter<events> {
 					Temporal.Now.instant().since(timestamp).round('millisecond')
 						.total('milliseconds')
 				}ms`,
-		}],
-		['version', {
-			name: 'version',
-			description: 'get the bots version',
-			execute: () => 'hello from v0.8.0-alpha.2!',
 		}],
 	]);
 	private plugins = new Map<string, plugin>();
@@ -48,14 +44,16 @@ export class core extends EventEmitter<events> {
 		this.prefix = cfg.prefix || '!';
 
 		for (const { module, config } of cfg.plugins) {
-			if (!module.default || !module.parse_config) {
+			if (!module.default || !module.schema) {
 				log_error({ ...module }, {
 					message: `one or more of you plugins isn't actually a plugin!`,
 					without_cause: true,
 				});
 			}
 
-			const instance = new module.default(module.parse_config(config));
+			const instance = new module.default(
+				validate_config(config, module.schema),
+			);
 
 			this.plugins.set(instance.name, instance);
 			this.handle_events(instance);
@@ -69,7 +67,7 @@ export class core extends EventEmitter<events> {
 	set_command(opts: command): void {
 		this.commands.set(opts.name, opts);
 
-		for (const [_, plugin] of this.plugins) {
+		for (const [, plugin] of this.plugins) {
 			if (plugin.set_commands) {
 				plugin.set_commands(this.commands.values().toArray());
 			}

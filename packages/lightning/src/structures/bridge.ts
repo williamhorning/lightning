@@ -29,9 +29,7 @@ export interface bridge_settings {
 }
 
 /** list of settings for a bridge */
-export const bridge_settings_list = [
-	'allow_everyone',
-];
+export const bridge_settings_list = ['allow_everyone'];
 
 /** representation of a bridged message collection */
 export interface bridge_message extends bridge {

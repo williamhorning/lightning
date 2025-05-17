@@ -1,5 +1,3 @@
-import { getEnv } from '@cross/env';
-import { stdout } from '@cross/utils';
 import type { Client } from '@db/postgres';
 import {
 	ProgressBar,
@@ -7,6 +5,7 @@ import {
 } from '@std/cli/unstable-progress-bar';
 import { Spinner } from '@std/cli/unstable-spinner';
 import type { bridge, bridge_message } from '../structures/bridge.ts';
+import { get_env, stdout } from '../structures/cross.ts';
 import type { bridge_data } from './mod.ts';
 
 const fmt = (fmt: ProgressBarFormatter) =>
@@ -206,7 +205,7 @@ export class postgres implements bridge_data {
 
 	static async migration_get_instance(): Promise<bridge_data> {
 		const default_url = `postgres://${
-			getEnv('USER') ?? getEnv('USERNAME')
+			get_env('USER') ?? get_env('USERNAME')
 		}@localhost/lightning`;
 
 		const pg_url = prompt(

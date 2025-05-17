@@ -1,5 +1,5 @@
-import { LightningError, log_error } from '@lightning/lightning';
 import type { Client } from '@jersey/rvapi';
+import { log_error } from '@lightning/lightning';
 import {
 	fetch_channel,
 	fetch_member,
@@ -8,12 +8,7 @@ import {
 } from './cache.ts';
 import { handle_error } from './errors.ts';
 
-const permission_bits = [
-	1 << 23, // ManageMessages
-	1 << 28, // Masquerade
-];
-
-const needed_permissions = permission_bits.reduce((a, b) => a | b, 0);
+const needed_permissions = 25165824; // ManageMessages and Masquerade
 
 export async function check_permissions(
 	channel_id: string,
@@ -68,8 +63,6 @@ export async function check_permissions(
 			log_error(`unsupported channel type: ${channel.channel_type}`);
 		}
 	} catch (e) {
-		if (e instanceof LightningError) throw e;
-
 		handle_error(e);
 	}
 }

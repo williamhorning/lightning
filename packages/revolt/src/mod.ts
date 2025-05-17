@@ -1,12 +1,12 @@
+import type { Message as APIMessage } from '@jersey/revolt-api-types';
+import { Bonfire, type Client, createClient } from '@jersey/rvapi';
 import {
 	type bridge_message_opts,
+	type config_schema,
 	type deleted_message,
-	log_error,
 	type message,
 	plugin,
 } from '@lightning/lightning';
-import type { Message as APIMessage } from '@jersey/revolt-api-types';
-import { Bonfire, type Client, createClient } from '@jersey/rvapi';
 import { fetch_message } from './cache.ts';
 import { handle_error } from './errors.ts';
 import { get_incoming } from './incoming.ts';
@@ -21,19 +21,14 @@ export interface revolt_config {
 	user_id: string;
 }
 
-/** check if something is actually a config object, return if it is */
-export function parse_config(v: unknown): revolt_config {
-	if (typeof v !== 'object' || v === null) {
-		log_error("revolt config isn't an object!", { without_cause: true });
-	}
-	if (!('token' in v) || typeof v.token !== 'string') {
-		log_error("revolt token isn't a string", { without_cause: true });
-	}
-	if (!('user_id' in v) || typeof v.user_id !== 'string') {
-		log_error("revolt user ID isn't a string", { without_cause: true });
-	}
-	return { token: v.token, user_id: v.user_id };
-}
+/** the config schema for the revolt plugin */
+export const schema: config_schema = {
+	name: 'bolt-revolt',
+	keys: {
+		token: { type: 'string', required: true },
+		user_id: { type: 'string', required: true },
+	},
+};
 
 /** revolt support for lightning */
 export default class revolt extends plugin {
