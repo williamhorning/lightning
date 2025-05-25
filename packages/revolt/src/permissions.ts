@@ -8,7 +8,9 @@ import {
 } from './cache.ts';
 import { handle_error } from './errors.ts';
 
-const needed_permissions = 25165824; // ManageMessages and Masquerade
+const needed_permissions = 485495808;
+const error_message = 'missing ChangeNickname, ChangeAvatar, ReadMessageHistory, \
+SendMessage, ManageMessages, SendEmbeds, UploadFiles, and/or Masquerade permissions';
 
 export async function check_permissions(
 	channel_id: string,
@@ -19,11 +21,9 @@ export async function check_permissions(
 		const channel = await fetch_channel(client, channel_id);
 
 		if (channel.channel_type === 'Group') {
-			if (channel.permissions && (channel.permissions & needed_permissions)) {
-				return channel._id;
-			}
-
-			log_error('missing ManageMessages and/or Masquerade permission');
+			if (
+				!(channel.permissions && (channel.permissions & needed_permissions))
+			) log_error(error_message);
 		} else if (channel.channel_type === 'TextChannel') {
 			const server = await fetch_server(client, channel.server);
 			const member = await fetch_member(client, channel.server, bot_id);
@@ -56,12 +56,12 @@ export async function check_permissions(
 				}
 			}
 
-			if (currentPermissions & needed_permissions) return channel._id;
-
-			log_error('missing ManageMessages and/or Masquerade permission');
+			if (!(currentPermissions & needed_permissions)) log_error(error_message);
 		} else {
 			log_error(`unsupported channel type: ${channel.channel_type}`);
 		}
+
+		return channel_id;
 	} catch (e) {
 		handle_error(e);
 	}
