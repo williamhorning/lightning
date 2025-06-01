@@ -80,6 +80,62 @@ async function fetch_stickers(
 	}))).flatMap((i) => i.status === 'fulfilled' ? i.value : []);
 }
 
+async function handle_content(
+	content: string,
+	api: API,
+	guild_id?: string,
+): Promise<string> {
+	// handle user mentions
+	for (const match of content.matchAll(/<@!?(\d+)>/g)) {
+		try {
+			const user = guild_id
+				? await api.guilds.getMember(guild_id, match[1])
+				: await api.users.get(match[1]);
+			content = content.replace(
+				match[0],
+				`@${
+					'nickname' in user
+						? user.nickname
+						: 'username' in user
+						? user.global_name ?? user.username
+						: user.user.global_name ?? user.user.username
+				}`,
+			);
+		} catch {
+			// safe to ignore, we already have content here as a fallback
+		}
+	}
+
+	// handle channel mentions
+	for (const match of content.matchAll(/<#(\d+)>/g)) {
+		try {
+			content = content.replace(
+				match[0],
+				`#${(await api.channels.get(match[1])).name}`,
+			);
+		} catch {
+			// safe to ignore, we already have content here as a fallback
+		}
+	}
+
+	// handle role mentions
+	if (guild_id) {
+		for (const match of content.matchAll(/<@&(\d+)>/g)) {
+			try {
+				content = content.replace(
+					match[0],
+					`@${(await api.guilds.getRole(guild_id!, match[1])).name}`,
+				);
+			} catch {
+				// safe to ignore, we already have content here as a fallback
+			}
+		}
+	}
+
+	// handle emojis
+	return content.replaceAll(/<(a?)?(:\w+:)\d+>/g, (_, _2, emoji) => emoji);
+}
+
 export async function get_incoming_message(
 	{ api, data }: { api: API; data: GatewayMessageUpdateDispatchData },
 ): Promise<message | undefined> {
@@ -111,7 +167,7 @@ export async function get_incoming_message(
 			? '*joined on discord*'
 			: (data.flags || 0) & 128
 			? '*loading...*'
-			: data.content,
+			: await handle_content(data.content, api, data.guild_id),
 		embeds: data.embeds.map((i) => ({
 			...i,
 			timestamp: i.timestamp ? Number(i.timestamp) : undefined,

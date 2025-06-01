@@ -2,7 +2,57 @@ import type { Message as APIMessage } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
 import type { embed, message } from '@lightning/lightning';
 import { decodeTime } from '@std/ulid';
-import { fetch_author } from './cache.ts';
+import { fetch_author, fetch_channel, fetch_emoji } from './cache.ts';
+
+async function get_content(
+	api: Client,
+	channel_id: string,
+	content?: string | null,
+) {
+	if (!content) return;
+
+	for (
+		const match of content.matchAll(/:([0-7][0-9A-HJKMNP-TV-Z]{25}):/g)
+	) {
+		try {
+			content = content.replace(
+				match[0],
+				`:${(await fetch_emoji(api, match[1])).name}:`,
+			);
+		} catch {
+			content = content.replace(match[0], `:${match[1]}:`);
+		}
+	}
+
+	for (
+		const match of content.matchAll(/<@([0-7][0-9A-HJKMNP-TV-Z]{25})>/g)
+	) {
+		try {
+			content = content.replace(
+				match[0],
+				`@${(await fetch_author(api, match[1], channel_id)).username}`,
+			);
+		} catch {
+			content = content.replace(match[0], `@${match[1]}`);
+		}
+	}
+
+	for (
+		const match of content.matchAll(/<#([0-7][0-9A-HJKMNP-TV-Z]{25})>/g)
+	) {
+		try {
+			const channel = await fetch_channel(api, match[1]);
+			content = content.replace(
+				match[0],
+				`#${'name' in channel ? channel.name : `DM${channel._id}`}`,
+			);
+		} catch {
+			content = content.replace(match[0], `#${match[1]}`);
+		}
+	}
+
+	return content;
+}
 
 export async function get_incoming(
 	message: APIMessage,
@@ -19,7 +69,7 @@ export async function get_incoming(
 		}),
 		author: await fetch_author(api, message.author, message.channel),
 		channel_id: message.channel,
-		content: message.content ?? undefined,
+		content: await get_content(api, message.channel, message.content),
 		embeds: message.embeds?.map((i) => {
 			return {
 				color: 'colour' in i && i.colour

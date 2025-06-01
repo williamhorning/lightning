@@ -1,5 +1,6 @@
 import type {
 	Channel,
+	Emoji,
 	Masquerade,
 	Member,
 	Message,
@@ -12,6 +13,7 @@ import { cacher, type message_author } from '@lightning/lightning';
 
 const authors = new cacher<`${string}/${string}`, message_author>();
 const channels = new cacher<string, Channel>();
+const emojis = new cacher<string, Emoji>();
 const members = new cacher<`${string}/${string}`, Member>();
 const messages = new cacher<`${string}/${string}`, Message>();
 const roles = new cacher<`${string}/${string}`, Role>();
@@ -85,6 +87,18 @@ export async function fetch_channel(
 	) as Channel;
 
 	return channels.set(channelID, channel);
+}
+
+export async function fetch_emoji(api: Client, emoji_id: string): Promise<Emoji> {
+	const cached = emojis.get(emoji_id);
+
+	if (cached) return cached;
+
+	return emojis.set(emoji_id, await api.request(
+		'get',
+		`/custom/emoji/${emoji_id}`,
+		undefined,
+	));
 }
 
 export async function fetch_member(

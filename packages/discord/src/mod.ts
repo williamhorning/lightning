@@ -34,6 +34,7 @@ export const schema: config_schema = {
 export default class discord extends plugin {
 	name = 'bolt-discord';
 	private client: Client;
+	private received_messages = new Set<string>();
 
 	/** create the plugin */
 	constructor(cfg: discord_config) {
@@ -57,6 +58,10 @@ export default class discord extends plugin {
 
 	private setup_events() {
 		this.client.on(GatewayDispatchEvents.MessageCreate, async (data) => {
+			if (this.received_messages.has(data.data.id)) {
+				return this.received_messages.delete(data.data.id);
+			} else this.received_messages.add(data.data.id);
+
 			const msg = await get_incoming_message(data);
 			if (msg) this.emit('create_message', msg);
 		}).on(GatewayDispatchEvents.MessageDelete, ({ data }) => {

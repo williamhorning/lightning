@@ -109,7 +109,7 @@ export async function get_incoming(
 	content = content?.replaceAll(
 		/!\[.*\]\(https:\/\/cdn\.gldcdn\.com\/ContentMediaGenericFiles\/.*\)/gm,
 		'',
-	);
+	)?.replaceAll(/<(:\w+:)\d+>/g, (_, emoji) => emoji);
 
 	return {
 		attachments: await fetch_attachments(urls, client),
