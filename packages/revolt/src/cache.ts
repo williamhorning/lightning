@@ -89,16 +89,22 @@ export async function fetch_channel(
 	return channels.set(channelID, channel);
 }
 
-export async function fetch_emoji(api: Client, emoji_id: string): Promise<Emoji> {
+export async function fetch_emoji(
+	api: Client,
+	emoji_id: string,
+): Promise<Emoji> {
 	const cached = emojis.get(emoji_id);
 
 	if (cached) return cached;
 
-	return emojis.set(emoji_id, await api.request(
-		'get',
-		`/custom/emoji/${emoji_id}`,
-		undefined,
-	));
+	return emojis.set(
+		emoji_id,
+		await api.request(
+			'get',
+			`/custom/emoji/${emoji_id}`,
+			undefined,
+		),
+	);
 }
 
 export async function fetch_member(
@@ -113,7 +119,7 @@ export async function fetch_member(
 	const response = await client.request(
 		'get',
 		`/servers/${serverID}/members/${userID}`,
-		undefined,
+		{ roles: false },
 	) as Member;
 
 	return members.set(`${serverID}/${userID}`, response);

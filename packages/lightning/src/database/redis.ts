@@ -20,7 +20,7 @@ export interface redis_config {
 }
 
 const fmt = (fmt: ProgressBarFormatter) =>
-	`[redis] ${fmt.progressBar} ${fmt.styledTime()} [${fmt.value}/${fmt.max}]\n`;
+	`[redis] ${fmt.progressBar} ${fmt.styledTime} [${fmt.value}/${fmt.max}]\n`;
 
 export class redis implements bridge_data {
 	private redis: RedisClient;
@@ -192,13 +192,14 @@ export class redis implements bridge_data {
 
 		const bridges = [] as bridge[];
 
-		const progress = new ProgressBar(stdout(), {
+		const progress = new ProgressBar({
 			max: keys.length,
 			fmt,
+			writable: stdout(),
 		});
 
 		for (const key of keys) {
-			progress.add(1);
+			progress.value++;
 			if (!this.seven) {
 				const bridge = await this.get_bridge_by_id(
 					key.replace('lightning-bridge-', ''),
@@ -237,19 +238,20 @@ export class redis implements bridge_data {
 			}
 		}
 
-		progress.end();
+		progress.stop();
 
 		return bridges;
 	}
 
 	async migration_set_bridges(bridges: bridge[]): Promise<void> {
-		const progress = new ProgressBar(stdout(), {
+		const progress = new ProgressBar({
 			max: bridges.length,
 			fmt,
+			writable: stdout(),
 		});
 
 		for (const bridge of bridges) {
-			progress.add(1);
+			progress.value++;
 
 			await this.redis.sendCommand([
 				'DEL',
@@ -280,7 +282,7 @@ export class redis implements bridge_data {
 			}
 		}
 
-		progress.end();
+		progress.stop();
 
 		await this.redis.sendCommand(['SET', 'lightning-db-version', '0.8.0']);
 	}
@@ -293,34 +295,36 @@ export class redis implements bridge_data {
 
 		const messages = [] as bridge_message[];
 
-		const progress = new ProgressBar(stdout(), {
+		const progress = new ProgressBar({
 			max: keys.length,
 			fmt,
+			writable: stdout(),
 		});
 
 		for (const key of keys) {
-			progress.add(1);
+			progress.value++;
 			const message = await this.get_json<bridge_message>(key);
 			if (message) messages.push(message);
 		}
 
-		progress.end();
+		progress.stop();
 
 		return messages;
 	}
 
 	async migration_set_messages(messages: bridge_message[]): Promise<void> {
-		const progress = new ProgressBar(stdout(), {
+		const progress = new ProgressBar({
 			max: messages.length,
 			fmt,
+			writable: stdout(),
 		});
 
 		for (const message of messages) {
-			progress.add(1);
+			progress.value++;
 			await this.create_message(message);
 		}
 
-		progress.end();
+		progress.stop();
 
 		await this.redis.sendCommand(['SET', 'lightning-db-version', '0.8.0']);
 	}

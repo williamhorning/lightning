@@ -9,7 +9,8 @@ import {
 import { handle_error } from './errors.ts';
 
 const needed_permissions = 485495808;
-const error_message = 'missing ChangeNickname, ChangeAvatar, ReadMessageHistory, \
+const error_message =
+	'missing ChangeNickname, ChangeAvatar, ReadMessageHistory, \
 SendMessage, ManageMessages, SendEmbeds, UploadFiles, and/or Masquerade permissions \
 please add them to a role, assign that role to the bot, and rejoin the bridge';
 

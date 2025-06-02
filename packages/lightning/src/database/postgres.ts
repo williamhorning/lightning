@@ -9,7 +9,7 @@ import { get_env, stdout } from '../structures/cross.ts';
 import type { bridge_data } from './mod.ts';
 
 const fmt = (fmt: ProgressBarFormatter) =>
-	`[postgres] ${fmt.progressBar} ${fmt.styledTime()} [${fmt.value}/${fmt.max}]\n`;
+	`[postgres] ${fmt.progressBar} ${fmt.styledTime} [${fmt.value}/${fmt.max}]\n`;
 
 export class postgres implements bridge_data {
 	private pg: Client;
@@ -165,13 +165,14 @@ export class postgres implements bridge_data {
 	}
 
 	async migration_set_messages(messages: bridge_message[]): Promise<void> {
-		const progress = new ProgressBar(stdout(), {
+		const progress = new ProgressBar({
 			max: messages.length,
 			fmt: fmt,
+			writable: stdout(),
 		});
 
 		for (const msg of messages) {
-			progress.add(1);
+			progress.value++;
 
 			try {
 				await this.create_message(msg);
@@ -180,17 +181,18 @@ export class postgres implements bridge_data {
 			}
 		}
 
-		progress.end();
+		progress.stop();
 	}
 
 	async migration_set_bridges(bridges: bridge[]): Promise<void> {
-		const progress = new ProgressBar(stdout(), {
+		const progress = new ProgressBar({
 			max: bridges.length,
 			fmt: fmt,
+			writable: stdout(),
 		});
 
 		for (const br of bridges) {
-			progress.add(1);
+			progress.value++;
 
 			await this.pg.queryArray`
                 INSERT INTO bridges (id, name, channels, settings)
@@ -200,7 +202,7 @@ export class postgres implements bridge_data {
             `;
 		}
 
-		progress.end();
+		progress.stop();
 	}
 
 	static async migration_get_instance(): Promise<bridge_data> {
