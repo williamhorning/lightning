@@ -8,6 +8,6 @@ your `lightning.toml` file:
 
 ```toml
 [[plugins]]
-plugin = "jsr:@lightning/guilded@0.8.0-alpha.3"
+plugin = "jsr:@lightning/guilded@0.8.0-alpha.4"
 config.token = "your_bot_token"
 ```

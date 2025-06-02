@@ -23,7 +23,7 @@ export class core extends EventEmitter<events> {
 			name: 'help',
 			description: 'get help with the bot',
 			execute: () =>
-				"hi! i'm lightning v0.8.0-alpha.3.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help.",
+				"hi! i'm lightning v0.8.0-alpha.4.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help.",
 		}],
 		['ping', {
 			name: 'ping',

@@ -8,7 +8,7 @@ to your config:
 
 ```toml
 [[plugins]]
-plugin = "jsr:@lightning/telegram@0.8.0-alpha.3"
+plugin = "jsr:@lightning/telegram@0.8.0-alpha.4"
 config.token = "your_bot_token"
 config.proxy_port = 9090
 config.proxy_url = "https://example.com:9090"
