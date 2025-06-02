@@ -1,4 +1,4 @@
-import type { Message as APIMessage } from '@jersey/revolt-api-types';
+import type { Message } from '@jersey/revolt-api-types';
 import { Bonfire, type Client, createClient } from '@jersey/rvapi';
 import {
 	type bridge_message_opts,
@@ -98,7 +98,7 @@ export default class revolt extends plugin {
 					'post',
 					`/channels/${message.channel_id}/messages`,
 					await get_outgoing(this.client, message, data !== undefined),
-				) as APIMessage)._id,
+				) as Message)._id,
 			];
 		} catch (e) {
 			return handle_error(e);
@@ -116,7 +116,7 @@ export default class revolt extends plugin {
 					'patch',
 					`/channels/${message.channel_id}/messages/${data.edit_ids[0]}`,
 					await get_outgoing(this.client, message, true),
-				) as APIMessage)._id,
+				) as Message)._id,
 			];
 		} catch (e) {
 			return handle_error(e, true);

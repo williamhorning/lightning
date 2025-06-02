@@ -5,8 +5,8 @@
 	"exports": "./src/mod.ts",
 	"imports": {
 		"@lightning/lightning": "jsr:@lightning/lightning@0.8.0-alpha.3",
-		"@jersey/rvapi": "jsr:@jersey/rvapi@^0.0.9",
-		"@jersey/revolt-api-types": "jsr:@jersey/revolt-api-types@^0.8.4",
+		"@jersey/rvapi": "jsr:@jersey/rvapi@^0.0.11",
+		"@jersey/revolt-api-types": "jsr:@jersey/revolt-api-types@^0.8.7",
 		"@std/ulid": "jsr:@std/ulid@^1.0.0"
 	}
 }

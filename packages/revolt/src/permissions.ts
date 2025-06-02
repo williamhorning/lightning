@@ -10,7 +10,8 @@ import { handle_error } from './errors.ts';
 
 const needed_permissions = 485495808;
 const error_message = 'missing ChangeNickname, ChangeAvatar, ReadMessageHistory, \
-SendMessage, ManageMessages, SendEmbeds, UploadFiles, and/or Masquerade permissions';
+SendMessage, ManageMessages, SendEmbeds, UploadFiles, and/or Masquerade permissions \
+please add them to a role, assign that role to the bot, and rejoin the bridge';
 
 export async function check_permissions(
 	channel_id: string,

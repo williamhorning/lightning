@@ -1,4 +1,4 @@
-import type { Message as APIMessage } from '@jersey/revolt-api-types';
+import type { Message } from '@jersey/revolt-api-types';
 import type { Client } from '@jersey/rvapi';
 import type { embed, message } from '@lightning/lightning';
 import { decodeTime } from '@std/ulid';
@@ -55,7 +55,7 @@ async function get_content(
 }
 
 export async function get_incoming(
-	message: APIMessage,
+	message: Message,
 	api: Client,
 ): Promise<message> {
 	return {
