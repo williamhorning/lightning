@@ -1,12 +1,13 @@
 import {
 	type bridge_message_opts,
+	type command,
 	type config_schema,
 	type deleted_message,
 	type message,
 	plugin,
 } from '@lightning/lightning';
-import { Bot } from 'grammy';
-import { get_incoming } from './incoming.ts';
+import { Bot, type Composer, type Context } from 'grammy';
+import { get_command, get_incoming } from './incoming.ts';
 import { get_outgoing } from './outgoing.ts';
 
 /** options for telegram */
@@ -33,11 +34,13 @@ export const schema: config_schema = {
 export default class telegram extends plugin {
 	name = 'bolt-telegram';
 	private bot: Bot;
+	private composer: Composer<Context>;
 
 	/** setup telegram and its file proxy */
 	constructor(opts: telegram_config) {
 		super();
 		this.bot = new Bot(opts.token);
+		this.composer = this.bot.on('message') as Composer<Context>;
 		this.bot.start();
 
 		this.bot.on(['message', 'edited_message'], async (ctx) => {
@@ -75,6 +78,21 @@ export default class telegram extends plugin {
 		console.log(
 			`[telegram] proxy available at localhost:${opts.proxy_port} or ${opts.proxy_url}`,
 		);
+	}
+
+	/** handle commands */
+	override async set_commands(commands: command[]): Promise<void> {
+		await this.bot.api.setMyCommands(commands.map((cmd) => ({
+			command: cmd.name,
+			description: cmd.description,
+		})));
+
+		for (const cmd of commands) {
+			const name = cmd.name === 'help' ? ['help', 'start'] : cmd.name;
+			this.composer.command(name, (ctx) => {
+				this.emit('create_command', get_command(ctx, cmd));
+			});
+		}
 	}
 
 	/** stub for setup_channel */

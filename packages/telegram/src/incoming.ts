@@ -1,5 +1,6 @@
-import type { message } from '@lightning/lightning';
-import type { Context } from 'grammy';
+import type { command, create_command, message } from '@lightning/lightning';
+import type { CommandContext, Context } from 'grammy';
+import { get_outgoing } from './outgoing.ts';
 
 const types = [
 	'text',
@@ -13,7 +14,6 @@ const types = [
 	'video',
 	'video_note',
 	'voice',
-	'unsupported',
 ] as const;
 
 export async function get_incoming(
@@ -80,5 +80,36 @@ export async function get_incoming(
 			name: file.file_path,
 			size: (file.file_size ?? 0) / 1048576,
 		}],
+	};
+}
+
+export function get_command(
+	ctx: CommandContext<Context>,
+	cmd: command,
+): create_command {
+	return {
+		channel_id: ctx.chat.id.toString(),
+		command: cmd.name,
+		message_id: ctx.msgId.toString(),
+		timestamp: Temporal.Instant.fromEpochMilliseconds(ctx.msg.date * 1000),
+		plugin: 'bolt-telegram',
+		prefix: '/',
+		args: {},
+		rest: cmd.subcommands
+			? ctx.match.split(' ').slice(1)
+			: ctx.match.split(' '),
+		subcommand: cmd.subcommands ? ctx.match.split(' ')[0] : undefined,
+		reply: async (message: message) => {
+			for (const msg of await get_outgoing(message, false)) {
+				await ctx.api[msg.function](
+					ctx.chat.id,
+					msg.value,
+					{
+						reply_parameters: { message_id: ctx.msgId },
+						parse_mode: 'MarkdownV2',
+					},
+				);
+			}
+		},
 	};
 }
