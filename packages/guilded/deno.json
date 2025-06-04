@@ -5,7 +5,7 @@
 	"exports": "./src/mod.ts",
 	"imports": {
 		"@lightning/lightning": "jsr:@lightning/lightning@0.8.0-alpha.4",
-		"@jersey/guildapi": "jsr:@jersey/guildapi@^0.0.5",
-		"@jersey/guilded-api-types": "jsr:@jersey/guilded-api-types@^0.0.2"
+		"@jersey/guildapi": "jsr:@jersey/guildapi@^0.0.6",
+		"@jersey/guilded-api-types": "jsr:@jersey/guilded-api-types@^0.0.3"
 	}
 }
