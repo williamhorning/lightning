@@ -1,6 +1,6 @@
 import type { core } from '../core.ts';
 import { create_database, type database_config } from '../database/mod.ts';
-import { create, join, leave, status, toggle } from './commands.ts';
+import { create, join, subscribe, leave, status, toggle } from './commands.ts';
 import { bridge_message } from './handler.ts';
 
 export async function setup_bridge(core: core, config: database_config) {
@@ -43,6 +43,16 @@ export async function setup_bridge(core: core, config: database_config) {
 					required: true,
 				}],
 				execute: (o) => join(database, o),
+			},
+			{
+				name: 'subscribe',
+				description: 'subscribe to a bridge',
+				arguments: [{
+					name: 'id',
+					description: 'id of the bridge',
+					required: true,
+				}],
+				execute: (o) => subscribe(database, o),
 			},
 			{
 				name: 'leave',

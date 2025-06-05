@@ -58,6 +58,39 @@ export async function join(
 	}
 }
 
+export async function subscribe(
+	db: bridge_data,
+	opts: command_opts,
+): Promise<string> {
+	const result = await _add(db, opts);
+
+	if (typeof result === 'string') return result;
+
+	const target_bridge = await db.get_bridge_by_id(
+		opts.args.id!,
+	);
+
+	if (!target_bridge) {
+		return `Bridge with id \`${opts.args.id}\` not found. Make sure you have the correct id.`;
+	}
+
+	target_bridge.channels.push({
+		...result,
+		disabled: { read: true, write: false },
+	});
+
+	try {
+		await db.edit_bridge(target_bridge);
+
+		return `Bridge subscribed successfully! You will not receive messages from this channel, but you can still send messages to it.`;
+	} catch (e) {
+		log_error(e, {
+			message: 'Failed to update bridge in database',
+			extra: { target_bridge },
+		});
+	}
+}
+
 async function _add(
 	db: bridge_data,
 	opts: command_opts,
@@ -74,7 +107,7 @@ async function _add(
 		return {
 			id: opts.channel_id,
 			data: await opts.plugin.setup_channel(opts.channel_id),
-			disabled: false,
+			disabled: { read: false, write: false },
 			plugin: opts.plugin.name,
 		};
 	} catch (e) {
@@ -128,10 +161,17 @@ export async function status(
 
 	let str = `Name: \`${bridge.name}\`\n\nChannels:\n`;
 
-	for (const [i, value] of bridge.channels.entries()) {
-		str += `${i + 1}. \`${value.id}\` on \`${value.plugin}\`${
-			value.disabled ? ' (disabled)' : ''
-		}\n`;
+	for (const [i, value] of bridge.channels.entries()) {		
+		str += `${i + 1}. \`${value.id}\` on \`${value.plugin}\``;
+
+		if (typeof value.disabled === 'object') {
+			if (value.disabled.read) str += ` (subscribed)`;
+			if (value.disabled.write) str += ` (write disabled)`;
+		} else if (value.disabled === true) {
+			str += ` (disabled)`;
+		}
+
+		str += `\n`;
 	}
 
 	str += `\nSettings:\n`;

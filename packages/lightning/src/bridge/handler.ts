@@ -22,14 +22,17 @@ export async function bridge_message(
 			(channel) =>
 				channel.id === data.channel_id &&
 				channel.plugin === data.plugin &&
-				channel.disabled,
+				(channel.disabled === true ||
+					typeof channel.disabled === 'object' &&
+						channel.disabled.read === true),
 		)
 	) return;
 
 	// remove ourselves & disabled channels
 	const channels = bridge.channels.filter((channel) =>
 		(channel.id !== data.channel_id || channel.plugin !== data.plugin) &&
-		(!channel.disabled || !channel.data)
+		(!(channel.disabled === true || typeof channel.disabled === 'object' &&
+				channel.disabled.write === true) || !channel.data)
 	);
 
 	// if there aren't any left, return
@@ -104,11 +107,11 @@ export async function bridge_message(
 				message: `An error occurred while handling a message in the bridge`,
 			});
 
-			if (err.disable_channel) {
+			if (err.disable) {
 				new LightningError(
 					`disabling channel ${channel.id} in bridge ${bridge.id}`,
 					{
-						extra: { original_error: err.id },
+						extra: { original_error: err.id, disable: err.disable },
 					},
 				);
 
@@ -116,7 +119,7 @@ export async function bridge_message(
 					...bridge,
 					channels: bridge.channels.map((ch) =>
 						ch.id === channel.id && ch.plugin === channel.plugin
-							? { ...ch, disabled: true }
+							? { ...ch, disabled: err.disable! }
 							: ch
 					),
 				});

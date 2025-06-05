@@ -8,7 +8,7 @@ export interface error_options {
 	/** the extra data to log */
 	extra?: Record<string, unknown>;
 	/** whether to disable the associated channel (when bridging) */
-	disable?: boolean;
+	disable?: { read: boolean; write: boolean };
 	/** whether this should be logged without the cause */
 	without_cause?: boolean;
 }
@@ -29,7 +29,7 @@ export class LightningError extends Error {
 	/** the user-facing error message */
 	msg: message;
 	/** whether to disable the associated channel (when bridging) */
-	disable_channel?: boolean;
+	disable?: { read: boolean; write: boolean };
 	/** whether to show the cause or not */
 	without_cause?: boolean;
 
@@ -41,7 +41,7 @@ export class LightningError extends Error {
 			this.error_cause = e.error_cause;
 			this.extra = e.extra;
 			this.msg = e.msg;
-			this.disable_channel = e.disable_channel;
+			this.disable = e.disable;
 			this.without_cause = e.without_cause;
 			return e;
 		}
@@ -60,20 +60,15 @@ export class LightningError extends Error {
 		this.id = id;
 		this.error_cause = cause_err;
 		this.extra = options?.extra ?? {};
-		this.disable_channel = options?.disable;
+		this.disable = options?.disable;
 		this.without_cause = options?.without_cause;
 		this.msg = create_message(
 			`Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\`\`\`\n${this.message}\n${this.id}\n\`\`\``,
 		);
 
 		console.error(`%c[lightning] ${this.message} - ${this.id}`, 'color: red');
-		console.error(
-			`%c[lightning] this does${
-				this.disable_channel ? ' ' : ' not '
-			}disable a channel`,
-			'color: red',
-		);
-
+		if (this.disable?.read) console.log(`[lightning] channel reads disabled`);
+		if (this.disable?.write) console.log(`[lightning] channel writes disabled`);
 		if (!this.without_cause) this.log();
 	}
 
