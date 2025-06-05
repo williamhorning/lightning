@@ -79,7 +79,7 @@ export async function get_outgoing(
 			description: msg.attachments
 				.slice(0, 5)
 				.map((a) => {
-					return `![${a.alt || a.name}](${a.file})`;
+					return `![${a.alt ?? a.name}](${a.file})`;
 				})
 				.join('\n'),
 		});

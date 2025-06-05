@@ -33,7 +33,7 @@ export async function check_permissions(
 			// check server permissions
 			let currentPermissions = server.default_permissions;
 
-			for (const role of (member.roles || [])) {
+			for (const role of (member.roles ?? [])) {
 				const { permissions: role_permissions } = await fetch_role(
 					client,
 					server._id,
@@ -52,7 +52,7 @@ export async function check_permissions(
 
 			// apply role permissions
 			if (channel.role_permissions) {
-				for (const role of (member.roles || [])) {
+				for (const role of (member.roles ?? [])) {
 					currentPermissions |= channel.role_permissions[role]?.a || 0;
 					currentPermissions &= ~channel.role_permissions[role]?.d || 0;
 				}

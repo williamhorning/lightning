@@ -1,6 +1,6 @@
 import type { core } from '../core.ts';
 import { create_database, type database_config } from '../database/mod.ts';
-import { create, join, subscribe, leave, status, toggle } from './commands.ts';
+import { create, join, leave, status, subscribe, toggle } from './commands.ts';
 import { bridge_message } from './handler.ts';
 
 export async function setup_bridge(core: core, config: database_config) {

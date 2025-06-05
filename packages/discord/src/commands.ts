@@ -11,7 +11,7 @@ export async function setup_commands(
 			description: arg.description,
 			type: 3,
 			required: arg.required,
-		})) || [];
+		})) ?? [];
 
 	const format_subcommands = (subcommands: command['subcommands']) =>
 		subcommands?.map((subcommand) => ({
@@ -19,7 +19,7 @@ export async function setup_commands(
 			description: subcommand.description,
 			type: 1,
 			options: format_arguments(subcommand.arguments),
-		})) || [];
+		})) ?? [];
 
 	await api.applicationCommands.bulkOverwriteGlobalCommands(
 		(await api.applications.getCurrent()).id,

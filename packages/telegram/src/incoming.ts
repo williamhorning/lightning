@@ -20,7 +20,7 @@ export async function get_incoming(
 	ctx: Context,
 	proxy: string,
 ): Promise<message | undefined> {
-	const msg = ctx.editedMessage || ctx.msg;
+	const msg = ctx.editedMessage ?? ctx.msg;
 	if (!msg) return;
 	const author = await ctx.getAuthor();
 	const profile = await ctx.getUserProfilePhotos({ limit: 1 });
@@ -30,7 +30,7 @@ export async function get_incoming(
 			username: author.user.last_name
 				? `${author.user.first_name} ${author.user.last_name}`
 				: author.user.first_name,
-			rawname: author.user.username || author.user.first_name,
+			rawname: author.user.username ?? author.user.first_name,
 			color: '#24A1DE',
 			profile: profile.total_count
 				? `${proxy}/${
@@ -42,7 +42,7 @@ export async function get_incoming(
 		channel_id: msg.chat.id.toString(),
 		message_id: msg.message_id.toString(),
 		timestamp: Temporal.Instant.fromEpochMilliseconds(
-			(msg.edit_date || msg.date) * 1000,
+			(msg.edit_date ?? msg.date) * 1000,
 		),
 		plugin: 'bolt-telegram',
 		reply_id: msg.reply_to_message

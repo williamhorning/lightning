@@ -20,7 +20,7 @@ jobs:
       - name: setup deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.3.3
+          deno-version: v2.3.5
       - name: publish to jsr
         run: deno publish
       - name: Set up QEMU

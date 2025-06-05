@@ -2,8 +2,8 @@ import { RequestError } from '@jersey/guilded-api-types';
 import { log_error } from '@lightning/lightning';
 
 const errors = [
-	[403, 'No permission to send/delete messages! Check permissions', false, true],
-	[404, 'Not found! This might be a Guilded problem if making a bridge', false, true],
+	[403, 'The bot lacks some permissions, please check them', false, true],
+	[404, 'Not found! This might be a Guilded problem', false, true],
 	[0, 'Unknown Guilded error, not disabling channel', false, false],
 ] as const;
 

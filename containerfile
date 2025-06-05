@@ -1,4 +1,4 @@
-FROM denoland/deno:alpine-2.3.3
+FROM denoland/deno:alpine-2.3.5
 
 # make a deno cache directory
 RUN ["mkdir", "/deno_dir"]

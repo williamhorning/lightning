@@ -32,11 +32,11 @@ async function fetch_author(api: API, data: GatewayMessageUpdateDispatchData) {
 			Number(BigInt(data.author.id) >> 22n) % 6
 		}.png`;
 
-	let username = data.author.global_name || data.author.username;
+	let username = data.author.global_name ?? data.author.username;
 
 	if (data.guild_id) {
 		try {
-			const member = data.member || await api.guilds.getMember(
+			const member = data.member ?? await api.guilds.getMember(
 				data.guild_id,
 				data.author.id,
 			);
@@ -165,7 +165,7 @@ export async function get_incoming_message(
 		channel_id: data.channel_id,
 		content: data.type === 7
 			? '*joined on discord*'
-			: (data.flags || 0) & 128
+			: (data.flags ?? 0) & 128
 			? '*loading...*'
 			: await handle_content(data.content, api, data.guild_id),
 		embeds: data.embeds.map((i) => ({
@@ -193,7 +193,7 @@ export function get_incoming_command(
 	const args: Record<string, string> = {};
 	let subcommand: string | undefined;
 
-	for (const option of interaction.data.data.options || []) {
+	for (const option of interaction.data.data.options ?? []) {
 		if (option.type === 1) {
 			subcommand = option.name;
 			for (const suboption of option.options ?? []) {

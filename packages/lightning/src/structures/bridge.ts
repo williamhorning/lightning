@@ -17,7 +17,7 @@ export interface bridge_channel {
 	/** data needed to bridge this channel */
 	data: unknown;
 	/** whether the channel is disabled */
-	disabled: boolean | { read: boolean, write: boolean };
+	disabled: boolean | { read: boolean; write: boolean };
 	/** the plugin used to bridge this channel */
 	plugin: string;
 }

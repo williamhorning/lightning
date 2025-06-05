@@ -24,10 +24,10 @@ export async function fetch_author(msg: ChatMessage, client: Client) {
 			);
 
 			return {
-				username: author.nickname || author.user.name,
+				username: author.nickname ?? author.user.name,
 				rawname: author.user.name,
 				id: msg.createdBy,
-				profile: author.user.avatar || undefined,
+				profile: author.user.avatar,
 			};
 		} else {
 			const key = `${msg.serverId}/${msg.createdByWebhookId}` as const;
@@ -77,12 +77,12 @@ async function fetch_attachments(markdown: string[], client: Client) {
 				if (signed.retryAfter || !signed.signature) continue;
 
 				attachments.push(asset_cache.set(signed.url, {
-					name: signed.signature.split('/').pop()?.split('?')[0] || 'unknown',
+					name: signed.signature.split('/').pop()?.split('?')[0] ?? 'unknown',
 					file: signed.signature,
 					size: parseInt(
 						(await fetch(signed.signature, {
 							method: 'HEAD',
-						})).headers.get('Content-Length') || '0',
+						})).headers.get('Content-Length') ?? '0',
 					) / 1048576,
 				}));
 			} catch {
@@ -104,7 +104,7 @@ export async function get_incoming(
 
 	const urls = content?.match(
 		/!\[.*\]\(https:\/\/cdn\.gldcdn\.com\/ContentMediaGenericFiles\/.*\)/gm,
-	) || [];
+	) ?? [];
 
 	content = content?.replaceAll(
 		/!\[.*\]\(https:\/\/cdn\.gldcdn\.com\/ContentMediaGenericFiles\/.*\)/gm,
@@ -124,19 +124,19 @@ export async function get_incoming(
 			author: embed.author
 				? {
 					...embed.author,
-					name: embed.author.name || '',
+					name: embed.author.name ?? '',
 				}
 				: undefined,
 			image: embed.image
 				? {
 					...embed.image,
-					url: embed.image.url || '',
+					url: embed.image.url ?? '',
 				}
 				: undefined,
 			thumbnail: embed.thumbnail
 				? {
 					...embed.thumbnail,
-					url: embed.thumbnail.url || '',
+					url: embed.thumbnail.url ?? '',
 				}
 				: undefined,
 			timestamp: embed.timestamp ? Number(embed.timestamp) : undefined,

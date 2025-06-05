@@ -135,7 +135,7 @@ export class core extends EventEmitter<events> {
 			if (subcommand) command = subcommand;
 		}
 
-		for (const arg of (command.arguments || [])) {
+		for (const arg of (command.arguments ?? [])) {
 			if (!opts.args[arg.name]) {
 				opts.args[arg.name] = opts.rest?.shift();
 			}

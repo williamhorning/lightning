@@ -119,7 +119,7 @@ export class redis implements bridge_data {
 	async edit_bridge(br: bridge): Promise<void> {
 		const old_bridge = await this.get_bridge_by_id(br.id);
 
-		for (const channel of old_bridge?.channels || []) {
+		for (const channel of old_bridge?.channels ?? []) {
 			await this.redis.sendCommand([
 				'DEL',
 				`lightning-bchannel-${channel.id}`,

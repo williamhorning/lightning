@@ -34,7 +34,7 @@ export async function get_outgoing(
 
 	return {
 		attachments,
-		content: (message.content?.length || 0) > 2000
+		content: (message.content?.length ?? 0) > 2000
 			? `${message.content?.substring(0, 1997)}...`
 			: message.content,
 		embeds: message.embeds?.map((embed) => {
