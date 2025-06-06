@@ -3,7 +3,7 @@
 # lightning - a chatbot
 
 > [!NOTE]
-> This branch contains the next version of lightning, currently `0.8.0-alpha.4`,
+> This branch contains the next version of lightning, currently `0.8.0-alpha.5`,
 > and reflects active development. To see the latest stable version, go to the
 > `main` branch.
 

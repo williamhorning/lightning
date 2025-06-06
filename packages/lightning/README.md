@@ -17,11 +17,11 @@ type = "postgres"
 config = "postgresql://server:password@postgres:5432/lightning"
 
 [[plugins]]
-plugin = "jsr:@lightning/discord@0.8.0-alpha.4"
+plugin = "jsr:@lightning/discord@0.8.0-alpha.5"
 config.token = "your_token"
 
 [[plugins]]
-plugin = "jsr:@lightning/revolt@0.8.0-alpha.4"
+plugin = "jsr:@lightning/revolt@0.8.0-alpha.5"
 config.token = "your_token"
 config.user_id = "your_bot_user_id"
 ```
