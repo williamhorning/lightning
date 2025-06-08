@@ -37,16 +37,16 @@ export async function get_incoming(
 					(await ctx.api.getFile(profile.photos[0][0].file_id)).file_path
 				}`
 				: undefined,
-			id: author.user.id.toString(),
+			id: `${author.user.id}`,
 		},
-		channel_id: msg.chat.id.toString(),
-		message_id: msg.message_id.toString(),
+		channel_id: `${msg.chat.id}`,
+		message_id: `${msg.message_id}`,
 		timestamp: Temporal.Instant.fromEpochMilliseconds(
 			(msg.edit_date ?? msg.date) * 1000,
 		),
 		plugin: 'bolt-telegram',
 		reply_id: msg.reply_to_message
-			? msg.reply_to_message.message_id.toString()
+			? `${msg.reply_to_message.message_id}`
 			: undefined,
 	};
 
@@ -88,9 +88,9 @@ export function get_command(
 	cmd: command,
 ): create_command {
 	return {
-		channel_id: ctx.chat.id.toString(),
+		channel_id: `${ctx.chat.id}`,
 		command: cmd.name,
-		message_id: ctx.msgId.toString(),
+		message_id: `${ctx.msgId}`,
 		timestamp: Temporal.Instant.fromEpochMilliseconds(ctx.msg.date * 1000),
 		plugin: 'bolt-telegram',
 		prefix: '/',

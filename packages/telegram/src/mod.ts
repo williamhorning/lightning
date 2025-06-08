@@ -114,14 +114,14 @@ export default class telegram extends plugin {
 				{
 					reply_parameters: message.reply_id
 						? {
-							message_id: Number(message.reply_id),
+							message_id: parseInt(message.reply_id),
 						}
 						: undefined,
 					parse_mode: 'MarkdownV2',
 				},
 			);
 
-			messages.push(String(result.message_id));
+			messages.push(`${result.message_id}`);
 		}
 
 		return messages;
@@ -135,7 +135,7 @@ export default class telegram extends plugin {
 		try {
 			await this.bot.api.editMessageText(
 				opts.channel.id,
-				Number(opts.edit_ids[0]),
+				parseInt(opts.edit_ids[0]),
 				get_outgoing(message, true)[0].value,
 				{ parse_mode: 'MarkdownV2' },
 			);
@@ -154,7 +154,7 @@ export default class telegram extends plugin {
 			messages.map(async (msg) => {
 				await this.bot.api.deleteMessage(
 					msg.channel_id,
-					Number(msg.message_id),
+					parseInt(msg.message_id),
 				);
 				return msg.message_id;
 			}),
