@@ -6,7 +6,7 @@ import {
 	type message,
 	plugin,
 } from '@lightning/lightning';
-import { Bot, type Composer, type Context } from 'grammy';
+import { Bot, type Composer, type Context, GrammyError } from 'grammy';
 import { get_command, get_incoming } from './incoming.ts';
 import { get_outgoing } from './outgoing.ts';
 
@@ -51,7 +51,7 @@ export default class telegram extends plugin {
 		const handler = async ({ url }: { url: string }) =>
 			await fetch(
 				`https://api.telegram.org/file/bot${opts.token}/${
-					url.replace('/telegram', '/')
+					(new URL(url)).pathname.replace('/telegram', '/')
 				}`,
 			);
 
@@ -132,14 +132,18 @@ export default class telegram extends plugin {
 		message: message,
 		opts: bridge_message_opts & { edit_ids: string[] },
 	): Promise<string[]> {
-		await this.bot.api.editMessageText(
-			opts.channel.id,
-			Number(opts.edit_ids[0]),
-			get_outgoing(message, true)[0].value,
-			{
-				parse_mode: 'MarkdownV2',
-			},
-		);
+		try {
+			await this.bot.api.editMessageText(
+				opts.channel.id,
+				Number(opts.edit_ids[0]),
+				get_outgoing(message, true)[0].value,
+				{ parse_mode: 'MarkdownV2' },
+			);
+		} catch (e) {
+			if (!(e instanceof GrammyError && e.error_code === 400)) {
+				throw e;
+			}
+		}
 
 		return opts.edit_ids;
 	}

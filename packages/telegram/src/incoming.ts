@@ -100,7 +100,7 @@ export function get_command(
 			: ctx.match.split(' '),
 		subcommand: cmd.subcommands ? ctx.match.split(' ')[0] : undefined,
 		reply: async (message: message) => {
-			for (const msg of await get_outgoing(message, false)) {
+			for (const msg of get_outgoing(message, false)) {
 				await ctx.api[msg.function](
 					ctx.chat.id,
 					msg.value,

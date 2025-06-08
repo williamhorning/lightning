@@ -107,7 +107,7 @@ export async function bridge_message(
 				message: `An error occurred while handling a message in the bridge`,
 			});
 
-			if (err.disable) {
+			if (err.disable?.read || err.disable?.write) {
 				new LightningError(
 					`disabling channel ${channel.id} in bridge ${bridge.id}`,
 					{
