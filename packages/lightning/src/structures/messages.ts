@@ -111,7 +111,7 @@ export interface message extends deleted_message {
 	/** discord-style embeds */
 	embeds?: embed[];
 	/** the id of the message replied to */
-	reply_id?: string;
+	reply_id?: string[];
 }
 
 /** an author of a message */

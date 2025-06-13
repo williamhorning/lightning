@@ -57,9 +57,11 @@ export async function get_outgoing(
 
 			return data;
 		}),
-		replies: message.reply_id
-			? [{ id: message.reply_id, mention: true }]
-			: undefined,
+		replies: message.reply_id?.map((reply) => ({
+			id: reply,
+			mention: false,
+			fail_if_not_exists: false,
+		})),
 		masquerade: masquerade
 			? {
 				name: message.author.username,

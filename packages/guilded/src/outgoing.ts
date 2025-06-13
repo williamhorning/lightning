@@ -32,7 +32,7 @@ async function fetch_reply(
 	try {
 		const { message } = await client.request(
 			'get',
-			`/channels/${msg.channel_id}/messages/${msg.reply_id}`,
+			`/channels/${msg.channel_id}/messages/${msg.reply_id[0]}`,
 			undefined,
 		);
 

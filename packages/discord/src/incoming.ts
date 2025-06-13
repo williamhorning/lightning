@@ -177,7 +177,7 @@ export async function get_incoming_message(
 		plugin: 'bolt-discord',
 		reply_id: data.message_reference &&
 				data.message_reference.type === 0
-			? data.message_reference.message_id
+			? [data.message_reference.message_id!]
 			: undefined,
 		timestamp: Temporal.Instant.fromEpochMilliseconds(
 			Number(BigInt(data.id) >> 22n) + 1420070400000,

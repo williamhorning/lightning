@@ -46,7 +46,7 @@ export async function get_incoming(
 		),
 		plugin: 'bolt-telegram',
 		reply_id: msg.reply_to_message
-			? `${msg.reply_to_message.message_id}`
+			? [`${msg.reply_to_message.message_id}`]
 			: undefined,
 	};
 

@@ -83,6 +83,6 @@ export async function get_incoming(
 		timestamp: message.edited
 			? Temporal.Instant.from(message.edited)
 			: Temporal.Instant.fromEpochMilliseconds(decodeTime(message._id)),
-		reply_id: message.replies?.[0] ?? undefined,
+		reply_id: message.replies ?? undefined,
 	};
 }

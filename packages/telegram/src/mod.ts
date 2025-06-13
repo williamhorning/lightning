@@ -112,9 +112,9 @@ export default class telegram extends plugin {
 				message.channel_id,
 				msg.value,
 				{
-					reply_parameters: message.reply_id
+					reply_parameters: message.reply_id && message.reply_id.length > 0
 						? {
-							message_id: parseInt(message.reply_id),
+							message_id: parseInt(message.reply_id[0]),
 						}
 						: undefined,
 					parse_mode: 'MarkdownV2',

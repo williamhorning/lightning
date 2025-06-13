@@ -143,9 +143,7 @@ export async function get_incoming(
 		})),
 		message_id: msg.id,
 		plugin: 'bolt-guilded',
-		reply_id: msg.replyMessageIds && msg.replyMessageIds.length > 0
-			? msg.replyMessageIds[0]
-			: undefined,
+		reply_id: msg.replyMessageIds,
 		timestamp: Temporal.Instant.from(
 			msg.createdAt,
 		),

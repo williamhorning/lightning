@@ -20,26 +20,32 @@ export interface discord_payload
 
 async function fetch_reply(
 	channelID: string,
-	replyID?: string,
+	replies?: string[],
 	api?: API,
 ) {
 	try {
-		if (!replyID || !api) return;
+		if (!replies || !api) return;
 
 		const channel = await api.channels.get(channelID);
 		const channelPath = 'guild_id' in channel
 			? `${channel.guild_id}/${channelID}`
 			: `@me/${channelID}`;
-		const msg = await api.channels.getMessage(channelID, replyID);
 
 		return [{
-			type: 1 as const,
-			components: [{
-				type: 2 as const,
-				style: 5 as const,
-				label: `reply to ${msg.author.username}`,
-				url: `https://discord.com/channels/${channelPath}/${replyID}`,
-			}],
+			type: 1,
+			components: await Promise.all(
+				replies.slice(0, 5).map(async (reply) => ({
+					type: 1 as const,
+					components: [{
+						type: 2 as const,
+						style: 5 as const,
+						label: `reply to ${
+							(await api.channels.getMessage(channelID, reply)).author.username
+						}`,
+						url: `https://discord.com/channels/${channelPath}/${replies}`,
+					}],
+				})),
+			),
 		}];
 	} catch {
 		return;
@@ -47,29 +53,37 @@ async function fetch_reply(
 }
 
 async function fetch_files(
+	api: API,
+	channel_id: string,
 	attachments: attachment[] | undefined,
 ): Promise<DescriptiveRawFile[] | undefined> {
 	if (!attachments) return;
 
-	let totalSize = 0;
+	let attachment_max = 10;
+
+	try {
+		const channel = await api.channels.get(channel_id);
+		if ('guild_id' in channel && channel.guild_id) {
+			const server = await api.guilds.get(channel.guild_id, { with_counts: false });
+			if (server.premium_tier === 2) attachment_max = 50;
+			if (server.premium_tier === 3) attachment_max = 100;
+		}
+	} catch {
+		// If we can't get the server's attachment limit, default to 10MB
+	}
 
 	return (await Promise.all(
 		attachments.map(async (attachment) => {
 			try {
-				if (attachment.size >= 25) return;
-				if (totalSize + attachment.size >= 25) return;
-
-				const data = new Uint8Array(
-					await (await fetch(attachment.file, {
-						signal: AbortSignal.timeout(5000),
-					})).arrayBuffer(),
-				);
-
-				const name = attachment.name ?? attachment.file?.split('/').pop()!;
-
-				totalSize += attachment.size;
-
-				return { data, name };
+				if (attachment.size >= attachment_max) return;
+				return {
+					data: new Uint8Array(
+						await (await fetch(attachment.file, {
+							signal: AbortSignal.timeout(5000),
+						})).arrayBuffer(),
+					),
+					name: attachment.name ?? attachment.file?.split('/').pop()!,
+				};
 			} catch {
 				return;
 			}
@@ -99,9 +113,9 @@ export async function get_outgoing_message(
 			...e,
 			timestamp: e.timestamp?.toString(),
 		})),
-		files: await fetch_files(msg.attachments),
+		files: await fetch_files(api, msg.channel_id, msg.attachments),
 		message_reference: !button_reply && msg.reply_id
-			? { type: 0, channel_id: msg.channel_id, message_id: msg.reply_id }
+			? { type: 0, channel_id: msg.channel_id, message_id: msg.reply_id[0] }
 			: undefined,
 		username: msg.author.username,
 		wait: true,
