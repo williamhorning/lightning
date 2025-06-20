@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	lightning.RegisterPluginType("discord", newDiscordPlugin)
+	lightning.RegisterPluginType("bolt-discord", newDiscordPlugin)
 }
 
 func newDiscordPlugin(config any) (lightning.Plugin, error) {

@@ -130,7 +130,6 @@ func handleBridgeMessage(db Database, event string, data any) error {
 			Log.Trace().Str("event_id", base.EventID).Msg("Looking up prior message IDs")
 			bridgeMsg, _ := db.getMessage(base.EventID)
 			for _, msg := range bridgeMsg.Messages {
-				println(msg.ID[0], base.EventID, msg.Plugin, channel.Plugin)
 				if msg.Channel == channel.ID && msg.Plugin == channel.Plugin {
 					priorMessageIDs = msg.ID
 					Log.Trace().Strs("prior_ids", priorMessageIDs).Msg("Found prior message IDs")

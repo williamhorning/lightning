@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	lightning.RegisterPluginType("revolt", newRevoltPlugin)
+	lightning.RegisterPluginType("bolt-revolt", newRevoltPlugin)
 }
 
 type zerologAdapter struct{}
