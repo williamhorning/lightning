@@ -3,7 +3,7 @@
 # lightning - a chatbot
 
 > [!NOTE]
-> This branch contains the next version of lightning, currently `0.8.0-alpha.5`,
+> This branch contains the next version of lightning, currently `0.8.0-alpha.6`,
 > and reflects active development. To see the latest stable version, go to the
 > `main` branch.
 
@@ -11,8 +11,7 @@
 - **Extensible**: support for messaging apps provided by plugins which can be
   enabled/disabled by the user
 - **Easy to run**: able to run in Docker with multiple database options
-- **Based on TypeScript**: uses the flexibility of JavaScript along with the
-  safety provided by typing and Deno
+- **Based on Go**: uses the strong typing, performance and simplicity of Go
 
 ## documentation
 
@@ -54,11 +53,10 @@ to platform limitations.
 ### matrix notes
 
 The Matrix Specification is really difficult to correctly handle, especially
-with the current state of JavaScript libraries. Solutions that work without a
-reliance on `matrix-appservice-bridge` but still use JavaScript and are
-_consistently reliable_ aren't easy to implement, and currently I don't have
-time to work on implementing this. If you would like to implement Matrix
-support, please take a look at #66 for a prior attempt of mine.
+with the current state of the various Matrix libraries. Solutions that work
+well and are _consistently reliable_ aren't easy to implement, and currently
+I don't have time to work on implementing this. If you would like to implement
+Matrix support, please take a look at #66 for a prior attempt of mine.
 
 ### requesting another platform
 
@@ -67,7 +65,7 @@ to add support for more platforms, though there are a few requirements they
 should fulfil:
 
 1. having a pre-existing substantial user base
-2. having JavaScript libraries with decent code quality
+2. having Go libraries with decent code quality
 3. having rich-messaging support of some kind
 
 ## licensing

@@ -1,22 +1,29 @@
-FROM denoland/deno:alpine-2.3.5
+# build the cli
+FROM golang:1.24-alpine AS builder
 
-# make a deno cache directory
-RUN ["mkdir", "/deno_dir"]
-ENV DENO_DIR=/deno_dir
+WORKDIR /app
+COPY . .
+RUN go build -o lightning ./cli/main.go
 
-# install lightning
-RUN ["deno", "install", "-gA", "--unstable-temporal", "--unstable-net", "jsr:@lightning/lightning@0.8.0-alpha.5"]
-RUN ["chown", "--recursive", "1001:1001", "/deno_dir"]
+# build the final image
+FROM scratch
 
-# run as user instead of root
+# metadata
+LABEL maintainer="William Horning"
+LABEL version="0.8.0-alpha.6"
+LABEL description="Lightning"
+LABEL org.opencontainers.image.title="Lightning"
+LABEL org.opencontainers.image.description="extensible chatbot connecting communities"
+LABEL org.opencontainers.image.version="0.8.0-alpha.6"
+LABEL org.opencontainers.image.source="https://github.com/williamhorning/lightning"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# copy stuff over
 USER 1001:1001
-
-# the volume containing your lightning.toml file
+COPY --from=builder /app/lightning /lightning
 VOLUME [ "/data" ]
 WORKDIR /data
 
-# this is the lightning command line
-ENTRYPOINT [ "lightning" ]
-
-# run the bot using the user-provided lightning.toml file
+# run the bot
+ENTRYPOINT ["/lightning"]
 CMD [ "run" ]
