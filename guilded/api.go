@@ -2,15 +2,14 @@ package guilded
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/williamhorning/lightning"
 )
 
 func guildedMakeRequest(token, method, endpoint string, body *io.Reader) (*http.Response, error) {
@@ -35,67 +34,51 @@ func guildedMakeRequest(token, method, endpoint string, body *io.Reader) (*http.
 	return http.DefaultClient.Do(req)
 }
 
-type guildedCloseInfo struct {
-	Code   int
-	Reason string
-}
-
 type guildedSocketManager struct {
-	conn           *websocket.Conn
-	Alive          bool
-	LastMessageID  string
-	ReconnectCount int
-	Token          string
-	listeners      map[string][]func(...any)
-	mu             sync.RWMutex
-	done           chan struct{}
+	conn                  *websocket.Conn
+	Alive                 bool
+	Token                 string
+	mu                    sync.RWMutex
+	done                  chan struct{}
+	readyHandler          func(*guildedWelcomeMessage)
+	messageCreatedHandler func(*guildedChatMessageCreated)
+	messageUpdatedHandler func(*guildedChatMessageUpdated)
+	messageDeletedHandler func(*guildedChatMessageDeleted)
 }
 
 func guildedNewSocketManager(token string) *guildedSocketManager {
 	return &guildedSocketManager{
-		Token:     token,
-		listeners: make(map[string][]func(...any)),
-		done:      make(chan struct{}),
+		Token: token,
+		done:  make(chan struct{}),
 	}
 }
 
-func (s *guildedSocketManager) On(event string, handler any) {
+func (s *guildedSocketManager) OnReady(handler func(*guildedWelcomeMessage)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	// Convert handler to func(...any)
-	var fn func(...any)
-	switch h := handler.(type) {
-	case func(...any):
-		fn = h
-	case func():
-		fn = func(...any) { h() }
-	case func(any):
-		fn = func(args ...any) {
-			if len(args) > 0 {
-				h(args[0])
-			}
-		}
-	default:
-		fn = func(args ...any) {
-			if len(args) > 0 {
-				if f, ok := handler.(func(any)); ok {
-					f(args[0])
-				}
-			}
-		}
-	}
-	s.listeners[event] = append(s.listeners[event], fn)
+	s.readyHandler = handler
+	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered ready handler")
 }
 
-func (s *guildedSocketManager) Emit(event string, args ...any) {
-	s.mu.RLock()
-	handlers := s.listeners[event]
-	s.mu.RUnlock()
+func (s *guildedSocketManager) OnMessageCreated(handler func(*guildedChatMessageCreated)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messageCreatedHandler = handler
+	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered message created handler")
+}
 
-	for _, handler := range handlers {
-		handler(args...)
-	}
+func (s *guildedSocketManager) OnMessageUpdated(handler func(*guildedChatMessageUpdated)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messageUpdatedHandler = handler
+	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered message updated handler")
+}
+
+func (s *guildedSocketManager) OnMessageDeleted(handler func(*guildedChatMessageDeleted)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messageDeletedHandler = handler
+	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered message deleted handler")
 }
 
 func (s *guildedSocketManager) Connect() error {
@@ -111,6 +94,7 @@ func (s *guildedSocketManager) Connect() error {
 	if err != nil {
 		return err
 	}
+
 	s.Alive = true
 	s.done = make(chan struct{})
 
@@ -120,139 +104,87 @@ func (s *guildedSocketManager) Connect() error {
 
 func (s *guildedSocketManager) readMessages() {
 	defer func() {
-		s.conn.Close()
 		s.Alive = false
 		close(s.done)
+		if s.conn != nil {
+			s.conn.Close()
+		}
 	}()
 
-	for {
+	for s.Alive {
 		_, message, err := s.conn.ReadMessage()
 		if err != nil {
-			s.Emit("debug", fmt.Sprintf("Error reading from socket: %v", err))
-			closeInfo := guildedCloseInfo{Code: websocket.CloseNormalClosure}
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				if ce, ok := err.(*websocket.CloseError); ok {
-					closeInfo.Code = ce.Code
-					closeInfo.Reason = ce.Text
-				}
+			if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				lightning.Log.Error().Err(err).Msg("Error reading from WebSocket")
 			}
-			s.Emit("close", closeInfo)
-			s.handleReconnect()
-			return
+			break
 		}
 
-		s.Emit("debug", fmt.Sprintf("received packet: %s", message))
-		s.handleMessage(message)
-	}
-}
+		var data guildedSocketEventEnvelope
+		if err := json.Unmarshal(message, &data); err != nil {
+			lightning.Log.Error().Err(err).Msg("Error parsing WebSocket message")
+			continue
+		}
 
-func (s *guildedSocketManager) handleMessage(message []byte) {
-	var data guildedSocketEventEnvelope
-	if err := json.Unmarshal(message, &data); err != nil {
-		s.Emit("debug", "received invalid packet")
-		return
-	}
-
-	if data.S != nil {
-		s.LastMessageID = *data.S
-	}
-
-	switch data.Op {
-	case guildedSocketOPSuccess:
 		s.handleEvent(data)
-	case guildedSocketOPWelcome:
-		s.handleWelcome(data)
-	case guildedSocketOPResume:
-		s.Emit("debug", "received resume packet")
-		s.LastMessageID = ""
-	case guildedSocketOPError:
-		s.handleError(data)
-	case guildedSocketOPPing:
-		s.handlePing()
-	default:
-		s.Emit("debug", "received unknown opcode")
 	}
 }
 
 func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
 	if data.T == nil {
+		lightning.Log.Trace().Msg("Received event with nil type")
 		return
 	}
+
 	eventType := *data.T
-	eventJSON, _ := json.Marshal(data.D)
+	lightning.Log.Trace().
+		Str("plugin", "guilded").
+		Str("event_type", eventType).
+		Msg("Processing socket event")
 
-	var evt any
-	var err error
 	switch eventType {
+	case "ready":
+		if s.readyHandler != nil {
+			var welcome guildedWelcomeMessage
+			welcomeJSON, _ := json.Marshal(data.D)
+			if err := json.Unmarshal(welcomeJSON, &welcome); err != nil {
+				lightning.Log.Error().Err(err).Msg("Failed to parse ready event")
+				return
+			}
+			go s.readyHandler(&welcome)
+		}
 	case "ChatMessageCreated":
-		evt = &guildedChatMessageCreated{}
+		if s.messageCreatedHandler != nil {
+			var msg guildedChatMessageCreated
+			msgJSON, _ := json.Marshal(data.D)
+			if err := json.Unmarshal(msgJSON, &msg); err != nil {
+				lightning.Log.Error().Err(err).Msg("Failed to parse message created event")
+				return
+			}
+			lightning.Log.Trace().Str("plugin", "guilded").Msg("Calling message created handler")
+			go s.messageCreatedHandler(&msg)
+		}
 	case "ChatMessageUpdated":
-		evt = &guildedChatMessageUpdated{}
+		if s.messageUpdatedHandler != nil {
+			var msg guildedChatMessageUpdated
+			msgJSON, _ := json.Marshal(data.D)
+			if err := json.Unmarshal(msgJSON, &msg); err != nil {
+				lightning.Log.Error().Err(err).Msg("Failed to parse message updated event")
+				return
+			}
+			go s.messageUpdatedHandler(&msg)
+		}
 	case "ChatMessageDeleted":
-		evt = &guildedChatMessageDeleted{}
+		if s.messageDeletedHandler != nil {
+			var msg guildedChatMessageDeleted
+			msgJSON, _ := json.Marshal(data.D)
+			if err := json.Unmarshal(msgJSON, &msg); err != nil {
+				lightning.Log.Error().Err(err).Msg("Failed to parse message deleted event")
+				return
+			}
+			go s.messageDeletedHandler(&msg)
+		}
 	default:
-		s.Emit(eventType, data.D)
-		return
+		lightning.Log.Trace().Str("event", eventType).Msg("Unhandled event type")
 	}
-
-	if err = json.Unmarshal(eventJSON, evt); err != nil {
-		s.Emit("debug", fmt.Sprintf("Failed to parse %s: %v", eventType, err))
-		return
-	}
-	s.Emit(eventType, evt)
-}
-
-func (s *guildedSocketManager) handleWelcome(data guildedSocketEventEnvelope) {
-	var welcome guildedWelcomeMessage
-	welcomeJSON, _ := json.Marshal(data.D)
-	if err := json.Unmarshal(welcomeJSON, &welcome); err != nil {
-		s.Emit("debug", "received invalid welcome packet")
-		return
-	}
-	s.Emit("ready", &welcome)
-}
-
-func (s *guildedSocketManager) handleError(data guildedSocketEventEnvelope) {
-	s.Emit("debug", "received error packet")
-	var errorData struct {
-		Message string `json:"message"`
-	}
-	errJSON, _ := json.Marshal(data.D)
-	if err := json.Unmarshal(errJSON, &errorData); err == nil {
-		s.Emit("error", errors.New(errorData.Message), data)
-	}
-	s.LastMessageID = ""
-	s.conn.Close()
-}
-
-func (s *guildedSocketManager) handlePing() {
-	s.Emit("debug", "received ping packet, sending pong")
-	pong := map[string]any{"op": guildedSocketOPPong}
-	if pongData, err := json.Marshal(pong); err == nil {
-		s.conn.WriteMessage(websocket.TextMessage, pongData)
-	}
-}
-
-func (s *guildedSocketManager) handleReconnect() {
-	s.Emit("debug", "disconnecting due to close")
-	s.Emit("debug", "reconnecting to Guilded")
-	s.Emit("reconnect")
-	s.ReconnectCount++
-
-	backoff := time.Duration(math.Min(float64(s.ReconnectCount*s.ReconnectCount), 30)) * time.Second
-	time.Sleep(backoff)
-	s.Connect()
-}
-
-func (s *guildedSocketManager) Close() error {
-	if s.conn == nil {
-		return nil
-	}
-
-	err := s.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-	if err != nil {
-		return err
-	}
-	<-s.done
-	return nil
 }
