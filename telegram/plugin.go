@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	lightning.RegisterPluginType("telegram", newTelegramPlugin)
+	lightning.RegisterPluginType("bolt-telegram", newTelegramPlugin)
 }
 
 func newTelegramPlugin(config any) (lightning.Plugin, error) {

@@ -102,9 +102,11 @@ func (p *postgresDatabase) getBridge(id string) (Bridge, error) {
 
 func (p *postgresDatabase) getBridgeByChannel(channelID string) (Bridge, error) {
 	row := p.conn.QueryRow(p.ctx, `
-        SELECT * FROM bridges 
-        WHERE channels @> jsonb_build_array(jsonb_build_object('id', $1))
-	`, channelID)
+		SELECT id, name, channels, settings FROM bridges 
+		WHERE EXISTS (
+			SELECT 1 FROM jsonb_array_elements(channels) AS ch
+			WHERE ch->>'id' = $1
+		)`, channelID)
 	return handleBridgeRow(row)
 }
 
@@ -135,8 +137,12 @@ func (p *postgresDatabase) deleteMessage(id string) error {
 
 func (p *postgresDatabase) getMessage(id string) (BridgeMessageCollection, error) {
 	row := p.conn.QueryRow(p.ctx, `
-		SELECT * FROM bridge_messages
-		WHERE id = $1 OR jsonb_path_exists(messages, '$[*].id ? (@ == $1)', $1)
+		SELECT id, name, bridge_id, channels, messages, settings FROM bridge_messages
+		WHERE id = $1 OR EXISTS (
+			SELECT 1 FROM jsonb_array_elements(messages) AS msg
+			CROSS JOIN jsonb_array_elements_text(msg->'id') AS id_element
+			WHERE id_element = $1
+		)
 	`, id)
 	return handleMessageRow(row)
 }
@@ -235,8 +241,10 @@ func handleBridgeRow(row pgx.Row) (Bridge, error) {
 	var bridge Bridge
 	var channelsJSON, settingsJSON []byte
 
-	if err := row.Scan(&bridge.ID, &bridge.Name, &channelsJSON, &settingsJSON); err != nil {
+	if err := row.Scan(&bridge.ID, &bridge.Name, &channelsJSON, &settingsJSON); err != nil && err != pgx.ErrNoRows {
 		return Bridge{}, err
+	} else if err == pgx.ErrNoRows {
+		return Bridge{}, nil
 	}
 
 	if err := json.Unmarshal(channelsJSON, &bridge.Channels); err != nil {
@@ -254,8 +262,10 @@ func handleMessageRow(row pgx.Row) (BridgeMessageCollection, error) {
 	var message BridgeMessageCollection
 	var channelsJSON, messagesJSON, settingsJSON []byte
 
-	if err := row.Scan(&message.ID, &message.Name, &message.BridgeID, &channelsJSON, &messagesJSON, &settingsJSON); err != nil {
+	if err := row.Scan(&message.ID, &message.Name, &message.BridgeID, &channelsJSON, &messagesJSON, &settingsJSON); err != nil && err != pgx.ErrNoRows {
 		return BridgeMessageCollection{}, err
+	} else if err == pgx.ErrNoRows {
+		return BridgeMessageCollection{}, nil
 	}
 
 	if err := json.Unmarshal(channelsJSON, &message.Channels); err != nil {
