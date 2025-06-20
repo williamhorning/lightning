@@ -20,7 +20,7 @@ func main() {
 	(&cli.Command{
 		Name:                  "lightning",
 		Usage:                 "extensible chatbot connecting communities",
-		Version:               "0.8.0-alpha.6",
+		Version:               "0.8.0-alpha.7",
 		DefaultCommand:        "help",
 		EnableShellCompletion: true,
 		Authors:               []any{"William Horning", "Lightning contributors"},

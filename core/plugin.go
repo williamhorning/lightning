@@ -63,7 +63,7 @@ func distributeEvents[T any](ev string, plugin Plugin, source <-chan T, destinat
 	for event := range source {
 		key := getEventKey(event) + "-" + ev
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 
 		if _, exists := handledEvents[key]; exists {
 			Log.Trace().Str("plugin", plugin.Name()).Str("event", key).Msg("Event already handled, skipping")

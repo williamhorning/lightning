@@ -20,6 +20,11 @@ func newGuildedPlugin(config any) (lightning.Plugin, error) {
 		token := cfg["token"].(string)
 
 		socket := guildedNewSocketManager(token)
+		plugin := &guildedPlugin{token, socket}
+
+		socket.OnReady(func(msg *guildedWelcomeMessage) {
+			lightning.Log.Info().Str("plugin", "guilded").Str("username", msg.User.Name).Msg("ready!")
+		})
 
 		if err := socket.Connect(); err != nil {
 			return nil, lightning.LogError(
@@ -30,11 +35,7 @@ func newGuildedPlugin(config any) (lightning.Plugin, error) {
 			)
 		}
 
-		socket.On("ready", func(msg *guildedWelcomeMessage) {
-			lightning.Log.Info().Str("plugin", "guilded").Str("username", msg.User.Name).Msg("ready!")
-		})
-
-		return &guildedPlugin{token, socket}, nil
+		return plugin, nil
 	}
 }
 
@@ -73,29 +74,35 @@ func (p *guildedPlugin) SetupCommands(command []lightning.Command) error {
 }
 
 func (p *guildedPlugin) ListenMessages() <-chan lightning.Message {
-	ch := make(chan lightning.Message)
+	ch := make(chan lightning.Message, 100)
 
-	p.socket.On("ChatMessageCreated", func(msg *guildedChatMessageCreated) {
-		ch <- *getIncomingMessage(p.token, &msg.Message)
+	p.socket.OnMessageCreated(func(msg *guildedChatMessageCreated) {
+		message := getIncomingMessage(p.token, &msg.Message)
+		if message != nil {
+			ch <- *message
+		}
 	})
 
 	return ch
 }
 
 func (p *guildedPlugin) ListenEdits() <-chan lightning.Message {
-	ch := make(chan lightning.Message)
+	ch := make(chan lightning.Message, 100)
 
-	p.socket.On("ChatMessageUpdated", func(msg *guildedChatMessageUpdated) {
-		ch <- *getIncomingMessage(p.token, &msg.Message)
+	p.socket.OnMessageUpdated(func(msg *guildedChatMessageUpdated) {
+		message := getIncomingMessage(p.token, &msg.Message)
+		if message != nil {
+			ch <- *message
+		}
 	})
 
 	return ch
 }
 
 func (p *guildedPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	ch := make(chan lightning.BaseMessage)
+	ch := make(chan lightning.BaseMessage, 100)
 
-	p.socket.On("ChatMessageDeleted", func(msg *guildedChatMessageDeleted) {
+	p.socket.OnMessageDeleted(func(msg *guildedChatMessageDeleted) {
 		ch <- lightning.BaseMessage{
 			EventID:   msg.Message.Id,
 			ChannelID: msg.Message.ChannelId,
