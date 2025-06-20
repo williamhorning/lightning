@@ -21,6 +21,7 @@ LABEL org.opencontainers.image.licenses="MIT"
 # copy stuff over
 USER 1001:1001
 COPY --from=builder /app/lightning /lightning
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 VOLUME [ "/data" ]
 WORKDIR /data
 
