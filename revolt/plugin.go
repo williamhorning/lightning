@@ -120,7 +120,7 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Br
 		}
 	}
 
-	msg := getOutgoingMessage(p.revolt, message, false, canMasquerade)
+	msg := getOutgoingMessage(p.revolt, message, false, !canMasquerade)
 	res, err := p.revolt.ChannelMessageSend(message.ChannelID, msg)
 
 	if err != nil {
