@@ -21,7 +21,7 @@ var discordErrors = map[int]ErrorConfig{
 	10003: {10003, "unknown channel, disabling channel", true, true},
 	10015: {10015, "unknown message, disabling channel", false, true},
 	50027: {50027, "invalid webhook token, disabling channel", false, true},
-	0:     {0, "unknown RESTError, not disabling channel", false, false}, // Default case
+	0:     {0, "unknown RESTError, not disabling channel", false, false},
 }
 
 func getError(err error, extra map[string]any, message string) error {

@@ -85,14 +85,16 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 	return &lightning.CommandEvent{
 		CommandOptions: lightning.CommandOptions{
 			Arguments: args,
-			Channel:   interaction.ChannelID,
-			Plugin:    "bolt-discord",
-			Prefix:    "/",
-			Time:      timestamp,
+			BaseMessage: lightning.BaseMessage{
+				EventID:   interaction.ID,
+				ChannelID: interaction.ChannelID,
+				Plugin:    "bolt-discord",
+				Time:      timestamp,
+			},
+			Prefix: "/",
 		},
 		Command:    data.Name,
 		Subcommand: subcommand,
-		EventID:    interaction.ID,
 		Reply: func(message string) error {
 			return session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,

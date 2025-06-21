@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	lightning.RegisterPluginType("bolt-telegram", newTelegramPlugin)
+	lightning.Plugins.RegisterType("telegram", newTelegramPlugin)
 }
 
 func newTelegramPlugin(config any) (lightning.Plugin, error) {
@@ -147,14 +148,13 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 
 	content := parseContent(message, opts)
 
-	// Setup message options with proper reply handling
 	sendOpts := &gotgbot.SendMessageOpts{
 		ParseMode: gotgbot.ParseModeMarkdownV2,
 	}
 
 	if len(message.RepliedTo) > 0 {
 		replyID, err := strconv.ParseInt(message.RepliedTo[0], 10, 64)
-		if err == nil {
+		if err == nil && replyID > 0 {
 			sendOpts.ReplyParameters = &gotgbot.ReplyParameters{
 				MessageId:                replyID,
 				AllowSendingWithoutReply: true,
@@ -175,19 +175,8 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 
 	ids := []string{strconv.FormatInt(msg.MessageId, 10)}
 
-	docOpts := &gotgbot.SendDocumentOpts{}
-	if len(message.RepliedTo) > 0 {
-		replyID, err := strconv.ParseInt(message.RepliedTo[0], 10, 64)
-		if err == nil {
-			docOpts.ReplyParameters = &gotgbot.ReplyParameters{
-				MessageId:                replyID,
-				AllowSendingWithoutReply: true,
-			}
-		}
-	}
-
 	for _, attachment := range message.Attachments {
-		if msg, err := p.telegram.SendDocument(channel, gotgbot.InputFileByURL(attachment.URL), docOpts); err == nil {
+		if msg, err := p.telegram.SendDocument(channel, gotgbot.InputFileByURL(attachment.URL), nil); err == nil {
 			ids = append(ids, strconv.FormatInt(msg.MessageId, 10))
 		}
 	}
@@ -222,6 +211,10 @@ func (p *telegramPlugin) EditMessage(message lightning.Message, ids []string, op
 		MessageId: msgID,
 		ParseMode: gotgbot.ParseModeMarkdownV2,
 	})
+
+	if err != nil && strings.Contains("message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message", err.Error()) {
+		return nil
+	}
 
 	return err
 }

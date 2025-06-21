@@ -32,6 +32,6 @@ func getRevoltError(err error, extra map[string]any, message string, edit bool) 
 	} else if statusCode == 404 {
 		return lightning.LogError(err, "resource not found", extra, lightning.ReadWriteDisabled{Read: false, Write: true})
 	} else {
-		return lightning.LogError(err, message, extra, lightning.ReadWriteDisabled{Read: false, Write: true})
+		return lightning.LogError(err, message, extra, lightning.ReadWriteDisabled{Read: false, Write: false})
 	}
 }

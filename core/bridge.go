@@ -11,7 +11,7 @@ func SetupBridge(db Database) {
 	RegisterCommand(bridgeCommand(db))
 
 	go func() {
-		for event := range ListenMessages() {
+		for event := range Plugins.ListenMessages() {
 			Log.Trace().Str("event_id", event.EventID).Str("channel", event.ChannelID).Msg("Received message creation event")
 			if err := handleBridgeMessage(db, "create_message", event); err != nil {
 				LogError(err, "Failed to handle bridge message creation", nil, ReadWriteDisabled{})
@@ -20,7 +20,7 @@ func SetupBridge(db Database) {
 	}()
 
 	go func() {
-		for event := range ListenEdits() {
+		for event := range Plugins.ListenEdits() {
 			Log.Trace().Str("event_id", event.EventID).Str("channel", event.ChannelID).Msg("Received message edit event")
 			if err := handleBridgeMessage(db, "edit_message", event); err != nil {
 				LogError(err, "Failed to handle bridge message edit", nil, ReadWriteDisabled{})
@@ -29,7 +29,7 @@ func SetupBridge(db Database) {
 	}()
 
 	go func() {
-		for event := range ListenDeletes() {
+		for event := range Plugins.ListenDeletes() {
 			Log.Trace().Str("event_id", event.EventID).Str("channel", event.ChannelID).Msg("Received message deletion event")
 			if err := handleBridgeMessage(db, "delete_message", event); err != nil {
 				LogError(err, "Failed to handle bridge message deletion", nil, ReadWriteDisabled{})
@@ -149,7 +149,7 @@ func handleBridgeMessage(db Database, event string, data any) error {
 		}
 
 		Log.Trace().Str("plugin", channel.Plugin).Msg("Getting plugin")
-		plugin, ok := GetPlugin(channel.Plugin)
+		plugin, ok := Plugins.Get(channel.Plugin)
 		if !ok {
 			Log.Debug().Str("plugin", channel.Plugin).Msg("Plugin not found, skipping channel")
 			continue
@@ -270,7 +270,7 @@ func handleBridgeMessage(db Database, event string, data any) error {
 			}
 
 			for _, id := range resultIDs {
-				setHandled(channel.Plugin, id, strings.Replace(event, "_message", "", 1))
+				Plugins.setHandled(channel.Plugin, id, strings.Replace(event, "_message", "", 1))
 				Log.Trace().Str("plugin", channel.Plugin).Str("message_id", id).Msg("Marked message as handled")
 			}
 

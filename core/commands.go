@@ -19,7 +19,7 @@ func RegisterCommand(command Command) {
 		commands = append(commands, cmd)
 	}
 
-	for _, plugin := range pluginRegistry {
+	for _, plugin := range Plugins.Plugins {
 		if err := plugin.SetupCommands(commands); err != nil {
 			LogError(err, "Failed to setup commands for plugin", map[string]any{
 				"plugin": plugin.Name(),
@@ -40,11 +40,9 @@ type CommandArgument struct {
 }
 
 type CommandOptions struct {
+	BaseMessage
 	Arguments map[string]string
-	Channel   string
-	Plugin    string
 	Prefix    string
-	Time      time.Time
 }
 
 type Command struct {
@@ -60,7 +58,6 @@ type CommandEvent struct {
 	Command    string
 	Subcommand *string
 	Options    *[]string
-	EventID    string
 	Reply      func(message string) error
 }
 
@@ -95,13 +92,13 @@ func SetupCommands(prefix string) {
 	RegisterCommand(PingCommand())
 
 	go func() {
-		for event := range ListenCommands() {
+		for event := range Plugins.ListenCommands() {
 			handleCommandEvent(event)
 		}
 	}()
 
 	go func() {
-		for event := range ListenMessages() {
+		for event := range Plugins.ListenMessages() {
 			handleMessageCommand(event, prefix)
 		}
 	}()
@@ -125,17 +122,14 @@ func handleMessageCommand(event Message, prefix string) {
 
 	handleCommandEvent(CommandEvent{
 		CommandOptions: CommandOptions{
-			Arguments: make(map[string]string),
-			Channel:   event.ChannelID,
-			Plugin:    event.Plugin,
-			Prefix:    prefix,
-			Time:      event.Time,
+			Arguments:   make(map[string]string),
+			BaseMessage: event.BaseMessage,
+			Prefix:      prefix,
 		},
 		Command: commandName,
 		Options: &options,
-		EventID: event.EventID,
 		Reply: func(message string) error {
-			plugin, exists := GetPlugin(event.Plugin)
+			plugin, exists := Plugins.Get(event.Plugin)
 			if !exists {
 				return LogError(ErrPluginNotFound, "Plugin not found for command reply", map[string]any{
 					"plugin": event.Plugin,

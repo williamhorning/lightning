@@ -48,7 +48,6 @@ func getLightningAttachments(attachments []*discordgo.MessageAttachment, sticker
 	for _, sticker := range stickers {
 		stickerURL := ""
 
-		// Handle different sticker formats
 		switch sticker.FormatType {
 		case discordgo.StickerFormatTypePNG, discordgo.StickerFormatTypeAPNG:
 			stickerURL = "https://cdn.discordapp.com/stickers/" + sticker.ID + ".png"

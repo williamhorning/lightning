@@ -2,9 +2,8 @@ package telegram
 
 import (
 	"regexp"
-	"strings"
-
 	"slices"
+	"strings"
 
 	"github.com/williamhorning/lightning"
 )
@@ -21,7 +20,7 @@ func parseContent(message lightning.Message, opts *lightning.BridgeMessageOption
 	content := ""
 
 	if bridged {
-		content += message.Author.Nickname + " » "
+		content += escapeMarkdownV2(message.Author.Nickname) + " » "
 	}
 
 	content += message.Content
@@ -70,7 +69,7 @@ func processInlineMarkdown(input string) string {
 			closing := findClosing(chars, i+2, "**")
 			innerText := string(chars[i+2 : closing])
 			output.WriteString("*")
-			output.WriteString(processInlineMarkdown(innerText))
+			output.WriteString(escapeMarkdownV2(innerText))
 			output.WriteString("*")
 			i = closing + 2
 
@@ -78,7 +77,7 @@ func processInlineMarkdown(input string) string {
 			closing := findClosing(chars, i+1, "*")
 			innerText := string(chars[i+1 : closing])
 			output.WriteString("_")
-			output.WriteString(processInlineMarkdown(innerText))
+			output.WriteString(escapeMarkdownV2(innerText))
 			output.WriteString("_")
 			i = closing + 1
 
@@ -86,7 +85,7 @@ func processInlineMarkdown(input string) string {
 			closing := findClosing(chars, i+1, "_")
 			innerText := string(chars[i+1 : closing])
 			output.WriteString("_")
-			output.WriteString(processInlineMarkdown(innerText))
+			output.WriteString(escapeMarkdownV2(innerText))
 			output.WriteString("_")
 			i = closing + 1
 
@@ -94,7 +93,7 @@ func processInlineMarkdown(input string) string {
 			closing := findClosing(chars, i+2, "~~")
 			innerText := string(chars[i+2 : closing])
 			output.WriteString("~")
-			output.WriteString(processInlineMarkdown(innerText))
+			output.WriteString(escapeMarkdownV2(innerText))
 			output.WriteString("~")
 			i = closing + 2
 

@@ -5,7 +5,7 @@ import (
 )
 
 func init() {
-	lightning.RegisterPluginType("bolt-guilded", newGuildedPlugin)
+	lightning.Plugins.RegisterType("guilded", newGuildedPlugin)
 }
 
 func newGuildedPlugin(config any) (lightning.Plugin, error) {

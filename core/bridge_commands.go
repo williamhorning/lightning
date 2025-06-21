@@ -67,26 +67,26 @@ func bridgeCommand(db Database) Command {
 }
 
 func prepareChannelForBridge(db Database, opts CommandOptions) (BridgeChannel, string) {
-	Log.Trace().Str("channel", opts.Channel).Str("plugin", opts.Plugin).Msg("Adding channel to bridge")
+	Log.Trace().Str("channel", opts.ChannelID).Str("plugin", opts.Plugin).Msg("Adding channel to bridge")
 
-	if br, err := db.getBridgeByChannel(opts.Channel); br.ID != "" || err != nil {
+	if br, err := db.getBridgeByChannel(opts.ChannelID); br.ID != "" || err != nil {
 		return BridgeChannel{}, "This channel is already part of a bridge. Please leave the bridge first."
 	}
 
-	plugin, ok := GetPlugin(opts.Plugin)
+	plugin, ok := Plugins.Get(opts.Plugin)
 	if !ok {
 		return BridgeChannel{}, LogError(ErrPluginNotFound, "Failed to add channel to bridge using plugin",
-			map[string]any{"plugin": opts.Plugin, "channel": opts.Channel}, ReadWriteDisabled{}).Error()
+			map[string]any{"plugin": opts.Plugin, "channel": opts.ChannelID}, ReadWriteDisabled{}).Error()
 	}
 
-	data, err := plugin.SetupChannel(opts.Channel)
+	data, err := plugin.SetupChannel(opts.ChannelID)
 	if err != nil {
 		return BridgeChannel{}, LogError(err, "Failed to setup channel for bridge",
-			map[string]any{"plugin": plugin.Name(), "channel": opts.Channel}, ReadWriteDisabled{}).Error()
+			map[string]any{"plugin": plugin.Name(), "channel": opts.ChannelID}, ReadWriteDisabled{}).Error()
 	}
 
 	return BridgeChannel{
-		ID:       opts.Channel,
+		ID:       opts.ChannelID,
 		Data:     data,
 		Plugin:   plugin.Name(),
 		Disabled: ReadWriteDisabled{false, false},
@@ -111,7 +111,7 @@ func createCommand(db Database, opts CommandOptions) (string, error) {
 			map[string]any{"bridge": bridge}, ReadWriteDisabled{}).Error(), nil
 	}
 
-	Log.Debug().Str("bridge_id", bridge.ID).Str("channel", opts.Channel).Msg("Bridge created successfully")
+	Log.Debug().Str("bridge_id", bridge.ID).Str("channel", opts.ChannelID).Msg("Bridge created successfully")
 	return "Bridge created successfully! You can now join it using `" + opts.Prefix + "bridge join " + bridge.ID + "`.", nil
 }
 
@@ -139,17 +139,17 @@ func joinCommand(db Database, opts CommandOptions, subscribe bool) (string, erro
 			map[string]any{"bridge": br}, ReadWriteDisabled{}).Error(), nil
 	}
 
-	Log.Debug().Str("bridge_id", br.ID).Str("channel", opts.Channel).Msg("Channel joined bridge successfully")
+	Log.Debug().Str("bridge_id", br.ID).Str("channel", opts.ChannelID).Msg("Channel joined bridge successfully")
 	return "Bridge joined successfully!", nil
 }
 
 func leaveCommand(db Database, opts CommandOptions) (string, error) {
 	id := opts.Arguments["id"]
 
-	br, err := db.getBridgeByChannel(opts.Channel)
+	br, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.Channel}, ReadWriteDisabled{}).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, ReadWriteDisabled{}).Error(), nil
 	} else if br.ID == "" {
 		return "You are not in a bridge.", nil
 	}
@@ -159,7 +159,7 @@ func leaveCommand(db Database, opts CommandOptions) (string, error) {
 	}
 
 	for i, channel := range br.Channels {
-		if channel.ID == opts.Channel {
+		if channel.ID == opts.ChannelID {
 			br.Channels = slices.Delete(br.Channels, i, i+1)
 			break
 		}
@@ -176,10 +176,10 @@ func leaveCommand(db Database, opts CommandOptions) (string, error) {
 func toggleCommand(db Database, opts CommandOptions) (string, error) {
 	setting := opts.Arguments["setting"]
 
-	br, err := db.getBridgeByChannel(opts.Channel)
+	br, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.Channel}, ReadWriteDisabled{}).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, ReadWriteDisabled{}).Error(), nil
 	} else if br.ID == "" {
 		return "You are not in a bridge.", nil
 	}
@@ -199,10 +199,10 @@ func toggleCommand(db Database, opts CommandOptions) (string, error) {
 }
 
 func statusCommand(db Database, opts CommandOptions) (string, error) {
-	br, err := db.getBridgeByChannel(opts.Channel)
+	br, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.Channel}, ReadWriteDisabled{}).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, ReadWriteDisabled{}).Error(), nil
 	} else if br.ID == "" {
 		return "You are not in a bridge.", nil
 	}

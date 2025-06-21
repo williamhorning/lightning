@@ -2,12 +2,14 @@ package lightning
 
 import (
 	"os"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/rs/zerolog"
 )
 
 type Config struct {
+	BridgeDelay    *int64         `toml:"bridge_delay,omitempty"`
 	CommandPrefix  string         `toml:"prefix,omitempty"`
 	DatabaseConfig DatabaseConfig `toml:"database"`
 	ErrorURL       string         `toml:"error_url"`
@@ -37,10 +39,14 @@ func LoadConfig(path string) (Config, error) {
 		return Config{}, err
 	}
 
+	if config.BridgeDelay != nil {
+		Plugins.eventDelay = time.Duration(*config.BridgeDelay) * time.Millisecond
+	}
+
 	SetupCommands(config.CommandPrefix)
 
 	for plugin, cfg := range config.Plugins {
-		registerPlugin(plugin, cfg)
+		Plugins.registerPlugin(plugin, cfg)
 	}
 
 	return config, nil
