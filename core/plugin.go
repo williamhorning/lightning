@@ -9,19 +9,19 @@ import (
 var (
 	ErrPluginNotFound      = errors.New("plugin not found internally: this is a bug or misconfiguration")
 	ErrPluginConfigInvalid = errors.New("plugin config is invalid")
-
-	pluginConstructors = make(map[string]PluginConstructor)
-	pluginRegistry     = make(map[string]Plugin)
-	handledEvents      = make(map[string]struct{})
-
-	constructorsLock   sync.RWMutex
-	pluginRegistryLock sync.RWMutex
-
-	messages []chan Message
-	edits    []chan Message
-	deletes  []chan BaseMessage
-	commands []chan CommandEvent
-	mutex    sync.RWMutex
+	Plugins                = &PluginRegistry{
+		make(map[string]Plugin),
+		sync.RWMutex{},
+		make(map[string]PluginConstructor),
+		sync.RWMutex{},
+		make(map[string]struct{}),
+		[]chan Message{},
+		[]chan Message{},
+		[]chan BaseMessage{},
+		[]chan CommandEvent{},
+		sync.RWMutex{},
+		200 * time.Millisecond,
+	}
 )
 
 type PluginConstructor func(config any) (Plugin, error)
@@ -39,38 +39,119 @@ type Plugin interface {
 	ListenCommands() <-chan CommandEvent
 }
 
-func RegisterPluginType(name string, constructor PluginConstructor) {
-	constructorsLock.Lock()
-	defer constructorsLock.Unlock()
+type PluginRegistry struct {
+	Plugins         map[string]Plugin
+	pluginsLock     sync.RWMutex
+	pluginTypes     map[string]PluginConstructor
+	pluginTypesLock sync.RWMutex
+	handledEvents   map[string]struct{}
+	messages        []chan Message
+	edits           []chan Message
+	deletes         []chan BaseMessage
+	commands        []chan CommandEvent
+	eventMutex      sync.RWMutex
+	eventDelay      time.Duration
+}
+
+func (pr *PluginRegistry) RegisterType(name string, constructor PluginConstructor) {
+	pr.pluginTypesLock.Lock()
+	defer pr.pluginTypesLock.Unlock()
 
 	Log.Debug().Str("plugin", name).Msg("Registering plugin type")
 
-	if _, exists := pluginConstructors[name]; exists {
+	if _, exists := pr.pluginTypes[name]; exists {
 		Log.Panic().Str("plugin", name).Msg("Plugin type already registered")
 	}
 
-	pluginConstructors[name] = constructor
+	pr.pluginTypes[name] = constructor
 }
 
-func GetPlugin(name string) (Plugin, bool) {
-	pluginRegistryLock.RLock()
-	defer pluginRegistryLock.RUnlock()
-	plugin, exists := pluginRegistry[name]
+func (pr *PluginRegistry) Get(name string) (Plugin, bool) {
+	pr.pluginsLock.RLock()
+	defer pr.pluginsLock.RUnlock()
+	plugin, exists := pr.Plugins[name]
 	return plugin, exists
 }
 
-func distributeEvents[T any](ev string, plugin Plugin, source <-chan T, destinations *[]chan T) {
+func (pr *PluginRegistry) registerPlugin(name string, config any) error {
+	pr.pluginTypesLock.RLock()
+	pr.pluginsLock.Lock()
+	defer pr.pluginTypesLock.RUnlock()
+	defer pr.pluginsLock.Unlock()
+
+	Log.Debug().Str("plugin", name).Msg("Registering plugin")
+
+	if _, exists := pr.Plugins[name]; exists {
+		Log.Panic().Str("plugin", name).Msg("Plugin already registered")
+	}
+
+	constructor, exists := pr.pluginTypes[name]
+	if !exists {
+		return ErrPluginNotFound
+	}
+
+	instance, err := constructor(config)
+	if err != nil {
+		return err
+	}
+
+	pr.Plugins[instance.Name()] = instance
+
+	go distributeEvents(pr, "create", instance, instance.ListenMessages(), &pr.messages)
+	go distributeEvents(pr, "edit", instance, instance.ListenEdits(), &pr.edits)
+	go distributeEvents(pr, "delete", instance, instance.ListenDeletes(), &pr.deletes)
+	go distributeEvents(pr, "command", instance, instance.ListenCommands(), &pr.commands)
+
+	Log.Debug().Str("plugin", instance.Name()).Msg("Plugin registered and listening!")
+	return nil
+}
+
+func (pr *PluginRegistry) setHandled(plugin string, event string, ev string) {
+	pr.eventMutex.Lock()
+	defer pr.eventMutex.Unlock()
+	Log.Trace().Str("plugin", plugin).Str("event", event).Str("ev", ev).Msg("Setting handled event")
+	pr.handledEvents[ev+"-"+plugin+"-"+event] = struct{}{}
+}
+
+func (pr *PluginRegistry) ListenMessages() <-chan Message {
+	return createEventChannel(pr, 100, &pr.messages)
+}
+
+func (pr *PluginRegistry) ListenEdits() <-chan Message {
+	return createEventChannel(pr, 100, &pr.edits)
+}
+
+func (pr *PluginRegistry) ListenDeletes() <-chan BaseMessage {
+	return createEventChannel(pr, 100, &pr.deletes)
+}
+
+func (pr *PluginRegistry) ListenCommands() <-chan CommandEvent {
+	return createEventChannel(pr, 100, &pr.commands)
+}
+
+func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, source <-chan T, destinations *[]chan T) {
 	for event := range source {
-		key := getEventKey(event) + "-" + ev
+		key := ev + "-" + plugin.Name() + "-"
 
-		time.Sleep(150 * time.Millisecond)
+		switch v := any(event).(type) {
+		case Message:
+			key += v.EventID
+		case BaseMessage:
+			key += v.EventID
+		case CommandEvent:
+			key += v.EventID
+		}
 
-		if _, exists := handledEvents[key]; exists {
+		time.Sleep(pr.eventDelay)
+
+		if _, exists := pr.handledEvents[key]; exists {
 			Log.Trace().Str("plugin", plugin.Name()).Str("event", key).Msg("Event already handled, skipping")
 			continue
 		}
 
-		mutex.RLock()
+		pr.setHandled(plugin.Name(), ev, key)
+
+		pr.eventMutex.RLock()
 		for _, ch := range *destinations {
 			select {
 			case ch <- event:
@@ -79,93 +160,15 @@ func distributeEvents[T any](ev string, plugin Plugin, source <-chan T, destinat
 				Log.Warn().Str("plugin", plugin.Name()).Msg("Skipped event - channel full or closed")
 			}
 		}
-		mutex.RUnlock()
+		pr.eventMutex.RUnlock()
 	}
 }
 
-func getEventKey(event any) string {
-	switch e := event.(type) {
-	case Message:
-		return e.Plugin + "-" + e.EventID
-	case BaseMessage:
-		return e.Plugin + "-" + e.EventID
-	case CommandEvent:
-		return e.Plugin + "-" + e.EventID
-	default:
-		return "-"
-	}
-}
-
-func registerPlugin(plugin string, config any) {
-	pluginRegistryLock.Lock()
-	defer pluginRegistryLock.Unlock()
-
-	Log.Debug().Str("plugin", plugin).Msg("Registering plugin")
-
-	if _, exists := pluginRegistry[plugin]; exists {
-		Log.Panic().Str("plugin", plugin).Msg("Plugin already registered")
-	}
-
-	constructorsLock.RLock()
-	constructor, exists := pluginConstructors[plugin]
-	constructorsLock.RUnlock()
-
-	if !exists {
-		Log.Panic().Str("plugin", plugin).Msg("Plugin type not found")
-	}
-
-	instance, err := constructor(config)
-	if err != nil {
-		Log.Panic().Str("plugin", plugin).Err(err).Msg("Failed to setup plugin")
-	}
-
-	commands_list := make([]Command, 0, len(commandRegistry))
-	for _, cmd := range commandRegistry {
-		commands_list = append(commands_list, cmd)
-	}
-
-	if err := instance.SetupCommands(commands_list); err != nil {
-		Log.Warn().Str("plugin", plugin).Err(err).Msg("Failed to setup commands for plugin")
-	}
-
-	pluginRegistry[plugin] = instance
-	go distributeEvents("create", instance, instance.ListenMessages(), &messages)
-	go distributeEvents("edit", instance, instance.ListenEdits(), &edits)
-	go distributeEvents("delete", instance, instance.ListenDeletes(), &deletes)
-	go distributeEvents("command", instance, instance.ListenCommands(), &commands)
-
-	Log.Debug().Str("plugin", plugin).Msg("Plugin registered and listening!")
-}
-
-func setHandled(plugin string, event string, ev string) {
-	Log.Trace().Str("plugin", plugin).Str("event", event).Str("ev", ev).Msg("Setting handled event")
-	handledEvents[plugin+"-"+event+"-"+ev] = struct{}{}
-}
-
-func createEventChannel[T any](bufferSize int, channelList *[]chan T) <-chan T {
+func createEventChannel[T any](pr *PluginRegistry, bufferSize int, channelList *[]chan T) <-chan T {
+	Log.Trace().Msg("Creating event channel")
 	ch := make(chan T, bufferSize)
-	mutex.Lock()
+	pr.eventMutex.Lock()
+	defer pr.eventMutex.Unlock()
 	*channelList = append(*channelList, ch)
-	mutex.Unlock()
 	return ch
-}
-
-func ListenMessages() <-chan Message {
-	Log.Trace().Msg("Creating message event channel")
-	return createEventChannel(100, &messages)
-}
-
-func ListenEdits() <-chan Message {
-	Log.Trace().Msg("Creating edit event channel")
-	return createEventChannel(100, &edits)
-}
-
-func ListenDeletes() <-chan BaseMessage {
-	Log.Trace().Msg("Creating delete event channel")
-	return createEventChannel(100, &deletes)
-}
-
-func ListenCommands() <-chan CommandEvent {
-	Log.Trace().Msg("Creating command event channel")
-	return createEventChannel(100, &commands)
 }

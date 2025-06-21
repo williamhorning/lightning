@@ -12,6 +12,15 @@ import (
 	"github.com/williamhorning/lightning"
 )
 
+func getBase(ctx *ext.Context) lightning.BaseMessage {
+	return lightning.BaseMessage{
+		EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
+		ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
+		Plugin:    "bolt-telegram",
+		Time:      time.UnixMilli(ctx.EffectiveMessage.GetDate() * 1000),
+	}
+}
+
 func getCommand(cmdName string, b *gotgbot.Bot, ctx *ext.Context) lightning.CommandEvent {
 	if cmdName == "start" {
 		cmdName = "help"
@@ -26,14 +35,11 @@ func getCommand(cmdName string, b *gotgbot.Bot, ctx *ext.Context) lightning.Comm
 
 	return lightning.CommandEvent{
 		CommandOptions: lightning.CommandOptions{
-			Channel: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-			Plugin:  "bolt-telegram",
-			Prefix:  "/",
-			Time:    time.UnixMilli(ctx.EffectiveMessage.GetDate()),
+			BaseMessage: getBase(ctx),
+			Prefix:      "/",
 		},
 		Command: cmdName,
 		Options: &args,
-		EventID: strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
 		Reply: func(message string) error {
 			_, err := ctx.EffectiveMessage.Reply(b, telegramifyMarkdown(message), &gotgbot.SendMessageOpts{
 				ParseMode: gotgbot.ParseModeMarkdownV2,
@@ -45,12 +51,7 @@ func getCommand(cmdName string, b *gotgbot.Bot, ctx *ext.Context) lightning.Comm
 
 func getMessage(b *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {
 	msg := lightning.Message{
-		BaseMessage: lightning.BaseMessage{
-			EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
-			ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-			Plugin:    "bolt-telegram",
-			Time:      time.UnixMilli(ctx.EffectiveMessage.GetDate() * 1000),
-		},
+		BaseMessage: getBase(ctx),
 		Attachments: []lightning.Attachment{},
 		Author:      getLightningAuthor(b, ctx, proxyPath),
 		Embeds:      []lightning.Embed{},
