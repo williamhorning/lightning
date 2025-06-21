@@ -55,6 +55,8 @@ func newRevoltPlugin(config any) (lightning.Plugin, error) {
 			lightning.Log.Info().Str("plugin", "revolt").Msg("invite me at https://revolt.chat/invite/" + s.State.Self().ID)
 		})
 
+		revolt.ReconnectInterval = 100 * time.Millisecond
+
 		return &revoltPlugin{cfg, revolt}, nil
 	}
 }
@@ -68,13 +70,9 @@ func (p *revoltPlugin) Name() string {
 	return "bolt-revolt"
 }
 
-const requiredPermissions = revoltgo.PermissionChangeNickname |
-	revoltgo.PermissionChangeAvatar |
-	revoltgo.PermissionReadMessageHistory |
-	revoltgo.PermissionSendMessage |
-	revoltgo.PermissionManageMessages |
-	revoltgo.PermissionSendEmbeds |
-	revoltgo.PermissionUploadFiles
+const (
+	CorrectPermissionValue = uint(485495808)
+)
 
 func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	permissions, err := p.revolt.State.ChannelPermissions(p.revolt.State.Self(), p.revolt.State.Channel(channel))
@@ -88,11 +86,22 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 		)
 	}
 
-	if (permissions & requiredPermissions) != requiredPermissions {
+	lightning.Log.Debug().
+		Str("plugin", "revolt").
+		Uint64("actual_permissions", uint64(permissions)).
+		Uint64("expected_permissions", uint64(CorrectPermissionValue)).
+		Bool("permissions_sufficient", (permissions&CorrectPermissionValue) == CorrectPermissionValue).
+		Msg("Revolt permissions check")
+
+	if (permissions & CorrectPermissionValue) != CorrectPermissionValue {
 		return nil, lightning.LogError(
 			errors.New("insufficient permissions in Revolt channel"),
-			"missing ChangeNickname, ChangeAvatar, ReadMessageHistory, SendMessage, ManageMessages, SendEmbeds, UploadFiles, and/or Masquerade permissions please add them to a role, assign that role to the bot, and rejoin the bridge",
-			map[string]any{"channel": channel, "permissions": permissions},
+			"Missing required permissions. Please add all permissions to a role, assign that role to the bot, and rejoin the bridge",
+			map[string]any{
+				"channel":              channel,
+				"current_permissions":  permissions,
+				"expected_permissions": CorrectPermissionValue,
+			},
 			lightning.ReadWriteDisabled{},
 		)
 	}
