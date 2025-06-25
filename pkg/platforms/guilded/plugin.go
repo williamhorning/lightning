@@ -1,0 +1,119 @@
+package guilded
+
+import (
+	"github.com/williamhorning/lightning/pkg/lightning"
+)
+
+func init() {
+	lightning.Plugins.RegisterType("guilded", newGuildedPlugin)
+}
+
+func newGuildedPlugin(config any) (lightning.Plugin, error) {
+	if cfg, ok := config.(map[string]any); !ok {
+		return nil, lightning.LogError(
+			lightning.ErrPluginConfigInvalid,
+			"Invalid config for Guilded plugin",
+			nil,
+			lightning.ReadWriteDisabled{},
+		)
+	} else {
+		token := cfg["token"].(string)
+
+		socket := guildedNewSocketManager(token)
+		plugin := &guildedPlugin{token, socket}
+
+		socket.OnReady(func(msg *guildedWelcomeMessage) {
+			lightning.Log.Info().Str("plugin", "guilded").Str("username", msg.User.Name).Msg("ready!")
+		})
+
+		if err := socket.Connect(); err != nil {
+			return nil, lightning.LogError(
+				err,
+				"Failed to connect to Guilded socket",
+				nil,
+				lightning.ReadWriteDisabled{},
+			)
+		}
+
+		return plugin, nil
+	}
+}
+
+type guildedPlugin struct {
+	token  string
+	socket *guildedSocketManager
+}
+
+func (p *guildedPlugin) Name() string {
+	return "bolt-guilded"
+}
+
+func (p *guildedPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.BridgeMessageOptions) error {
+	return nil
+}
+
+func (p *guildedPlugin) DeleteMessage(ids []string, opts *lightning.BridgeMessageOptions) error {
+	for _, id := range ids {
+		_, err := guildedMakeRequest(p.token, "DELETE", "/channels/"+opts.Channel.ID+"/messages/"+id, nil)
+
+		if err != nil {
+			return lightning.LogError(
+				err,
+				"Failed to delete message",
+				map[string]any{"messageID": id, "channelID": opts.Channel.ID},
+				lightning.ReadWriteDisabled{},
+			)
+		}
+	}
+
+	return nil
+}
+
+func (p *guildedPlugin) SetupCommands(command []lightning.Command) error {
+	return nil
+}
+
+func (p *guildedPlugin) ListenMessages() <-chan lightning.Message {
+	ch := make(chan lightning.Message, 100)
+
+	p.socket.OnMessageCreated(func(msg *guildedChatMessageCreated) {
+		message := getIncomingMessage(p.token, &msg.Message)
+		if message != nil {
+			ch <- *message
+		}
+	})
+
+	return ch
+}
+
+func (p *guildedPlugin) ListenEdits() <-chan lightning.Message {
+	ch := make(chan lightning.Message, 100)
+
+	p.socket.OnMessageUpdated(func(msg *guildedChatMessageUpdated) {
+		message := getIncomingMessage(p.token, &msg.Message)
+		if message != nil {
+			ch <- *message
+		}
+	})
+
+	return ch
+}
+
+func (p *guildedPlugin) ListenDeletes() <-chan lightning.BaseMessage {
+	ch := make(chan lightning.BaseMessage, 100)
+
+	p.socket.OnMessageDeleted(func(msg *guildedChatMessageDeleted) {
+		ch <- lightning.BaseMessage{
+			EventID:   msg.Message.Id,
+			ChannelID: msg.Message.ChannelId,
+			Plugin:    "bolt-guilded",
+			Time:      msg.DeletedAt,
+		}
+	})
+
+	return ch
+}
+
+func (p *guildedPlugin) ListenCommands() <-chan lightning.CommandEvent {
+	return make(chan lightning.CommandEvent)
+}

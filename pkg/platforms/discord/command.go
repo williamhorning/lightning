@@ -1,0 +1,107 @@
+package discord
+
+import (
+	"time"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/williamhorning/lightning/pkg/lightning"
+)
+
+func getDiscordCommandOptions(arguments lightning.Command) []*discordgo.ApplicationCommandOption {
+	options := make([]*discordgo.ApplicationCommandOption, 0)
+
+	for _, arg := range arguments.Arguments {
+		options = append(options, &discordgo.ApplicationCommandOption{
+			Name:        arg.Name,
+			Description: arg.Description,
+			Required:    arg.Required,
+			Type:        discordgo.ApplicationCommandOptionString,
+		})
+	}
+
+	for _, subcommand := range arguments.Subcommands {
+		options = append(options, &discordgo.ApplicationCommandOption{
+			Name:        subcommand.Name,
+			Description: subcommand.Description,
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
+			Options:     getDiscordCommandOptions(subcommand),
+		})
+	}
+
+	return options
+}
+
+func getDiscordCommand(command []lightning.Command) []*discordgo.ApplicationCommand {
+	commands := make([]*discordgo.ApplicationCommand, len(command))
+
+	for i, cmd := range command {
+		commands[i] = &discordgo.ApplicationCommand{
+			Name:        cmd.Name,
+			Type:        discordgo.ChatApplicationCommand,
+			Description: cmd.Description,
+			Options:     getDiscordCommandOptions(cmd),
+		}
+	}
+
+	return commands
+}
+
+func getLightningCommand(session *discordgo.Session, interaction *discordgo.InteractionCreate) *lightning.CommandEvent {
+	if interaction.Type != discordgo.InteractionApplicationCommand || interaction.Data.Type() != discordgo.InteractionApplicationCommand {
+		return nil
+	}
+
+	args := make(map[string]string)
+	data := interaction.Data.(discordgo.ApplicationCommandInteractionData)
+	var subcommand *string = nil
+
+	for _, option := range data.Options {
+		if option.Type == discordgo.ApplicationCommandOptionSubCommand {
+			subcommand = &option.Name
+
+			for _, subOption := range option.Options {
+				if subOption.Type == discordgo.ApplicationCommandOptionString {
+					args[subOption.Name] = subOption.StringValue()
+				}
+			}
+		} else if option.Type == discordgo.ApplicationCommandOptionString {
+			args[option.Name] = option.StringValue()
+		}
+	}
+
+	timestamp, err := discordgo.SnowflakeTimestamp(interaction.ID)
+
+	if err != nil {
+		lightning.LogError(
+			err,
+			"Failed to parse interaction timestamp",
+			map[string]any{"interaction_id": interaction.ID},
+			lightning.ReadWriteDisabled{Read: false, Write: false},
+		)
+
+		timestamp = time.Now()
+	}
+
+	return &lightning.CommandEvent{
+		CommandOptions: lightning.CommandOptions{
+			Arguments: args,
+			BaseMessage: lightning.BaseMessage{
+				EventID:   interaction.ID,
+				ChannelID: interaction.ChannelID,
+				Plugin:    "bolt-discord",
+				Time:      timestamp,
+			},
+			Prefix: "/",
+		},
+		Command:    data.Name,
+		Subcommand: subcommand,
+		Reply: func(message string) error {
+			return session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: message,
+				},
+			})
+		},
+	}
+}
