@@ -3,18 +3,18 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 COPY . .
-RUN go build -o lightning ./cli/main.go
+RUN go build -o lightning ./cmd/lightning/main.go
 
 # build the final image
 FROM scratch
 
 # metadata
 LABEL maintainer="William Horning"
-LABEL version="0.8.0-alpha.8"
+LABEL version="0.8.0-alpha.9"
 LABEL description="Lightning"
 LABEL org.opencontainers.image.title="Lightning"
 LABEL org.opencontainers.image.description="extensible chatbot connecting communities"
-LABEL org.opencontainers.image.version="0.8.0-alpha.8"
+LABEL org.opencontainers.image.version="0.8.0-alpha.9"
 LABEL org.opencontainers.image.source="https://github.com/williamhorning/lightning"
 LABEL org.opencontainers.image.licenses="MIT"
 
