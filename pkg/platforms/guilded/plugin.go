@@ -14,7 +14,7 @@ func newGuildedPlugin(config any) (lightning.Plugin, error) {
 			lightning.ErrPluginConfigInvalid,
 			"Invalid config for Guilded plugin",
 			nil,
-			lightning.ReadWriteDisabled{},
+			lightning.ChannelDisabled{},
 		)
 	} else {
 		token := cfg["token"].(string)
@@ -31,7 +31,7 @@ func newGuildedPlugin(config any) (lightning.Plugin, error) {
 				err,
 				"Failed to connect to Guilded socket",
 				nil,
-				lightning.ReadWriteDisabled{},
+				lightning.ChannelDisabled{},
 			)
 		}
 
@@ -48,20 +48,20 @@ func (p *guildedPlugin) Name() string {
 	return "bolt-guilded"
 }
 
-func (p *guildedPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.BridgeMessageOptions) error {
+func (p *guildedPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
 	return nil
 }
 
-func (p *guildedPlugin) DeleteMessage(ids []string, opts *lightning.BridgeMessageOptions) error {
+func (p *guildedPlugin) DeleteMessage(ids []string, opts *lightning.SendOptions) error {
 	for _, id := range ids {
-		_, err := guildedMakeRequest(p.token, "DELETE", "/channels/"+opts.Channel.ID+"/messages/"+id, nil)
+		_, err := guildedMakeRequest(p.token, "DELETE", "/channels/"+opts.ChannelID+"/messages/"+id, nil)
 
 		if err != nil {
 			return lightning.LogError(
 				err,
 				"Failed to delete message",
-				map[string]any{"messageID": id, "channelID": opts.Channel.ID},
-				lightning.ReadWriteDisabled{},
+				map[string]any{"messageID": id, "channelID": opts.ChannelID},
+				lightning.ChannelDisabled{},
 			)
 		}
 	}
@@ -69,7 +69,7 @@ func (p *guildedPlugin) DeleteMessage(ids []string, opts *lightning.BridgeMessag
 	return nil
 }
 
-func (p *guildedPlugin) SetupCommands(command []lightning.Command) error {
+func (p *guildedPlugin) SetupCommands(command map[string]lightning.Command) error {
 	return nil
 }
 

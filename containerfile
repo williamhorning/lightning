@@ -3,7 +3,7 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 COPY . .
-RUN go build -o lightning ./cmd/lightning/main.go
+RUN go build -o lightning ./cmd/lightning/*.go
 
 # build the final image
 FROM scratch

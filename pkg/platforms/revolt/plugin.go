@@ -18,7 +18,7 @@ func newRevoltPlugin(config any) (lightning.Plugin, error) {
 			lightning.ErrPluginConfigInvalid,
 			"Invalid config for Revolt plugin",
 			nil,
-			lightning.ReadWriteDisabled{},
+			lightning.ChannelDisabled{},
 		)
 	} else {
 		revolt := revoltgo.New(cfg["token"].(string))
@@ -28,7 +28,7 @@ func newRevoltPlugin(config any) (lightning.Plugin, error) {
 				err,
 				"Failed to open Revolt session",
 				nil,
-				lightning.ReadWriteDisabled{},
+				lightning.ChannelDisabled{},
 			)
 		}
 
@@ -68,7 +68,7 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 			err,
 			"Failed to get channel permissions in Revolt",
 			map[string]any{"channel": channel},
-			lightning.ReadWriteDisabled{},
+			lightning.ChannelDisabled{},
 		)
 	}
 
@@ -88,14 +88,14 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 				"current_permissions":  permissions,
 				"expected_permissions": CorrectPermissionValue,
 			},
-			lightning.ReadWriteDisabled{},
+			lightning.ChannelDisabled{},
 		)
 	}
 
 	return channel, nil
 }
 
-func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.BridgeMessageOptions) ([]string, error) {
+func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := getOutgoingMessage(p.revolt, message, false, opts != nil)
 	res, err := p.revolt.ChannelMessageSend(message.ChannelID, msg)
 
@@ -106,8 +106,8 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Br
 	return []string{res.ID}, nil
 }
 
-func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.BridgeMessageOptions) error {
-	_, err := p.revolt.ChannelMessageEdit(opts.Channel.ID, ids[0], toEdit(getOutgoingMessage(p.revolt, message, true, true)))
+func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
+	_, err := p.revolt.ChannelMessageEdit(opts.ChannelID, ids[0], toEdit(getOutgoingMessage(p.revolt, message, true, true)))
 
 	if err != nil {
 		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to edit message on Revolt", true)
@@ -116,9 +116,9 @@ func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts
 	return nil
 }
 
-func (p *revoltPlugin) DeleteMessage(ids []string, opts *lightning.BridgeMessageOptions) error {
+func (p *revoltPlugin) DeleteMessage(ids []string, opts *lightning.SendOptions) error {
 	for _, id := range ids {
-		err := p.revolt.ChannelMessageDelete(opts.Channel.ID, id)
+		err := p.revolt.ChannelMessageDelete(opts.ChannelID, id)
 
 		if err != nil {
 			return getRevoltError(err, map[string]any{"ids": ids}, "Failed to delete message on Revolt", true)
@@ -128,7 +128,7 @@ func (p *revoltPlugin) DeleteMessage(ids []string, opts *lightning.BridgeMessage
 	return nil
 }
 
-func (p *revoltPlugin) SetupCommands(command []lightning.Command) error {
+func (p *revoltPlugin) SetupCommands(command map[string]lightning.Command) error {
 	return nil
 }
 

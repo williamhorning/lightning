@@ -1,12 +1,9 @@
-package lightning
+package bridge
+
+import "github.com/williamhorning/lightning/pkg/lightning"
 
 type BridgeSettings struct {
 	AllowEveryone bool `json:"allow_everyone"`
-}
-
-type ReadWriteDisabled struct {
-	Read  bool `json:"read"`
-	Write bool `json:"write"`
 }
 
 type BridgeChannel struct {
@@ -14,11 +11,6 @@ type BridgeChannel struct {
 	Data     any    `json:"data"`
 	Disabled any    `json:"disabled"`
 	Plugin   string `json:"plugin"`
-}
-
-type BridgeMessageOptions struct {
-	Channel  BridgeChannel  `json:"channel"`
-	Settings BridgeSettings `json:"settings"`
 }
 
 type BridgeMessage struct {
@@ -40,24 +32,24 @@ type BridgeMessageCollection struct {
 	Messages []BridgeMessage `json:"messages"`
 }
 
-func (b *BridgeChannel) IsDisabled() ReadWriteDisabled {
+func (b *BridgeChannel) IsDisabled() lightning.ChannelDisabled {
 	switch v := b.Disabled.(type) {
 	case bool:
-		return ReadWriteDisabled{v, v}
+		return lightning.ChannelDisabled{Read: v, Write: v}
 	case map[string]any:
 		read, okRead := v["read"].(bool)
 		write, okWrite := v["write"].(bool)
 		if okRead && okWrite {
-			return ReadWriteDisabled{read, write}
+			return lightning.ChannelDisabled{Read: read, Write: write}
 		} else if okRead {
-			return ReadWriteDisabled{read, false}
+			return lightning.ChannelDisabled{Read: read, Write: false}
 		} else if okWrite {
-			return ReadWriteDisabled{false, write}
+			return lightning.ChannelDisabled{Read: false, Write: write}
 		} else {
-			return ReadWriteDisabled{false, false}
+			return lightning.ChannelDisabled{Read: false, Write: false}
 		}
-	case ReadWriteDisabled:
+	case lightning.ChannelDisabled:
 		return v
 	}
-	return ReadWriteDisabled{false, false}
+	return lightning.ChannelDisabled{Read: false, Write: false}
 }

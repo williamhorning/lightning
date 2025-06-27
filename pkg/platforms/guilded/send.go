@@ -11,12 +11,12 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *guildedPlugin) SendMessage(message lightning.Message, opts *lightning.BridgeMessageOptions) ([]string, error) {
+func (p *guildedPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := getOutgoingMessage(message, opts, p.token)
 	jsonMsg, err := json.Marshal(msg)
 	if err != nil {
 		return nil, lightning.LogError(err, "Failed to marshal outgoing message",
-			map[string]any{"message": message}, lightning.ReadWriteDisabled{})
+			map[string]any{"message": message}, lightning.ChannelDisabled{})
 	}
 
 	reader := bytes.NewReader(jsonMsg)
@@ -31,7 +31,7 @@ func (p *guildedPlugin) sendMessage(message lightning.Message, reader io.Reader)
 	resp, err := guildedMakeRequest(p.token, "POST", "/channels/"+message.ChannelID+"/messages", &reader)
 	if err != nil {
 		return nil, lightning.LogError(err, "Failed to send message",
-			map[string]any{"message": message, "channelID": message.ChannelID}, lightning.ReadWriteDisabled{})
+			map[string]any{"message": message, "channelID": message.ChannelID}, lightning.ChannelDisabled{})
 	}
 	defer resp.Body.Close()
 
@@ -49,12 +49,12 @@ func (p *guildedPlugin) sendMessage(message lightning.Message, reader io.Reader)
 	return []string{msg.Message.Id}, nil
 }
 
-func (p *guildedPlugin) sendWebhookMessage(message lightning.Message, opts *lightning.BridgeMessageOptions, reader io.Reader) ([]string, error) {
-	webhookData, ok := opts.Channel.Data.(map[string]any)
+func (p *guildedPlugin) sendWebhookMessage(message lightning.Message, opts *lightning.SendOptions, reader io.Reader) ([]string, error) {
+	webhookData, ok := opts.ChannelData.(map[string]any)
 	if !ok {
 		return nil, lightning.LogError(errors.New("invalid webhook data for Guilded channel"),
-			"Failed to use webhook for Guilded", map[string]any{"channel": opts.Channel.ID},
-			lightning.ReadWriteDisabled{Read: false, Write: true})
+			"Failed to use webhook for Guilded", map[string]any{"channel": opts.ChannelID},
+			lightning.ChannelDisabled{Read: false, Write: true})
 	}
 
 	id, _ := webhookData["id"].(string)
@@ -64,25 +64,25 @@ func (p *guildedPlugin) sendWebhookMessage(message lightning.Message, opts *ligh
 	req, err := http.NewRequest("POST", url, reader)
 	if err != nil {
 		return nil, lightning.LogError(err, "Failed to send message request",
-			map[string]any{"message": message, "channelID": opts.Channel.ID}, lightning.ReadWriteDisabled{})
+			map[string]any{"message": message, "channelID": opts.ChannelID}, lightning.ChannelDisabled{})
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, lightning.LogError(err, "Failed to send message",
-			map[string]any{"message": message, "channelID": opts.Channel.ID}, lightning.ReadWriteDisabled{})
+			map[string]any{"message": message, "channelID": opts.ChannelID}, lightning.ChannelDisabled{})
 	}
 	defer resp.Body.Close()
 
-	if err := p.checkStatusCode(resp, opts.Channel.ID); err != nil {
+	if err := p.checkStatusCode(resp, opts.ChannelID); err != nil {
 		return nil, err
 	}
 
 	var response struct {
 		ID string `json:"id"`
 	}
-	if err := p.readResponse(resp, &response, opts.Channel.ID); err != nil {
+	if err := p.readResponse(resp, &response, opts.ChannelID); err != nil {
 		return nil, err
 	}
 
@@ -106,7 +106,7 @@ func (p *guildedPlugin) checkStatusCode(resp *http.Response, channelID string) e
 
 	return lightning.LogError(errors.New(errMsg), "Failed to send message",
 		map[string]any{"channelID": channelID},
-		lightning.ReadWriteDisabled{Read: false, Write: true})
+		lightning.ChannelDisabled{Read: false, Write: true})
 }
 
 func (p *guildedPlugin) readResponse(resp *http.Response, target any, channelID string) error {
@@ -114,12 +114,12 @@ func (p *guildedPlugin) readResponse(resp *http.Response, target any, channelID 
 
 	if err != nil {
 		return lightning.LogError(err, "Failed to read response body",
-			map[string]any{"channelID": channelID}, lightning.ReadWriteDisabled{})
+			map[string]any{"channelID": channelID}, lightning.ChannelDisabled{})
 	}
 
 	if err := json.Unmarshal(bodyBytes, target); err != nil {
 		return lightning.LogError(err, "Failed to unmarshal response",
-			map[string]any{"channelID": channelID}, lightning.ReadWriteDisabled{})
+			map[string]any{"channelID": channelID}, lightning.ChannelDisabled{})
 	}
 
 	return nil
