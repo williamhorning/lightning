@@ -3,7 +3,6 @@ package lightning
 import (
 	"errors"
 	"sync"
-	"time"
 )
 
 var (
@@ -11,7 +10,6 @@ var (
 	ErrPluginNotFound          = errors.New("plugin not found internally: this is a bug or misconfiguration")
 	ErrPluginConfigInvalid     = errors.New("plugin config is invalid")
 	Plugins                    = &PluginRegistry{
-		200 * time.Millisecond,
 		make(map[string]Plugin),
 		sync.RWMutex{},
 		make(map[string]PluginConstructor),
@@ -47,7 +45,6 @@ type SendOptions struct {
 }
 
 type PluginRegistry struct {
-	EventDelay      time.Duration
 	plugins         map[string]Plugin
 	pluginsLock     sync.RWMutex
 	pluginTypes     map[string]PluginConstructor
@@ -148,8 +145,6 @@ func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, sourc
 		case CommandEvent:
 			key += v.EventID
 		}
-
-		time.Sleep(pr.EventDelay)
 
 		if _, exists := pr.handledEvents[key]; exists {
 			Log.Trace().Str("plugin", plugin.Name()).Str("event", key).Msg("Event already handled, skipping")
