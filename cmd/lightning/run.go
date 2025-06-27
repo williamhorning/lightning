@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/rs/zerolog"
@@ -20,7 +19,6 @@ import (
 )
 
 type config struct {
-	BridgeDelay    *int64                `toml:"bridge_delay,omitempty"`
 	CommandPrefix  string                `toml:"prefix,omitempty"`
 	DatabaseConfig bridge.DatabaseConfig `toml:"database"`
 	ErrorURL       string                `toml:"error_url"`
@@ -46,10 +44,6 @@ func run(ctx context.Context, c *cli.Command) error {
 	if err := os.Setenv("LIGHTNING_ERROR_WEBHOOK", config.ErrorURL); err != nil {
 		lightning.LogError(err, "something went wrong with setting the webhook url", nil, lightning.ChannelDisabled{})
 		os.Exit(1)
-	}
-
-	if config.BridgeDelay != nil {
-		lightning.Plugins.EventDelay = time.Duration(*config.BridgeDelay) * time.Millisecond
 	}
 
 	lightning.SetupCommands(config.CommandPrefix)

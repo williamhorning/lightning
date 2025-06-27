@@ -15,7 +15,7 @@ func parseContent(message lightning.Message, opts *lightning.SendOptions) string
 	content := ""
 
 	if opts != nil {
-		content += message.Author.Nickname + " » "
+		content += getMarkdownV2(message.Author.Nickname) + " » "
 	}
 
 	mdV2 := getMarkdownV2(message.Content)
@@ -29,8 +29,6 @@ func parseContent(message lightning.Message, opts *lightning.SendOptions) string
 	if len(message.Embeds) > 0 {
 		content += "\n_this message has embeds_"
 	}
-
-	println(content)
 
 	return content
 }
