@@ -7,9 +7,11 @@ import (
 )
 
 var (
-	ErrPluginNotFound      = errors.New("plugin not found internally: this is a bug or misconfiguration")
-	ErrPluginConfigInvalid = errors.New("plugin config is invalid")
-	Plugins                = &PluginRegistry{
+	ErrPluginAlreadyRegistered = errors.New("plugin already registered: this is a bug or misconfiguration")
+	ErrPluginNotFound          = errors.New("plugin not found internally: this is a bug or misconfiguration")
+	ErrPluginConfigInvalid     = errors.New("plugin config is invalid")
+	Plugins                    = &PluginRegistry{
+		200 * time.Millisecond,
 		make(map[string]Plugin),
 		sync.RWMutex{},
 		make(map[string]PluginConstructor),
@@ -20,7 +22,6 @@ var (
 		[]chan BaseMessage{},
 		[]chan CommandEvent{},
 		sync.RWMutex{},
-		200 * time.Millisecond,
 	}
 )
 
@@ -29,18 +30,25 @@ type PluginConstructor func(config any) (Plugin, error)
 type Plugin interface {
 	Name() string
 	SetupChannel(channel string) (any, error)
-	SendMessage(message Message, opts *BridgeMessageOptions) ([]string, error)
-	EditMessage(message Message, ids []string, opts *BridgeMessageOptions) error
-	DeleteMessage(ids []string, opts *BridgeMessageOptions) error
-	SetupCommands(command []Command) error
+	SendMessage(message Message, opts *SendOptions) ([]string, error)
+	EditMessage(message Message, ids []string, opts *SendOptions) error
+	DeleteMessage(ids []string, opts *SendOptions) error
+	SetupCommands(command map[string]Command) error
 	ListenMessages() <-chan Message
 	ListenEdits() <-chan Message
 	ListenDeletes() <-chan BaseMessage
 	ListenCommands() <-chan CommandEvent
 }
 
+type SendOptions struct {
+	AllowEveryonePings bool
+	ChannelID          string
+	ChannelData        any
+}
+
 type PluginRegistry struct {
-	Plugins         map[string]Plugin
+	EventDelay      time.Duration
+	plugins         map[string]Plugin
 	pluginsLock     sync.RWMutex
 	pluginTypes     map[string]PluginConstructor
 	pluginTypesLock sync.RWMutex
@@ -50,7 +58,6 @@ type PluginRegistry struct {
 	deletes         []chan BaseMessage
 	commands        []chan CommandEvent
 	eventMutex      sync.RWMutex
-	eventDelay      time.Duration
 }
 
 func (pr *PluginRegistry) RegisterType(name string, constructor PluginConstructor) {
@@ -69,11 +76,11 @@ func (pr *PluginRegistry) RegisterType(name string, constructor PluginConstructo
 func (pr *PluginRegistry) Get(name string) (Plugin, bool) {
 	pr.pluginsLock.RLock()
 	defer pr.pluginsLock.RUnlock()
-	plugin, exists := pr.Plugins[name]
+	plugin, exists := pr.plugins[name]
 	return plugin, exists
 }
 
-func (pr *PluginRegistry) registerPlugin(name string, config any) error {
+func (pr *PluginRegistry) RegisterPlugin(name string, config any) error {
 	pr.pluginTypesLock.RLock()
 	pr.pluginsLock.Lock()
 	defer pr.pluginTypesLock.RUnlock()
@@ -81,8 +88,8 @@ func (pr *PluginRegistry) registerPlugin(name string, config any) error {
 
 	Log.Debug().Str("plugin", name).Msg("Registering plugin")
 
-	if _, exists := pr.Plugins[name]; exists {
-		Log.Panic().Str("plugin", name).Msg("Plugin already registered")
+	if _, exists := pr.plugins[name]; exists {
+		return ErrPluginAlreadyRegistered
 	}
 
 	constructor, exists := pr.pluginTypes[name]
@@ -95,7 +102,7 @@ func (pr *PluginRegistry) registerPlugin(name string, config any) error {
 		return err
 	}
 
-	pr.Plugins[instance.Name()] = instance
+	pr.plugins[instance.Name()] = instance
 
 	go distributeEvents(pr, "create", instance, instance.ListenMessages(), &pr.messages)
 	go distributeEvents(pr, "edit", instance, instance.ListenEdits(), &pr.edits)
@@ -106,7 +113,7 @@ func (pr *PluginRegistry) registerPlugin(name string, config any) error {
 	return nil
 }
 
-func (pr *PluginRegistry) setHandled(plugin string, event string, ev string) {
+func (pr *PluginRegistry) SetHandled(plugin string, event string, ev string) {
 	pr.eventMutex.Lock()
 	defer pr.eventMutex.Unlock()
 	Log.Trace().Str("plugin", plugin).Str("event", event).Str("ev", ev).Msg("Setting handled event")
@@ -142,14 +149,14 @@ func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, sourc
 			key += v.EventID
 		}
 
-		time.Sleep(pr.eventDelay)
+		time.Sleep(pr.EventDelay)
 
 		if _, exists := pr.handledEvents[key]; exists {
 			Log.Trace().Str("plugin", plugin.Name()).Str("event", key).Msg("Event already handled, skipping")
 			continue
 		}
 
-		pr.setHandled(plugin.Name(), ev, key)
+		pr.SetHandled(plugin.Name(), ev, key)
 
 		pr.eventMutex.RLock()
 		for _, ch := range *destinations {

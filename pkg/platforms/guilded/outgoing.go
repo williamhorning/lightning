@@ -30,7 +30,7 @@ func getValidUsername(author lightning.MessageAuthor) string {
 	}
 }
 
-func getOutgoingMessage(message lightning.Message, opts *lightning.BridgeMessageOptions, token string) *guildedPayload {
+func getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions, token string) *guildedPayload {
 	base := &guildedPayload{
 		Content:         message.Content,
 		AvatarURL:       *message.Author.ProfilePicture,
@@ -43,7 +43,7 @@ func getOutgoingMessage(message lightning.Message, opts *lightning.BridgeMessage
 		base.Content = "\u2800"
 	}
 
-	if opts != nil && !opts.Settings.AllowEveryone {
+	if opts != nil && !opts.AllowEveryonePings {
 		base.Content = strings.ReplaceAll(base.Content, "@everyone", "@\u2800everyone")
 		base.Content = strings.ReplaceAll(base.Content, "@here", "@\u2800here")
 	}

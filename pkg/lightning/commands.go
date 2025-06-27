@@ -6,24 +6,17 @@ import (
 	"time"
 )
 
-var (
-	commandRegistry = make(map[string]Command)
-	CommandPrefix   = ""
-)
+var commandRegistry = make(map[string]Command)
 
 func RegisterCommand(command Command) {
 	Log.Debug().Str("command", command.Name).Msg("Registering command")
 	commandRegistry[command.Name] = command
-	commands := make([]Command, 0, len(commandRegistry))
-	for _, cmd := range commandRegistry {
-		commands = append(commands, cmd)
-	}
 
-	for _, plugin := range Plugins.Plugins {
-		if err := plugin.SetupCommands(commands); err != nil {
+	for _, plugin := range Plugins.plugins {
+		if err := plugin.SetupCommands(commandRegistry); err != nil {
 			LogError(err, "Failed to setup commands for plugin", map[string]any{
 				"plugin": plugin.Name(),
-			}, ReadWriteDisabled{})
+			}, ChannelDisabled{})
 		}
 	}
 }
@@ -86,8 +79,6 @@ func PingCommand() Command {
 }
 
 func SetupCommands(prefix string) {
-	CommandPrefix = prefix
-
 	RegisterCommand(HelpCommand())
 	RegisterCommand(PingCommand())
 
@@ -114,7 +105,7 @@ func handleMessageCommand(event Message, prefix string) {
 	content := strings.TrimPrefix(event.Content, prefix)
 	args := strings.Fields(content)
 	if len(args) == 0 {
-		return
+		args = []string{"help"}
 	}
 
 	commandName := args[0]
@@ -134,7 +125,7 @@ func handleMessageCommand(event Message, prefix string) {
 				return LogError(ErrPluginNotFound, "Plugin not found for command reply", map[string]any{
 					"plugin": event.Plugin,
 					"event":  event.EventID,
-				}, ReadWriteDisabled{})
+				}, ChannelDisabled{})
 			}
 
 			msg := CreateMessage(message)
@@ -180,7 +171,7 @@ func handleCommandEvent(event CommandEvent) error {
 					"argument": arg.Name,
 					"command":  command.Name,
 					"event":    event.EventID,
-				}, ReadWriteDisabled{})
+				}, ChannelDisabled{})
 			}
 			return nil
 		}
@@ -192,14 +183,14 @@ func handleCommandEvent(event CommandEvent) error {
 		response = LogError(err, "Error executing command", map[string]any{
 			"command": command.Name,
 			"event":   event.EventID,
-		}, ReadWriteDisabled{}).Error()
+		}, ChannelDisabled{}).Error()
 	}
 
 	if err = event.Reply(response); err != nil {
 		return LogError(err, "Error sending command response", map[string]any{
 			"command": command.Name,
 			"event":   event.EventID,
-		}, ReadWriteDisabled{})
+		}, ChannelDisabled{})
 	}
 
 	Log.Trace().Str("event_id", event.EventID).Str("command", command.Name).Msg("Command handled successfully")

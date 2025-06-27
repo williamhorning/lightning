@@ -1,11 +1,6 @@
 ![lightning logo](./logo.svg)
 
-# lightning - a chatbot
-
-> [!NOTE]
-> This branch contains the next version of lightning, currently `0.8.0-alpha.9`,
-> and reflects active development. To see the latest stable version, go to the
-> `main` branch.
+# lightning
 
 - **Connecting Communities**: bridges many popular messaging apps
 - **Extensible**: support for messaging apps provided by plugins which can be
@@ -22,41 +17,30 @@
 ## the problem - and solution
 
 If you've ever had a community, chances are you talk to them in many different
-places, whether that be on Discord, Revolt, Telegram, or Guilded. Over time,
-however, you end up with fragmentation as your community starts to grow and
-change. Many people end up using multiple messaging apps only for various
-versions of your community, people get upset about the differences between the
-messaging apps in your community, and it becomes a mess.
+places. Over time, you end up with fragmentation as your community starts to
+grow. Many people end up using multiple apps for just your community, people get
+upset about the differences between apps, and it becomes a mess.
 
 Now, you could just say "_X is the only chat app we're using from now on_", but
 that risks alienating your community.
 
-What other options are there? Bridging! Everyone gets to use their preferred app
-of choice, gets the same messages, and is on the same page.
+What other options are there? Bridging! Everyone gets to use their preferred
+app, gets the same messages, and is on the same page.
 
 ## prior art
 
-Many bridges have existed before the existence of lightning, however, many of
-these solutions have had issues. Some bridges didn't play well with others,
-others didn't handle attachments, others refused to handle embedded media, and
-it was a mess. With lightning, part of the goal was to solve these issues by
-bringing many platforms into one tool, having it become the handler of truth.
+Many other bridges exist, however, many of them have issues. Some bridges didn't
+play well with others, others didn't handle attachments, others refused to
+handle embedded media, and it was a mess. With lightning, I wanted to solve
+these issues by bringing many platforms with one tool, having it handle
+everything.
 
 ## supported platforms
 
-Currently, the following platforms are supported: Discord, Guilded, Revolt, and
-Telegram. Support for more platforms is possible to do, however, support for
-these platforms should be up to par with support for other platforms and
-messages should be presented as similarly to other messages as possible, subject
-to platform limitations.
-
-### matrix notes
-
-The Matrix Specification is really difficult to correctly handle, especially
-with the current state of the various Matrix libraries. Solutions that work
-well and are _consistently reliable_ aren't easy to implement, and currently
-I don't have time to work on implementing this. If you would like to implement
-Matrix support, please take a look at #66 for a prior attempt of mine.
+Currently, Discord, Guilded, Revolt, and Telegram are supported. Support for
+more platforms is possible to do, but support for these platforms should be
+similar to other supported platforms and messages should be presented as
+similarly to other messages as possible.
 
 ### requesting another platform
 
@@ -68,6 +52,8 @@ should fulfil:
 2. having Go libraries with decent code quality
 3. having rich-messaging support of some kind
 
-## licensing
+### matrix notes
 
-lightning is available under the MIT license
+The Matrix Specification is really difficult to correctly handle. Solutions that
+_work well_ aren't easy to implement, and I've tried implementing support via an
+appservice, but, with MSC4144, I'm hoping that this will become easier to do

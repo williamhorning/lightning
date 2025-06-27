@@ -11,7 +11,7 @@ import (
 
 var specialChars = []string{"[", "]", "(", ")", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!", "\\."}
 
-func parseContent(message lightning.Message, opts *lightning.BridgeMessageOptions) string {
+func parseContent(message lightning.Message, opts *lightning.SendOptions) string {
 	content := ""
 
 	if opts != nil {

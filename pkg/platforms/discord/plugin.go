@@ -15,7 +15,7 @@ func newDiscordPlugin(config any) (lightning.Plugin, error) {
 			lightning.ErrPluginConfigInvalid,
 			"Invalid config for Discord plugin",
 			nil,
-			lightning.ReadWriteDisabled{},
+			lightning.ChannelDisabled{},
 		)
 	} else {
 		token, ok := cfg["token"].(string)
@@ -24,7 +24,7 @@ func newDiscordPlugin(config any) (lightning.Plugin, error) {
 				lightning.ErrPluginConfigInvalid,
 				"Missing or invalid token in Discord plugin config",
 				nil,
-				lightning.ReadWriteDisabled{},
+				lightning.ChannelDisabled{},
 			)
 		}
 
@@ -40,7 +40,7 @@ func newDiscordPlugin(config any) (lightning.Plugin, error) {
 				err,
 				"Failed to create Discord session",
 				nil,
-				lightning.ReadWriteDisabled{},
+				lightning.ChannelDisabled{},
 			)
 		}
 
@@ -51,7 +51,7 @@ func newDiscordPlugin(config any) (lightning.Plugin, error) {
 				err,
 				"Failed to open Discord session",
 				nil,
-				lightning.ReadWriteDisabled{},
+				lightning.ChannelDisabled{},
 			)
 		}
 
@@ -84,11 +84,11 @@ func (p *discordPlugin) SetupChannel(channel string) (any, error) {
 	return map[string]string{"id": wh.ID, "token": wh.Token}, nil
 }
 
-func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.BridgeMessageOptions) ([]string, error) {
+func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := getOutgoingMessage(p.discord, message, opts, opts != nil)
 
 	if opts != nil {
-		id, token, err := getWebhookFromChannel(opts.Channel)
+		id, token, err := getWebhookFromChannel(opts)
 
 		if err != nil {
 			return nil, err
@@ -110,8 +110,8 @@ func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.B
 	}
 }
 
-func (p *discordPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.BridgeMessageOptions) error {
-	id, token, err := getWebhookFromChannel(opts.Channel)
+func (p *discordPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
+	id, token, err := getWebhookFromChannel(opts)
 
 	if err != nil {
 		return err
@@ -126,8 +126,8 @@ func (p *discordPlugin) EditMessage(message lightning.Message, ids []string, opt
 	}
 }
 
-func (p *discordPlugin) DeleteMessage(ids []string, opts *lightning.BridgeMessageOptions) error {
-	if err := p.discord.ChannelMessagesBulkDelete(opts.Channel.ID, ids); err != nil {
+func (p *discordPlugin) DeleteMessage(ids []string, opts *lightning.SendOptions) error {
+	if err := p.discord.ChannelMessagesBulkDelete(opts.ChannelID, ids); err != nil {
 		if err = getError(err, map[string]any{"ids": ids}, "Failed to delete messages in Discord"); err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func (p *discordPlugin) DeleteMessage(ids []string, opts *lightning.BridgeMessag
 	return nil
 }
 
-func (p *discordPlugin) SetupCommands(command []lightning.Command) error {
+func (p *discordPlugin) SetupCommands(command map[string]lightning.Command) error {
 	if p.config["slash_commands"] != true {
 		return nil
 	}
@@ -148,7 +148,7 @@ func (p *discordPlugin) SetupCommands(command []lightning.Command) error {
 			err,
 			"Failed to get application info for Discord commands",
 			nil,
-			lightning.ReadWriteDisabled{Read: false, Write: false},
+			lightning.ChannelDisabled{Read: false, Write: false},
 		)
 	}
 
@@ -159,7 +159,7 @@ func (p *discordPlugin) SetupCommands(command []lightning.Command) error {
 			err,
 			"Failed to setup commands in Discord",
 			map[string]any{"commands": command},
-			lightning.ReadWriteDisabled{Read: false, Write: false},
+			lightning.ChannelDisabled{Read: false, Write: false},
 		)
 	}
 

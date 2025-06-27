@@ -66,14 +66,14 @@ func (o *discordOutgoingMessage) Message() *discordgo.MessageSend {
 	}
 }
 
-func getWebhookFromChannel(channel lightning.BridgeChannel) (id string, token string, err error) {
-	webhookData, ok := channel.Data.(map[string]any)
+func getWebhookFromChannel(options *lightning.SendOptions) (id string, token string, err error) {
+	webhookData, ok := options.ChannelData.(map[string]any)
 	if !ok {
 		return "", "", lightning.LogError(
 			errors.New("invalid webhook data for Discord channel"),
 			"Failed to use webhook for Discord",
-			map[string]any{"channel": channel.ID},
-			lightning.ReadWriteDisabled{Read: false, Write: true},
+			map[string]any{"channel": options.ChannelID},
+			lightning.ChannelDisabled{Read: false, Write: true},
 		)
 	}
 
@@ -82,7 +82,7 @@ func getWebhookFromChannel(channel lightning.BridgeChannel) (id string, token st
 	return id, token, nil
 }
 
-func getOutgoingMessage(session *discordgo.Session, message lightning.Message, opts *lightning.BridgeMessageOptions, button bool) *discordOutgoingMessage {
+func getOutgoingMessage(session *discordgo.Session, message lightning.Message, opts *lightning.SendOptions, button bool) *discordOutgoingMessage {
 	msg := discordOutgoingMessage{
 		AllowedMentions: getOutgoingMention(opts),
 		AvatarURL:       getOutgoingProfile(message),
@@ -101,8 +101,8 @@ func getOutgoingMessage(session *discordgo.Session, message lightning.Message, o
 	return &msg
 }
 
-func getOutgoingMention(opts *lightning.BridgeMessageOptions) *discordgo.MessageAllowedMentions {
-	if opts == nil || opts.Settings.AllowEveryone {
+func getOutgoingMention(opts *lightning.SendOptions) *discordgo.MessageAllowedMentions {
+	if opts == nil || opts.AllowEveryonePings {
 		return nil
 	}
 	return &discordgo.MessageAllowedMentions{

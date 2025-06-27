@@ -10,25 +10,17 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/rs/zerolog"
 )
 
-var (
-	Log                 = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "Jan 02 15:04:05"}).With().Timestamp().Logger().Level(zerolog.InfoLevel)
-	ErrLogErrorNilError = errors.New("LogError called with nil error. Please provide a valid error")
-)
+var ErrLogErrorNilError = errors.New("LogError called with nil error. Please provide a valid error")
 
-type zerologAdapter struct{}
-
-func (z *zerologAdapter) Write(p []byte) (n int, err error) {
-	Log.Debug().
-		Str("type", "log package log").
-		Msg(string(p))
-	return len(p), nil
+type ChannelDisabled struct {
+	Read  bool `json:"read"`
+	Write bool `json:"write"`
 }
 
 type LightningError struct {
-	Disable ReadWriteDisabled
+	Disable ChannelDisabled
 	Message string
 }
 
@@ -36,7 +28,11 @@ func (e LightningError) Error() string {
 	return e.Message
 }
 
-func LogError(err error, message string, extra map[string]any, disable ReadWriteDisabled) LightningError {
+func LogError(err error, message string, extra map[string]any, disable ChannelDisabled) LightningError {
+	if err == nil {
+		err = ErrLogErrorNilError
+	}
+
 	if lightningErr, ok := err.(*LightningError); ok {
 		return *lightningErr
 	}
@@ -45,27 +41,17 @@ func LogError(err error, message string, extra map[string]any, disable ReadWrite
 		return lightningErr
 	}
 
-	if err == nil {
-		err = ErrLogErrorNilError
-	}
-
 	if extra == nil {
 		extra = make(map[string]any)
 	}
 
 	id := ulid.Make().String()
 
-	Log.Error().
-		Str("id", id).
-		Str("message", message).
-		Bool("read_disabled", disable.Read).
-		Bool("write_disabled", disable.Write).
-		Fields(extra).
-		Err(err).Msg("[lightning] error")
+	Log.Error().Str("id", id).Str("message", message).Any("disabled", disable).Fields(extra).Err(err).Msg("[lightning]")
 
 	fmt.Fprintf(os.Stderr, "%+v\n", err)
 
-	if os.Getenv("LIGHTNING_ERROR_WEBHOOK") != "" {
+	if webhook := os.Getenv("LIGHTNING_ERROR_WEBHOOK"); webhook != "" {
 		body, err := json.Marshal(map[string]any{
 			"content": fmt.Sprintf("Error: %s", message),
 			"embeds": []map[string]any{
@@ -84,11 +70,13 @@ func LogError(err error, message string, extra map[string]any, disable ReadWrite
 		if err != nil {
 			Log.Error().Err(err).Msg("Error marshaling error webhook body")
 		} else {
-			resp, err := http.Post(os.Getenv("LIGHTNING_ERROR_WEBHOOK"), "application/json", bytes.NewReader(body))
+			resp, err := http.Post(webhook, "application/json", bytes.NewReader(body))
 			if err != nil {
 				Log.Error().Err(err).Msg("Error sending error webhook request")
 			} else {
-				resp.Body.Close()
+				if err := resp.Body.Close(); err != nil {
+					Log.Error().Err(err).Msg("Error closing response body")
+				}
 			}
 		}
 	}

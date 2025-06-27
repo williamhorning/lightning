@@ -31,16 +31,16 @@ func getDiscordCommandOptions(arguments lightning.Command) []*discordgo.Applicat
 	return options
 }
 
-func getDiscordCommand(command []lightning.Command) []*discordgo.ApplicationCommand {
-	commands := make([]*discordgo.ApplicationCommand, len(command))
+func getDiscordCommand(command map[string]lightning.Command) []*discordgo.ApplicationCommand {
+	commands := make([]*discordgo.ApplicationCommand, 0)
 
-	for i, cmd := range command {
-		commands[i] = &discordgo.ApplicationCommand{
+	for _, cmd := range command {
+		commands = append(commands, &discordgo.ApplicationCommand{
 			Name:        cmd.Name,
 			Type:        discordgo.ChatApplicationCommand,
 			Description: cmd.Description,
 			Options:     getDiscordCommandOptions(cmd),
-		}
+		})
 	}
 
 	return commands
@@ -76,7 +76,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 			err,
 			"Failed to parse interaction timestamp",
 			map[string]any{"interaction_id": interaction.ID},
-			lightning.ReadWriteDisabled{Read: false, Write: false},
+			lightning.ChannelDisabled{Read: false, Write: false},
 		)
 
 		timestamp = time.Now()

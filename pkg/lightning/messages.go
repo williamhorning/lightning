@@ -2,6 +2,7 @@ package lightning
 
 import "time"
 
+// TODO: add a non-svg profile picture to caecilian
 var profilePicURL = "https://williamhorning.eu.org/assets/lightning/logo_color.svg"
 
 type BaseMessage struct {

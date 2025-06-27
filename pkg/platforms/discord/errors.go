@@ -37,8 +37,8 @@ func getError(err error, extra map[string]any, message string) error {
 			e.Code = restErr.Message.Code
 		}
 
-		return lightning.LogError(fmt.Errorf(e.Message+": %w", err), message, extra, lightning.ReadWriteDisabled{Read: e.DisableRead, Write: e.DisableWrite})
+		return lightning.LogError(fmt.Errorf(e.Message+": %w", err), message, extra, lightning.ChannelDisabled{Read: e.DisableRead, Write: e.DisableWrite})
 	} else {
-		return lightning.LogError(fmt.Errorf("unknown error: %w", err), message, extra, lightning.ReadWriteDisabled{})
+		return lightning.LogError(fmt.Errorf("unknown error: %w", err), message, extra, lightning.ChannelDisabled{})
 	}
 }

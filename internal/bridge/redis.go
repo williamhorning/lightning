@@ -1,4 +1,4 @@
-package lightning
+package bridge
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 var ErrUnsupportedVersion = errors.New("unsupported database version, please upgrade to the latest version of Lightning")
@@ -45,7 +46,7 @@ func newRedisDatabase(addr string) (Database, error) {
 		}
 
 		if keys > 0 {
-			Log.Warn().Msg("Migrating from 0.7.x to 0.8.0, this may take a while")
+			lightning.Log.Warn().Msg("Migrating from 0.7.x to 0.8.0, this may take a while")
 
 			self := redisDatabase{client, ctx, true}
 
@@ -67,7 +68,7 @@ func newRedisDatabase(addr string) (Database, error) {
 				return nil, err
 			}
 
-			Log.Warn().Msg("Do you want to write the migrated data to the database? See lightning-redis-migration.json for the data to be written. [y/N]")
+			lightning.Log.Warn().Msg("Do you want to write the migrated data to the database? See lightning-redis-migration.json for the data to be written. [y/N]")
 
 			b := make([]byte, 1)
 
@@ -78,11 +79,11 @@ func newRedisDatabase(addr string) (Database, error) {
 			}
 
 			if !(os.Getenv("LIGHTNING_MIGRATE_CONFIG") != "" || b[0] == 'y') {
-				Log.Warn().Msg("Migration aborted, please run the command again with LIGHTNING_MIGRATE_CONFIG=1 to write the data to the database")
+				lightning.Log.Warn().Msg("Migration aborted, please run the command again with LIGHTNING_MIGRATE_CONFIG=1 to write the data to the database")
 				return nil, ErrUnsupportedVersion
 			}
 
-			Log.Info().Msg("Writing migrated data to the database")
+			lightning.Log.Info().Msg("Writing migrated data to the database")
 
 			err = self.SetAllBridges(bridges)
 
@@ -90,7 +91,7 @@ func newRedisDatabase(addr string) (Database, error) {
 				return nil, err
 			}
 
-			Log.Info().Msg("Migration completed successfully")
+			lightning.Log.Info().Msg("Migration completed successfully")
 
 			self.svn = false
 
