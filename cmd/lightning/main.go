@@ -11,7 +11,7 @@ func main() {
 	(&cli.Command{
 		Name:           "lightning",
 		Usage:          "extensible chatbot connecting communities",
-		Version:        "0.8.0-alpha.9",
+		Version:        "0.8.0-alpha.10",
 		DefaultCommand: "help",
 		Commands: []*cli.Command{
 			{
