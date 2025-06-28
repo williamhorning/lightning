@@ -23,14 +23,14 @@ const (
 )
 
 type discordOutgoingMessage struct {
-	AllowedMentions *discordgo.MessageAllowedMentions `json:"allowed_mentions,omitempty"`
-	AvatarURL       string                            `json:"avatar_url,omitempty"`
-	Components      []discordgo.MessageComponent      `json:"components"`
-	Content         string                            `json:"content,omitempty"`
-	Embeds          []*discordgo.MessageEmbed         `json:"embeds,omitempty"`
-	Files           []*discordgo.File                 `json:"-"`
-	Reference       *discordgo.MessageReference       `json:"message_reference,omitempty"`
-	Username        string                            `json:"username,omitempty"`
+	AllowedMentions *discordgo.MessageAllowedMentions
+	AvatarURL       string
+	Components      []discordgo.MessageComponent
+	Content         string
+	Embeds          []*discordgo.MessageEmbed
+	Files           []*discordgo.File
+	Reference       *discordgo.MessageReference
+	Username        string
 }
 
 func (o *discordOutgoingMessage) Webhook() *discordgo.WebhookParams {
@@ -79,6 +79,9 @@ func getWebhookFromChannel(options *lightning.SendOptions) (id string, token str
 
 	id, _ = webhookData["id"].(string)
 	token, _ = webhookData["token"].(string)
+
+	webhookCache.Set(id, true)
+
 	return id, token, nil
 }
 

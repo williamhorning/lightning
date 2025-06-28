@@ -5,15 +5,21 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 var allowedTypes = []discordgo.MessageType{0, 7, 19, 20, 23}
+var webhookCache = lightning.NewExpiringCache[string, bool](30 * time.Second)
 
 func getLightningMessage(s *discordgo.Session, m *discordgo.Message) *lightning.Message {
 	if !slices.Contains(allowedTypes, m.Type) {
+		return nil
+	}
+
+	if exists, _ := webhookCache.Get(m.WebhookID); exists {
 		return nil
 	}
 

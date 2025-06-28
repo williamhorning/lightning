@@ -1,37 +1,34 @@
 package main
 
 import (
-	"context"
-	"os"
-
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 )
 
 func main() {
-	(&cli.Command{
-		Name:           "lightning",
-		Usage:          "extensible chatbot connecting communities",
-		Version:        "0.8.0-alpha.10",
-		DefaultCommand: "help",
-		Commands: []*cli.Command{
-			{
-				Name:   "migrate",
-				Usage:  "migrate databases",
-				Action: migrate,
-			},
-			{
-				Name:  "run",
-				Usage: "run a lightning instance",
-				Arguments: []cli.Argument{
-					&cli.StringArg{
-						Name:      "config",
-						UsageText: "the path to the configuration file",
-						Value:     "lightning.toml",
-						Config:    cli.StringConfig{TrimSpace: true},
-					},
-				},
-				Action: run,
-			},
-		},
-	}).Run(context.Background(), os.Args)
+	cmd := (&cobra.Command{
+		Use:     "lightning",
+		Short:   "extensible chatbot connecting communities",
+		Long:    "Lightning is an extensible chatbot that connects communities.\nDocs available at https://williamhorning.eu.org",
+		Version: "0.8.0-alpha.11",
+		Example: "  lightning run lightning.toml",
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:     "migrate",
+		Short:   "migrate databases",
+		Long:    "Migrate from one database to another, or from one version to another",
+		Example: "  lightning migrate",
+		Run:     migrate,
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:     "run",
+		Short:   "run a lightning instance",
+		Long:    "Run a lightning instance with the specified configuration file",
+		Args:    cobra.RangeArgs(0, 1),
+		Example: "  lightning run lightning.toml",
+		Run:     run,
+	})
+
+	cmd.Execute()
 }

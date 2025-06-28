@@ -167,7 +167,7 @@ func (p *discordPlugin) SetupCommands(command map[string]lightning.Command) erro
 }
 
 func (p *discordPlugin) ListenMessages() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 100)
+	ch := make(chan lightning.Message, 1000)
 
 	p.discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if msg := getLightningMessage(s, m.Message); msg != nil {
@@ -179,7 +179,7 @@ func (p *discordPlugin) ListenMessages() <-chan lightning.Message {
 }
 
 func (p *discordPlugin) ListenEdits() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 100)
+	ch := make(chan lightning.Message, 1000)
 
 	p.discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageUpdate) {
 		if msg := getLightningMessage(s, m.Message); msg != nil {
@@ -191,7 +191,7 @@ func (p *discordPlugin) ListenEdits() <-chan lightning.Message {
 }
 
 func (p *discordPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	ch := make(chan lightning.BaseMessage, 100)
+	ch := make(chan lightning.BaseMessage, 1000)
 
 	p.discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageDelete) {
 		ch <- lightning.BaseMessage{
@@ -206,7 +206,7 @@ func (p *discordPlugin) ListenDeletes() <-chan lightning.BaseMessage {
 }
 
 func (p *discordPlugin) ListenCommands() <-chan lightning.CommandEvent {
-	ch := make(chan lightning.CommandEvent, 100)
+	ch := make(chan lightning.CommandEvent, 1000)
 
 	p.discord.AddHandler(func(s *discordgo.Session, m *discordgo.InteractionCreate) {
 		cmd := getLightningCommand(s, m)

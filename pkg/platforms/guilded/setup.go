@@ -32,10 +32,7 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 		)
 	}
 
-	var channelData struct {
-		Channel guildedServerChannel `json:"channel"`
-	}
-
+	var channelData guildedServerChannelResponse
 	if err := json.Unmarshal(bodyBytes, &channelData); err != nil {
 		return nil, lightning.LogError(
 			err,
@@ -48,7 +45,7 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 	body, _ := json.Marshal(map[string]string{"channelId": channel, "name": "Lightning Bridges"})
 	var reader io.Reader = bytes.NewReader(body)
 
-	resp, err = guildedMakeRequest(p.token, "POST", "/servers/"+channelData.Channel.ServerId+"/webhooks", &reader)
+	resp, err = guildedMakeRequest(p.token, "POST", "/servers/"+channelData.Channel.ServerID+"/webhooks", &reader)
 
 	if err != nil {
 		return nil, lightning.LogError(err, "Failed to create webhook for channel", nil, lightning.ChannelDisabled{})
@@ -70,9 +67,7 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 		)
 	}
 
-	var webhookData struct {
-		Webhook guildedWebhook `json:"webhook"`
-	}
+	var webhookData guildedWebhookResponse
 
 	if err := json.NewDecoder(resp.Body).Decode(&webhookData); err != nil {
 		return nil, lightning.LogError(
@@ -92,5 +87,5 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 		)
 	}
 
-	return map[string]string{"id": webhookData.Webhook.Id, "token": *webhookData.Webhook.Token}, nil
+	return map[string]string{"id": webhookData.Webhook.ID, "token": *webhookData.Webhook.Token}, nil
 }

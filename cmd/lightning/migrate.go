@@ -1,16 +1,15 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 	"github.com/williamhorning/lightning/internal/bridge"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func migrate(ctx context.Context, c *cli.Command) error {
+func migrate(cmd *cobra.Command, args []string) {
 	sourceConfig := getDatabaseConfig("source")
 	destConfig := getDatabaseConfig("destination")
 
@@ -20,7 +19,7 @@ func migrate(ctx context.Context, c *cli.Command) error {
 
 	if confirm != "y" {
 		fmt.Println("Migration cancelled")
-		return nil
+		return
 	}
 
 	sourceDB, err := sourceConfig.GetDatabase()
@@ -46,7 +45,6 @@ func migrate(ctx context.Context, c *cli.Command) error {
 	}
 
 	fmt.Println("Migration completed successfully")
-	return nil
 }
 
 func getDatabaseConfig(name string) bridge.DatabaseConfig {

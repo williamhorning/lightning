@@ -66,9 +66,9 @@ func newTelegramPlugin(config any) (lightning.Plugin, error) {
 		)
 	}
 
-	commandChannel := make(chan lightning.CommandEvent, 100)
-	messageChannel := make(chan lightning.Message, 100)
-	editChannel := make(chan lightning.Message, 100)
+	commandChannel := make(chan lightning.CommandEvent, 1000)
+	messageChannel := make(chan lightning.Message, 1000)
+	editChannel := make(chan lightning.Message, 1000)
 
 	dispatch := ext.NewDispatcher(&ext.DispatcherOpts{
 		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
@@ -249,7 +249,10 @@ func (p *telegramPlugin) DeleteMessage(ids []string, opts *lightning.SendOptions
 }
 
 func (p *telegramPlugin) SetupCommands(commands map[string]lightning.Command) error {
-	commands["start"] = commands["help"]
+	if help, exists := commands["help"]; exists {
+		commands["start"] = help
+	}
+
 	cmds := make([]gotgbot.BotCommand, 0, len(commands))
 
 	for telegramName, cmd := range commands {

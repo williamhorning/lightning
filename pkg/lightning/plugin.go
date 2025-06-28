@@ -118,19 +118,19 @@ func (pr *PluginRegistry) SetHandled(plugin string, event string, ev string) {
 }
 
 func (pr *PluginRegistry) ListenMessages() <-chan Message {
-	return createEventChannel(pr, 100, &pr.messages)
+	return createEventChannel(pr, 1000, &pr.messages)
 }
 
 func (pr *PluginRegistry) ListenEdits() <-chan Message {
-	return createEventChannel(pr, 100, &pr.edits)
+	return createEventChannel(pr, 1000, &pr.edits)
 }
 
 func (pr *PluginRegistry) ListenDeletes() <-chan BaseMessage {
-	return createEventChannel(pr, 100, &pr.deletes)
+	return createEventChannel(pr, 1000, &pr.deletes)
 }
 
 func (pr *PluginRegistry) ListenCommands() <-chan CommandEvent {
-	return createEventChannel(pr, 100, &pr.commands)
+	return createEventChannel(pr, 1000, &pr.commands)
 }
 
 func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, source <-chan T, destinations *[]chan T) {
