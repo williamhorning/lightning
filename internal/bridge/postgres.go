@@ -147,6 +147,15 @@ func (p *postgresDatabase) getMessage(id string) (BridgeMessageCollection, error
 	return handleMessageRow(row)
 }
 
+func (p *postgresDatabase) hasMessage(id string) bool {
+	row := p.conn.QueryRow(p.ctx, `SELECT 1 FROM bridge_messages WHERE id = $1`, id)
+	var exists int
+	if err := row.Scan(&exists); err != nil {
+		return false
+	}
+	return exists == 1
+}
+
 func (p *postgresDatabase) GetAllBridges() ([]Bridge, error) {
 	defer startSpinner().Stop()
 

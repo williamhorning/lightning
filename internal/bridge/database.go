@@ -17,6 +17,7 @@ type Database interface {
 	createMessage(message BridgeMessageCollection) error
 	deleteMessage(id string) error
 	getMessage(id string) (BridgeMessageCollection, error)
+	hasMessage(id string) bool
 	GetAllBridges() ([]Bridge, error)
 	GetAllMessages() ([]BridgeMessageCollection, error)
 	SetAllBridges(bridges []Bridge) error

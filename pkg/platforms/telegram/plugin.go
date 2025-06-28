@@ -168,7 +168,7 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 		return []string{}, lightning.LogError(
 			err,
 			"Failed to send message to Telegram",
-			map[string]any{"channel_id": opts.ChannelID, "content": content},
+			map[string]any{"channel_id": opts.ChannelID, "content": content, "reply_opts": sendOpts.ReplyParameters},
 			lightning.ChannelDisabled{},
 		)
 	}
@@ -212,7 +212,7 @@ func (p *telegramPlugin) EditMessage(message lightning.Message, ids []string, op
 		ParseMode: gotgbot.ParseModeMarkdownV2,
 	})
 
-	if err != nil && strings.Contains("message is not modified", err.Error()) {
+	if err != nil && strings.Contains("message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message", err.Error()) {
 		return nil
 	}
 

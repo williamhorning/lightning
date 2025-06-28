@@ -141,7 +141,7 @@ func getOutgoingEmbeds(embeds []lightning.Embed) []*revoltgo.MessageEmbed {
 			}
 		}
 
-		if embed.Thumbnail != nil {
+		if embed.Thumbnail != nil && len([]rune(embed.Thumbnail.URL)) > 0 && len([]rune(embed.Thumbnail.URL)) <= 128 {
 			revoltEmbed.IconURL = embed.Thumbnail.URL
 		}
 
@@ -173,7 +173,7 @@ func getOutgoingMasquerade(author lightning.MessageAuthor, useMasquerade bool) *
 	}
 
 	avatar := ""
-	if author.ProfilePicture != nil && len([]rune(*author.ProfilePicture)) > 1 && len([]rune(*author.ProfilePicture)) <= 128 {
+	if author.ProfilePicture != nil && len([]rune(*author.ProfilePicture)) > 1 && len([]rune(*author.ProfilePicture)) <= 256 {
 		avatar = *author.ProfilePicture
 	}
 

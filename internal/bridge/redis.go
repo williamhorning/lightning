@@ -227,6 +227,14 @@ func (r redisDatabase) getMessage(id string) (BridgeMessageCollection, error) {
 	return message, nil
 }
 
+func (r redisDatabase) hasMessage(id string) bool {
+	exists, err := r.rdb.Exists(r.ctx, keyMessage+id).Result()
+	if err != nil {
+		return false
+	}
+	return exists == 1
+}
+
 var ulidRegex = regexp.MustCompile("[0-7][0-9A-HJKMNP-TV-Z]{25}")
 var uuidRegex = regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
