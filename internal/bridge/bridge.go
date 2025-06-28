@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
@@ -63,7 +64,7 @@ func handleBridgeMessage(db Database, event string, data any) error {
 	if event == "create_message" {
 		lightning.Log.Trace().Str("channel", base.ChannelID).Str("event", event).Msg("Getting bridge by channel for new message")
 
-		if br, err := db.getMessage(base.EventID); err == nil && br.ID != "" {
+		if db.hasMessage(base.EventID) {
 			lightning.Log.Trace().Str("channel", base.ChannelID).Str("message", base.EventID).Msg("Skipping duplicate message")
 			return nil
 		}
@@ -132,19 +133,61 @@ func handleBridgeMessage(db Database, event string, data any) error {
 
 	lightning.Log.Trace().Str("bridge_id", bridge.ID).Int("target_channels", len(channels)).Msg("Processing message for target channels")
 
-	var messages []BridgeMessage
+	var bridgeMsg BridgeMessageCollection
+	if event != "create_message" {
+		bridgeMsg, err = db.getMessage(base.EventID)
+		if err != nil {
+			return lightning.LogError(err, "Failed to get bridge message", nil, lightning.ChannelDisabled{})
+		}
+	}
+
+	messages := make([]BridgeMessage, 0, len(channels)+1)
+
+	var replyChainMap map[string]map[string][]string
+	if msg, ok := data.(lightning.Message); ok && len(msg.RepliedTo) > 0 {
+		lightning.Log.Trace().Strs("replied_to", msg.RepliedTo).Msg("Processing reply chain")
+		replyChainMap = make(map[string]map[string][]string)
+
+		for _, replyID := range msg.RepliedTo {
+			bridgedReply, err := db.getMessage(replyID)
+			if err != nil {
+				lightning.Log.Trace().Str("reply_id", replyID).Err(err).Msg("Failed to get bridged reply")
+				continue
+			}
+
+			for _, replyMsg := range bridgedReply.Messages {
+				if len(replyMsg.ID) == 0 {
+					continue
+				}
+
+				if replyChainMap[replyMsg.Plugin] == nil {
+					replyChainMap[replyMsg.Plugin] = make(map[string][]string)
+				}
+
+				replyChainMap[replyMsg.Plugin][replyMsg.Channel] = append(
+					replyChainMap[replyMsg.Plugin][replyMsg.Channel],
+					replyMsg.ID[0],
+				)
+
+				lightning.Log.Trace().
+					Str("plugin", replyMsg.Plugin).
+					Str("channel", replyMsg.Channel).
+					Str("reply_id", replyMsg.ID[0]).
+					Msg("Mapped reply ID")
+			}
+		}
+	}
+
+	var messagesMutex sync.Mutex
 
 	for _, channel := range channels {
 		lightning.Log.Trace().Str("channel", channel.ID).Str("plugin", channel.Plugin).Str("event", event).Msg("Processing channel")
 
 		var priorMessageIDs []string
 		if event != "create_message" {
-			lightning.Log.Trace().Str("event_id", base.EventID).Msg("Looking up prior message IDs")
-			bridgeMsg, _ := db.getMessage(base.EventID)
 			for _, msg := range bridgeMsg.Messages {
 				if msg.Channel == channel.ID && msg.Plugin == channel.Plugin {
 					priorMessageIDs = msg.ID
-					lightning.Log.Trace().Strs("prior_ids", priorMessageIDs).Msg("Found prior message IDs")
 					break
 				}
 			}
@@ -168,21 +211,14 @@ func handleBridgeMessage(db Database, event string, data any) error {
 		}
 
 		var replyIDs []string
-		if msg, ok := data.(lightning.Message); ok && len(msg.RepliedTo) > 0 {
-			lightning.Log.Trace().Strs("replied_to", msg.RepliedTo).Msg("Processing reply chain")
-			for _, replyID := range msg.RepliedTo {
-				bridgedReply, err := db.getMessage(replyID)
-				if err != nil {
-					lightning.Log.Trace().Str("reply_id", replyID).Err(err).Msg("Failed to get bridged reply")
-					continue
-				}
-
-				for _, replyMsg := range bridgedReply.Messages {
-					if replyMsg.Channel == channel.ID && replyMsg.Plugin == channel.Plugin && len(replyMsg.ID) > 0 {
-						replyIDs = append(replyIDs, replyMsg.ID[0])
-						lightning.Log.Trace().Str("reply_id", replyMsg.ID[0]).Msg("Added reply ID")
-					}
-				}
+		if pluginMap, ok := replyChainMap[channel.Plugin]; ok {
+			if channelReplies, ok := pluginMap[channel.ID]; ok && len(channelReplies) > 0 {
+				replyIDs = channelReplies
+				lightning.Log.Trace().
+					Str("channel", channel.ID).
+					Str("plugin", channel.Plugin).
+					Strs("reply_ids", replyIDs).
+					Msg("Using cached reply IDs")
 			}
 		}
 
@@ -193,7 +229,7 @@ func handleBridgeMessage(db Database, event string, data any) error {
 			ChannelData:        channel.Data,
 		}
 
-		func() {
+		go func() {
 			defer func() {
 				if r := recover(); r != nil {
 					lightning.LogError(fmt.Errorf("%v", r), "Panic in bridge message handling", map[string]any{
@@ -287,11 +323,13 @@ func handleBridgeMessage(db Database, event string, data any) error {
 				lightning.Log.Trace().Str("plugin", channel.Plugin).Str("message_id", id).Msg("Marked message as handled")
 			}
 
+			messagesMutex.Lock()
 			messages = append(messages, BridgeMessage{
 				ID:      resultIDs,
 				Channel: channel.ID,
 				Plugin:  channel.Plugin,
 			})
+			messagesMutex.Unlock()
 		}()
 	}
 
@@ -303,7 +341,7 @@ func handleBridgeMessage(db Database, event string, data any) error {
 
 	lightning.Log.Trace().Str("bridge_id", bridge.ID).Str("event", event).Int("message_count", len(messages)).Msg("Creating bridge message collection")
 
-	bridgeMsg := BridgeMessageCollection{
+	bridgeMsg = BridgeMessageCollection{
 		Bridge: Bridge{
 			ID:       base.EventID,
 			Name:     bridge.Name,

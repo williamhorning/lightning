@@ -46,8 +46,6 @@ func run(ctx context.Context, c *cli.Command) error {
 		os.Exit(1)
 	}
 
-	lightning.SetupCommands(config.CommandPrefix)
-
 	for plugin, cfg := range config.Plugins {
 		if err := lightning.Plugins.RegisterPlugin(plugin, cfg); err != nil {
 			lightning.LogError(err, "something went wrong setting up a plugin", nil, lightning.ChannelDisabled{})
@@ -62,6 +60,8 @@ func run(ctx context.Context, c *cli.Command) error {
 	}
 
 	bridge.Setup(db)
+
+	lightning.SetupCommands(config.CommandPrefix)
 
 	quitChannel := make(chan os.Signal, 1)
 	signal.Notify(quitChannel, syscall.SIGINT, syscall.SIGTERM)
