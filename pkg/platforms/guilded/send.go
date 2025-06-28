@@ -39,14 +39,12 @@ func (p *guildedPlugin) sendMessage(message lightning.Message, reader io.Reader)
 		return nil, err
 	}
 
-	var msg struct {
-		Message guildedChatMessage `json:"message"`
-	}
+	var msg guildedChatMessageResponse
 	if err := p.readResponse(resp, &msg, message.ChannelID); err != nil {
 		return nil, err
 	}
 
-	return []string{msg.Message.Id}, nil
+	return []string{msg.Message.ID}, nil
 }
 
 func (p *guildedPlugin) sendWebhookMessage(message lightning.Message, opts *lightning.SendOptions, reader io.Reader) ([]string, error) {
@@ -60,6 +58,8 @@ func (p *guildedPlugin) sendWebhookMessage(message lightning.Message, opts *ligh
 	id, _ := webhookData["id"].(string)
 	token, _ := webhookData["token"].(string)
 	url := fmt.Sprintf("https://media.guilded.gg/webhooks/%s/%s", id, token)
+
+	cache.WebhookIDs.Set(id, true)
 
 	req, err := http.NewRequest("POST", url, reader)
 	if err != nil {
@@ -79,9 +79,7 @@ func (p *guildedPlugin) sendWebhookMessage(message lightning.Message, opts *ligh
 		return nil, err
 	}
 
-	var response struct {
-		ID string `json:"id"`
-	}
+	var response guildedWebhookExecuteResponse
 	if err := p.readResponse(resp, &response, opts.ChannelID); err != nil {
 		return nil, err
 	}
@@ -95,18 +93,22 @@ func (p *guildedPlugin) checkStatusCode(resp *http.Response, channelID string) e
 	}
 
 	var errMsg string
+	var disable bool
 	switch resp.StatusCode {
 	case 404:
 		errMsg = "not found! this might be a Guilded problem"
+		disable = true
 	case 403:
 		errMsg = "the bot lacks some permissions, please check them"
+		disable = true
 	default:
 		errMsg = "unexpected status code: " + resp.Status
+		disable = false
 	}
 
 	return lightning.LogError(errors.New(errMsg), "Failed to send message",
 		map[string]any{"channelID": channelID},
-		lightning.ChannelDisabled{Read: false, Write: true})
+		lightning.ChannelDisabled{Read: false, Write: disable})
 }
 
 func (p *guildedPlugin) readResponse(resp *http.Response, target any, channelID string) error {

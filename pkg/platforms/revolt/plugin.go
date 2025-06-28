@@ -97,13 +97,38 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 
 func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := getOutgoingMessage(p.revolt, message, false, opts != nil)
+	leftoverAttachments := make([]string, 0)
+
+	if len(msg.Attachments) > 5 {
+		leftoverAttachments = msg.Attachments[5:]
+		msg.Attachments = msg.Attachments[:5]
+	}
+
 	res, err := p.revolt.ChannelMessageSend(message.ChannelID, msg)
 
 	if err != nil {
 		return nil, getRevoltError(err, map[string]any{"msg": msg}, "Failed to send message to Revolt", false)
 	}
 
-	return []string{res.ID}, nil
+	ids := []string{res.ID}
+
+	if len(leftoverAttachments) > 0 {
+		res, err := p.revolt.ChannelMessageSend(message.ChannelID, revoltgo.MessageSend{
+			Attachments: leftoverAttachments,
+			Content:     "",
+			Masquerade:  msg.Masquerade,
+			Replies:     msg.Replies,
+		})
+
+		if err != nil {
+			lightning.Log.Warn().Str("plugin", "revolt").Strs("leftover", leftoverAttachments).Err(err).Msg("Failed to send leftover attachments to Revolt")
+		} else {
+			ids = append(ids, res.ID)
+			lightning.Log.Debug().Str("plugin", "revolt").Strs("leftover", leftoverAttachments).Msg("Sent leftover attachments to Revolt")
+		}
+	}
+
+	return ids, nil
 }
 
 func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
@@ -133,7 +158,7 @@ func (p *revoltPlugin) SetupCommands(command map[string]lightning.Command) error
 }
 
 func (p *revoltPlugin) ListenMessages() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 100)
+	ch := make(chan lightning.Message, 1000)
 
 	p.revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventMessage) {
 		if msg := getLightningMessage(s, m.Message); msg != nil {
@@ -145,7 +170,7 @@ func (p *revoltPlugin) ListenMessages() <-chan lightning.Message {
 }
 
 func (p *revoltPlugin) ListenEdits() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 100)
+	ch := make(chan lightning.Message, 1000)
 
 	p.revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventMessageUpdate) {
 		if msg := getLightningMessage(s, m.Data); msg != nil {
@@ -157,7 +182,7 @@ func (p *revoltPlugin) ListenEdits() <-chan lightning.Message {
 }
 
 func (p *revoltPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	ch := make(chan lightning.BaseMessage, 100)
+	ch := make(chan lightning.BaseMessage, 1000)
 
 	p.revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventMessageDelete) {
 		ch <- lightning.BaseMessage{

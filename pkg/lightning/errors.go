@@ -20,6 +20,7 @@ type ChannelDisabled struct {
 }
 
 type LightningError struct {
+	ID      string
 	Disable ChannelDisabled
 	Message string
 }
@@ -81,5 +82,5 @@ func LogError(err error, message string, extra map[string]any, disable ChannelDi
 		}
 	}
 
-	return LightningError{disable, "Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\n```\n" + id + "\n\n" + message + "\n```"}
+	return LightningError{id, disable, "Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\n```\n" + id + "\n\n" + message + "\n```"}
 }

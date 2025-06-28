@@ -61,7 +61,7 @@ func HelpCommand() Command {
 		Arguments:   []CommandArgument{},
 		Subcommands: []Command{},
 		Executor: func(options CommandOptions) (string, error) {
-			return "hi! i'm lightning v0.8.0-alpha.10.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help!", nil
+			return "hi! i'm lightning v0.8.0-alpha.11.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help!", nil
 		},
 	}
 }

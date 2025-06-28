@@ -13,8 +13,8 @@ require (
 	github.com/redis/go-redis/v9 v9.11.0
 	github.com/rs/zerolog v1.34.0
 	github.com/sentinelb51/revoltgo v0.0.0-20250522112229-346cb7fb458d
+	github.com/spf13/cobra v1.9.1
 	github.com/sshturbo/GoTeleMD v1.0.10
-	github.com/urfave/cli/v3 v3.3.8
 )
 
 require (
@@ -23,6 +23,7 @@ require (
 	github.com/dolthub/maphash v0.1.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
@@ -30,6 +31,7 @@ require (
 	github.com/lxzan/gws v1.8.9 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect

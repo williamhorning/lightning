@@ -74,7 +74,7 @@ func (p *guildedPlugin) SetupCommands(command map[string]lightning.Command) erro
 }
 
 func (p *guildedPlugin) ListenMessages() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 100)
+	ch := make(chan lightning.Message, 1000)
 
 	p.socket.OnMessageCreated(func(msg *guildedChatMessageCreated) {
 		message := getIncomingMessage(p.token, &msg.Message)
@@ -87,7 +87,7 @@ func (p *guildedPlugin) ListenMessages() <-chan lightning.Message {
 }
 
 func (p *guildedPlugin) ListenEdits() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 100)
+	ch := make(chan lightning.Message, 1000)
 
 	p.socket.OnMessageUpdated(func(msg *guildedChatMessageUpdated) {
 		message := getIncomingMessage(p.token, &msg.Message)
@@ -100,12 +100,12 @@ func (p *guildedPlugin) ListenEdits() <-chan lightning.Message {
 }
 
 func (p *guildedPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	ch := make(chan lightning.BaseMessage, 100)
+	ch := make(chan lightning.BaseMessage, 1000)
 
 	p.socket.OnMessageDeleted(func(msg *guildedChatMessageDeleted) {
 		ch <- lightning.BaseMessage{
-			EventID:   msg.Message.Id,
-			ChannelID: msg.Message.ChannelId,
+			EventID:   msg.Message.ID,
+			ChannelID: msg.Message.ChannelID,
 			Plugin:    "bolt-guilded",
 			Time:      msg.DeletedAt,
 		}

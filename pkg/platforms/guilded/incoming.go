@@ -18,17 +18,13 @@ var attachmentRegex = regexp.MustCompile(`!\[.*?\]\(https:\/\/cdn\.gldcdn\.com\/
 var emojiRegex = regexp.MustCompile(`<(:\w+:)\d+>`)
 
 func extractURLFromMarkdown(markdown string) string {
-	startIdx := strings.LastIndex(markdown, "(")
-	endIdx := strings.LastIndex(markdown, ")")
+	startIDx := strings.LastIndex(markdown, "(")
+	endIDx := strings.LastIndex(markdown, ")")
 
-	if startIdx != -1 && endIdx != -1 && startIdx < endIdx {
-		return markdown[startIdx+1 : endIdx]
+	if startIDx != -1 && endIDx != -1 && startIDx < endIDx {
+		return markdown[startIDx+1 : endIDx]
 	}
 	return ""
-}
-
-type signatureResponse struct {
-	URLSignatures []guildedUrlSignature `json:"urlSignatures"`
 }
 
 func getIncomingAttachments(token string, markdownURLs []string) []lightning.Attachment {
@@ -65,7 +61,7 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 			continue
 		}
 
-		var signatureResp signatureResponse
+		var signatureResp guildedUrlSignatureResponse
 		if err := json.Unmarshal(body, &signatureResp); err != nil {
 			continue
 		}
@@ -116,8 +112,14 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 }
 
 func getIncomingMessage(token string, msg *guildedChatMessage) *lightning.Message {
-	if msg.ServerId == nil {
+	if msg.ServerID == nil {
 		return nil
+	}
+
+	if msg.CreatedByWebhookID != nil {
+		if exists, _ := cache.WebhookIDs.Get(*msg.CreatedByWebhookID); exists {
+			return nil
+		}
 	}
 
 	timestamp := msg.CreatedAt
@@ -138,14 +140,14 @@ func getIncomingMessage(token string, msg *guildedChatMessage) *lightning.Messag
 	content = emojiRegex.ReplaceAllString(content, "$1")
 
 	var repliedTo []string
-	if msg.ReplyMessageIds != nil {
-		repliedTo = *msg.ReplyMessageIds
+	if msg.ReplyMessageIDs != nil {
+		repliedTo = *msg.ReplyMessageIDs
 	}
 
 	return &lightning.Message{
 		BaseMessage: lightning.BaseMessage{
-			EventID:   msg.Id,
-			ChannelID: msg.ChannelId,
+			EventID:   msg.ID,
+			ChannelID: msg.ChannelID,
 			Plugin:    "bolt-guilded",
 			Time:      timestamp,
 		},
@@ -169,8 +171,8 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 	}
 
 	try := func() (lightning.MessageAuthor, error) {
-		if msg.CreatedByWebhookId == nil {
-			key := *msg.ServerId + "/" + msg.CreatedBy
+		if msg.CreatedByWebhookID == nil {
+			key := *msg.ServerID + "/" + msg.CreatedBy
 
 			if cached, exists := cache.Members.Get(key); exists {
 				return lightning.MessageAuthor{
@@ -181,7 +183,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 				}, nil
 			}
 
-			endpoint := fmt.Sprintf("/servers/%s/members/%s", *msg.ServerId, msg.CreatedBy)
+			endpoint := fmt.Sprintf("/servers/%s/members/%s", *msg.ServerID, msg.CreatedBy)
 			resp, err := guildedMakeRequest(token, http.MethodGet, endpoint, nil)
 			if err != nil {
 				return lightning.MessageAuthor{}, err
@@ -193,10 +195,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 				return lightning.MessageAuthor{}, err
 			}
 
-			var memberResp struct {
-				Member guildedServerMember `json:"member"`
-			}
-
+			var memberResp guildedServerMemberResponse
 			if err := json.Unmarshal(body, &memberResp); err != nil {
 				return lightning.MessageAuthor{}, err
 			}
@@ -212,18 +211,18 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 			}, nil
 
 		} else {
-			key := *msg.ServerId + "/" + *msg.CreatedByWebhookId
+			key := *msg.ServerID + "/" + *msg.CreatedByWebhookID
 
 			if cached, exists := cache.Webhooks.Get(key); exists {
 				return lightning.MessageAuthor{
 					Nickname:       cached.Name,
 					Username:       cached.Name,
-					ID:             cached.Id,
+					ID:             cached.ID,
 					ProfilePicture: cached.Avatar,
 				}, nil
 			}
 
-			endpoint := fmt.Sprintf("/servers/%s/webhooks/%s", *msg.ServerId, *msg.CreatedByWebhookId)
+			endpoint := fmt.Sprintf("/servers/%s/webhooks/%s", *msg.ServerID, *msg.CreatedByWebhookID)
 			resp, err := guildedMakeRequest(token, http.MethodGet, endpoint, nil)
 			if err != nil {
 				return lightning.MessageAuthor{}, err
@@ -235,10 +234,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 				return lightning.MessageAuthor{}, err
 			}
 
-			var webhookResp struct {
-				Webhook guildedWebhook `json:"webhook"`
-			}
-
+			var webhookResp guildedWebhookResponse
 			if err := json.Unmarshal(body, &webhookResp); err != nil {
 				return lightning.MessageAuthor{}, err
 			}
@@ -249,7 +245,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 			return lightning.MessageAuthor{
 				Nickname:       webhook.Name,
 				Username:       webhook.Name,
-				ID:             webhook.Id,
+				ID:             webhook.ID,
 				ProfilePicture: webhook.Avatar,
 			}, nil
 		}

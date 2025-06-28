@@ -10,14 +10,6 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type guildedPayload struct {
-	Content         string             `json:"content"`
-	Embeds          []guildedChatEmbed `json:"embeds,omitempty"`
-	ReplyMessageIds []string           `json:"replyMessageIds,omitempty"`
-	AvatarURL       string             `json:"avatar_url,omitempty"`
-	Username        string             `json:"username,omitempty"`
-}
-
 var usernameRegex = regexp.MustCompile(`(?ms)^[a-zA-Z0-9_ ()-]{1,25}$`)
 
 func getValidUsername(author lightning.MessageAuthor) string {
@@ -35,7 +27,7 @@ func getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions, 
 		Content:         message.Content,
 		AvatarURL:       *message.Author.ProfilePicture,
 		Username:        getValidUsername(message.Author),
-		ReplyMessageIds: message.RepliedTo,
+		ReplyMessageIDs: message.RepliedTo,
 		Embeds:          getOutgoingEmbeds(message, opts != nil, token),
 	}
 
@@ -53,24 +45,16 @@ func getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions, 
 func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []guildedChatEmbed {
 	guildedEmbeds := make([]guildedChatEmbed, 0)
 	for _, embed := range message.Embeds {
-		var image *struct {
-			Url *string `json:"url,omitempty"`
-		}
+		var image *guildedChatEmbedMedia
 		if embed.Image != nil && embed.Image.URL != "" {
-			image = &struct {
-				Url *string `json:"url,omitempty"`
-			}{
+			image = &guildedChatEmbedMedia{
 				Url: &embed.Image.URL,
 			}
 		}
 
-		var thumbnail *struct {
-			Url *string `json:"url,omitempty"`
-		}
+		var thumbnail *guildedChatEmbedMedia
 		if embed.Thumbnail != nil && embed.Thumbnail.URL != "" {
-			thumbnail = &struct {
-				Url *string `json:"url,omitempty"`
-			}{
+			thumbnail = &guildedChatEmbedMedia{
 				Url: &embed.Thumbnail.URL,
 			}
 		}
@@ -80,15 +64,9 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 			timestamp = &t
 		}
 
-		var footer *struct {
-			IconUrl *string `json:"icon_url,omitempty"`
-			Text    string  `json:"text"`
-		}
+		var footer *guildedChatEmbedFooter
 		if embed.Footer != nil {
-			footer = &struct {
-				IconUrl *string `json:"icon_url,omitempty"`
-				Text    string  `json:"text"`
-			}{
+			footer = &guildedChatEmbedFooter{
 				Text: embed.Footer.Text,
 			}
 			if embed.Footer.IconURL != nil {
@@ -107,25 +85,13 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 			}
 		}
 
-		var fields *[]struct {
-			Inline *bool  `json:"inline,omitempty"`
-			Name   string `json:"name"`
-			Value  string `json:"value"`
-		}
+		var fields *[]guildedChatEmbedField
 
 		if len(embed.Fields) > 0 {
-			convertedFields := make([]struct {
-				Inline *bool  `json:"inline,omitempty"`
-				Name   string `json:"name"`
-				Value  string `json:"value"`
-			}, len(embed.Fields))
+			convertedFields := make([]guildedChatEmbedField, len(embed.Fields))
 
 			for i, field := range embed.Fields {
-				convertedFields[i] = struct {
-					Inline *bool  `json:"inline,omitempty"`
-					Name   string `json:"name"`
-					Value  string `json:"value"`
-				}{
+				convertedFields[i] = guildedChatEmbedField{
 					Inline: &field.Inline,
 					Name:   field.Name,
 					Value:  field.Value,
@@ -166,9 +132,7 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 		resp, err := guildedMakeRequest(token, "GET", "/channels/"+message.ChannelID+"/messages/"+message.RepliedTo[0], nil)
 
 		if err == nil {
-			var messageResp struct {
-				Message guildedChatMessage `json:"message"`
-			}
+			var messageResp guildedChatMessageResponse
 
 			body, err := io.ReadAll(resp.Body)
 			if err == nil && json.Unmarshal(body, &messageResp) == nil {

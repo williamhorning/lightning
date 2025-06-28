@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"os"
 	"os/signal"
@@ -9,7 +8,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/rs/zerolog"
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 	"github.com/williamhorning/lightning/internal/bridge"
 	"github.com/williamhorning/lightning/pkg/lightning"
 	_ "github.com/williamhorning/lightning/pkg/platforms/discord"
@@ -26,10 +25,14 @@ type config struct {
 	Plugins        map[string]any        `toml:"plugins"`
 }
 
-func run(ctx context.Context, c *cli.Command) error {
+func run(cmd *cobra.Command, args []string) {
 	var config config
 
-	if _, err := toml.DecodeFile(c.StringArg("config"), &config); err != nil {
+	if len(args) != 1 {
+		args = []string{"lightning.toml"}
+	}
+
+	if _, err := toml.DecodeFile(args[0], &config); err != nil {
 		lightning.LogError(err, "something went wrong with loading the config", nil, lightning.ChannelDisabled{})
 		os.Exit(1)
 	}
@@ -68,5 +71,4 @@ func run(ctx context.Context, c *cli.Command) error {
 	<-quitChannel
 
 	lightning.LogError(errors.New("lightning instance stopped"), "lightning instance stopped", nil, lightning.ChannelDisabled{})
-	return nil
 }

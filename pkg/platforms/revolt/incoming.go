@@ -12,6 +12,10 @@ import (
 )
 
 func getLightningMessage(s *revoltgo.Session, m revoltgo.Message) *lightning.Message {
+	if m.Author == s.State.Self().ID && m.Masquerade != nil {
+		return nil
+	}
+
 	timestamp, err := getLightningTime(m)
 	if err != nil {
 		timestamp = time.Now()
