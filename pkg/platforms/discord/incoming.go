@@ -96,6 +96,10 @@ func getLightningAuthor(s *discordgo.Session, m *discordgo.Message) lightning.Me
 		}
 	}
 
+	if m.Member.GuildID == "" {
+		m.Member.GuildID = m.GuildID
+	}
+
 	m.Member.User = m.Author
 	author.Nickname = m.Member.DisplayName()
 	profilePicture = m.Member.AvatarURL("")
