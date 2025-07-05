@@ -17,7 +17,7 @@ func (p *telegramPlugin) startProxy() {
 		req, err := http.NewRequestWithContext(r.Context(), r.Method, url, nil)
 		if err != nil {
 			http.Error(w, "Failed to create request", http.StatusInternalServerError)
-			lightning.Log.Error().Str("plugin", "telegram").Err(err).Msg("Failed to create request for Telegram file proxy")
+			lightning.LogError(err, "Failed to create request for Telegram file proxy", nil, nil)
 			return
 		}
 
@@ -25,7 +25,7 @@ func (p *telegramPlugin) startProxy() {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			http.Error(w, "Failed to fetch file from Telegram", http.StatusInternalServerError)
-			lightning.Log.Error().Str("plugin", "telegram").Err(err).Msg("Failed to fetch file from Telegram")
+			lightning.LogError(err, "Failed to fetch file from Telegram", nil, nil)
 			return
 		}
 
@@ -34,18 +34,14 @@ func (p *telegramPlugin) startProxy() {
 		w.WriteHeader(resp.StatusCode)
 		if _, err := io.CopyBuffer(w, resp.Body, make([]byte, 64*1024)); err != nil {
 			http.Error(w, "Failed to write response", http.StatusInternalServerError)
-			lightning.Log.Error().Str("plugin", "telegram").Err(err).Msg("Failed to write response from Telegram file proxy")
+			lightning.LogError(err, "Failed to write response from Telegram file proxy", nil, nil)
 			return
 		}
 	})
 
 	if err := http.ListenAndServe("0.0.0.0:"+strconv.FormatInt(p.proxyPort, 10), nil); err != nil {
-		lightning.Log.Panic().Str("plugin", "telegram").Err(err).Msg("Failed to start Telegram file proxy")
+		panic(lightning.LogError(err, "Failed to start Telegram file proxy", nil, nil))
 	}
 
-	lightning.Log.Info().
-		Str("plugin", "telegram").
-		Int64("port", p.proxyPort).
-		Str("url", p.proxyURL).
-		Msg("Telegram file proxy available")
+	lightning.Log.With("plugin", "telegram").Info("file proxy available", "url", p.proxyURL, "port", p.proxyPort)
 }

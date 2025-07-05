@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	ErrPluginAlreadyRegistered = errors.New("plugin already registered: this is a bug or misconfiguration")
+	ErrPluginAlreadyRegistered = errors.New("plugin (or type) already registered: this is a bug or misconfiguration")
 	ErrPluginNotFound          = errors.New("plugin not found internally: this is a bug or misconfiguration")
 	ErrPluginConfigInvalid     = errors.New("plugin config is invalid")
 	Plugins                    = &PluginRegistry{
@@ -61,10 +61,8 @@ func (pr *PluginRegistry) RegisterType(name string, constructor PluginConstructo
 	pr.pluginTypesLock.Lock()
 	defer pr.pluginTypesLock.Unlock()
 
-	Log.Debug().Str("plugin", name).Msg("Registering plugin type")
-
 	if _, exists := pr.pluginTypes[name]; exists {
-		Log.Panic().Str("plugin", name).Msg("Plugin type already registered")
+		panic(LogError(ErrPluginAlreadyRegistered, "Plugin type already registered", map[string]any{"name": name}, nil))
 	}
 
 	pr.pluginTypes[name] = constructor
@@ -82,8 +80,6 @@ func (pr *PluginRegistry) RegisterPlugin(name string, config any) error {
 	pr.pluginsLock.Lock()
 	defer pr.pluginTypesLock.RUnlock()
 	defer pr.pluginsLock.Unlock()
-
-	Log.Debug().Str("plugin", name).Msg("Registering plugin")
 
 	if _, exists := pr.plugins[name]; exists {
 		return ErrPluginAlreadyRegistered
@@ -105,15 +101,12 @@ func (pr *PluginRegistry) RegisterPlugin(name string, config any) error {
 	go distributeEvents(pr, "edit", instance, instance.ListenEdits(), &pr.edits)
 	go distributeEvents(pr, "delete", instance, instance.ListenDeletes(), &pr.deletes)
 	go distributeEvents(pr, "command", instance, instance.ListenCommands(), &pr.commands)
-
-	Log.Debug().Str("plugin", instance.Name()).Msg("Plugin registered and listening!")
 	return nil
 }
 
 func (pr *PluginRegistry) SetHandled(plugin string, event string, ev string) {
 	pr.eventMutex.Lock()
 	defer pr.eventMutex.Unlock()
-	Log.Trace().Str("plugin", plugin).Str("event", event).Str("ev", ev).Msg("Setting handled event")
 	pr.handledEvents[ev+"-"+plugin+"-"+event] = struct{}{}
 }
 
@@ -147,7 +140,6 @@ func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, sourc
 		}
 
 		if _, exists := pr.handledEvents[key]; exists {
-			Log.Trace().Str("plugin", plugin.Name()).Str("event", key).Msg("Event already handled, skipping")
 			continue
 		}
 
@@ -157,9 +149,8 @@ func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, sourc
 		for _, ch := range *destinations {
 			select {
 			case ch <- event:
-				Log.Trace().Str("plugin", plugin.Name()).Str("event", key).Msg("Event distributed")
 			default:
-				Log.Warn().Str("plugin", plugin.Name()).Msg("Skipped event - channel full or closed")
+				Log.Warn("skipped event, channel full or closed", "plugin", plugin.Name(), "event", ev, "key", key)
 			}
 		}
 		pr.eventMutex.RUnlock()
@@ -167,7 +158,6 @@ func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, sourc
 }
 
 func createEventChannel[T any](pr *PluginRegistry, bufferSize int, channelList *[]chan T) <-chan T {
-	Log.Trace().Msg("Creating event channel")
 	ch := make(chan T, bufferSize)
 	pr.eventMutex.Lock()
 	defer pr.eventMutex.Unlock()

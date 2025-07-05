@@ -10,12 +10,22 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-var attachmentRegex = regexp.MustCompile(`!\[.*?\]\(https:\/\/cdn\.gldcdn\.com\/ContentMediaGenericFiles\/.*\)`)
+const assetCacheTTL = 24 * time.Hour
+const defaultCacheTTL = 30 * time.Second
+
+var attachmentRegex = regexp.MustCompile(`!\[.*?\]\(https:\/\/cdn\.gldcdn\.com\/ContentMedia(GenericFiles)?\/.*\)`)
 var emojiRegex = regexp.MustCompile(`<(:\w+:)\d+>`)
+
+var assetsCache = cache.New[string, lightning.Attachment](assetCacheTTL)
+var membersCache = cache.New[string, guildedServerMember](defaultCacheTTL)
+var webhooksCache = cache.New[string, guildedWebhook](defaultCacheTTL)
+var webhookIDsCache = cache.New[string, bool](defaultCacheTTL)
 
 func extractURLFromMarkdown(markdown string) string {
 	startIDx := strings.LastIndex(markdown, "(")
@@ -36,7 +46,7 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 			continue
 		}
 
-		if cached, exists := cache.Assets.Get(url); exists {
+		if cached, exists := assetsCache.Get(url); exists {
 			attachments = append(attachments, cached)
 			continue
 		}
@@ -71,7 +81,7 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 		}
 
 		signed := signatureResp.URLSignatures[0]
-		if signed.RetryAfter == nil || *signed.RetryAfter > 0 || signed.Signature == nil {
+		if signed.RetryAfter != nil || signed.Signature == nil {
 			continue
 		}
 
@@ -103,7 +113,7 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 			Size: size,
 		}
 
-		cache.Assets.Set(url, attachment)
+		assetsCache.Set(url, attachment)
 
 		attachments = append(attachments, attachment)
 	}
@@ -117,7 +127,7 @@ func getIncomingMessage(token string, msg *guildedChatMessage) *lightning.Messag
 	}
 
 	if msg.CreatedByWebhookID != nil {
-		if exists, _ := cache.WebhookIDs.Get(*msg.CreatedByWebhookID); exists {
+		if exists, _ := webhookIDsCache.Get(*msg.CreatedByWebhookID); exists {
 			return nil
 		}
 	}
@@ -174,7 +184,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 		if msg.CreatedByWebhookID == nil {
 			key := *msg.ServerID + "/" + msg.CreatedBy
 
-			if cached, exists := cache.Members.Get(key); exists {
+			if cached, exists := membersCache.Get(key); exists {
 				return lightning.MessageAuthor{
 					Nickname:       getNickname(cached),
 					Username:       cached.User.Name,
@@ -200,7 +210,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 				return lightning.MessageAuthor{}, err
 			}
 
-			cache.Members.Set(key, memberResp.Member)
+			membersCache.Set(key, memberResp.Member)
 
 			author := memberResp.Member
 			return lightning.MessageAuthor{
@@ -213,7 +223,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 		} else {
 			key := *msg.ServerID + "/" + *msg.CreatedByWebhookID
 
-			if cached, exists := cache.Webhooks.Get(key); exists {
+			if cached, exists := webhooksCache.Get(key); exists {
 				return lightning.MessageAuthor{
 					Nickname:       cached.Name,
 					Username:       cached.Name,
@@ -239,7 +249,7 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 				return lightning.MessageAuthor{}, err
 			}
 
-			cache.Webhooks.Set(key, webhookResp.Webhook)
+			webhooksCache.Set(key, webhookResp.Webhook)
 
 			webhook := webhookResp.Webhook
 			return lightning.MessageAuthor{

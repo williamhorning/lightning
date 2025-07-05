@@ -2,36 +2,35 @@ package bridge
 
 import "github.com/williamhorning/lightning/pkg/lightning"
 
+var bridgeLog = lightning.Log.WithPrefix("bridge")
+
 func Setup(db Database) {
-	lightning.Log.Info().Msg("Setting up bridge system")
+	bridgeLog.Info("Setting up bridge system")
 	lightning.RegisterCommand(bridgeCommand(db))
 
 	go func() {
 		for event := range lightning.Plugins.ListenMessages() {
-			lightning.Log.Trace().Str("event_id", event.EventID).Str("channel", event.ChannelID).Msg("Received message creation event")
 			if err := handleBridgeMessage(db, "create_message", event); err != nil {
-				lightning.LogError(err, "Failed to handle bridge message creation", nil, lightning.ChannelDisabled{})
+				bridgeLog.Error("Failed to handle bridge message creation", "error", err, "event", event.EventID)
 			}
 		}
 	}()
 
 	go func() {
 		for event := range lightning.Plugins.ListenEdits() {
-			lightning.Log.Trace().Str("event_id", event.EventID).Str("channel", event.ChannelID).Msg("Received message edit event")
 			if err := handleBridgeMessage(db, "edit_message", event); err != nil {
-				lightning.LogError(err, "Failed to handle bridge message edit", nil, lightning.ChannelDisabled{})
+				bridgeLog.Error("Failed to handle bridge message edit", "error", err, "event", event.EventID)
 			}
 		}
 	}()
 
 	go func() {
 		for event := range lightning.Plugins.ListenDeletes() {
-			lightning.Log.Trace().Str("event_id", event.EventID).Str("channel", event.ChannelID).Msg("Received message deletion event")
 			if err := handleBridgeMessage(db, "delete_message", event); err != nil {
-				lightning.LogError(err, "Failed to handle bridge message deletion", nil, lightning.ChannelDisabled{})
+				bridgeLog.Error("Failed to handle bridge message deletion", "error", err, "event", event.EventID)
 			}
 		}
 	}()
 
-	lightning.Log.Info().Msg("Bridge system setup!")
+	bridgeLog.Info("Bridge system setup!")
 }

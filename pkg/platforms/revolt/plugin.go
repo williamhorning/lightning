@@ -8,37 +8,29 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
+var revoltLog = lightning.Log.With("plugin", "revolt")
+
 func init() {
 	lightning.Plugins.RegisterType("revolt", newRevoltPlugin)
 }
 
 func newRevoltPlugin(config any) (lightning.Plugin, error) {
 	if cfg, ok := config.(map[string]any); !ok {
-		return nil, lightning.LogError(
-			lightning.ErrPluginConfigInvalid,
-			"Invalid config for Revolt plugin",
-			nil,
-			lightning.ChannelDisabled{},
-		)
+		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Invalid config for Revolt plugin", nil, nil)
 	} else {
 		revolt := revoltgo.New(cfg["token"].(string))
 
 		if err := revolt.Open(); err != nil {
-			return nil, lightning.LogError(
-				err,
-				"Failed to open Revolt session",
-				nil,
-				lightning.ChannelDisabled{},
-			)
+			return nil, lightning.LogError(err, "Failed to open Revolt session", nil, nil)
 		}
 
 		revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventReady) {
-			lightning.Log.Info().Str("plugin", "revolt").Str("username", s.State.Self().Username).Int("servers", len(m.Servers)).Msg("ready!")
-			lightning.Log.Info().Str("plugin", "revolt").Msg("invite me at https://revolt.chat/invite/" + s.State.Self().ID)
+			revoltLog.Info("ready!", "username", s.State.Self().Username, "servers", len(m.Servers))
+			revoltLog.Info("Invite me at https://revolt.chat/invite/" + s.State.Self().ID)
 		})
 
 		revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventError) {
-			lightning.Log.Error().Str("plugin", "revolt").Str("type", string(m.Error)).Msg("revolt webhook error")
+			revoltLog.Error("socket error", "error", m.Error)
 		})
 
 		revolt.ReconnectInterval = 100 * time.Millisecond
@@ -56,9 +48,7 @@ func (p *revoltPlugin) Name() string {
 	return "bolt-revolt"
 }
 
-const (
-	CorrectPermissionValue = uint(485495808)
-)
+const correctPermissionValue = uint(485495808)
 
 func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	permissions, err := p.revolt.State.ChannelPermissions(p.revolt.State.Self(), p.revolt.State.Channel(channel))
@@ -68,27 +58,22 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 			err,
 			"Failed to get channel permissions in Revolt",
 			map[string]any{"channel": channel},
-			lightning.ChannelDisabled{},
+			nil,
 		)
 	}
 
-	lightning.Log.Debug().
-		Str("plugin", "revolt").
-		Uint64("actual_permissions", uint64(permissions)).
-		Uint64("expected_permissions", uint64(CorrectPermissionValue)).
-		Bool("permissions_sufficient", (permissions&CorrectPermissionValue) == CorrectPermissionValue).
-		Msg("revolt permissions check")
+	revoltLog.Debug("revolt permissions", "channel", channel, "permissions", permissions)
 
-	if (permissions & CorrectPermissionValue) != CorrectPermissionValue {
+	if (permissions & correctPermissionValue) != correctPermissionValue {
 		return nil, lightning.LogError(
 			errors.New("insufficient permissions in Revolt channel"),
 			"Missing required permissions. Please add all permissions to a role, assign that role to the bot, and rejoin the bridge",
 			map[string]any{
 				"channel":              channel,
 				"current_permissions":  permissions,
-				"expected_permissions": CorrectPermissionValue,
+				"expected_permissions": correctPermissionValue,
 			},
-			lightning.ChannelDisabled{},
+			nil,
 		)
 	}
 
@@ -121,10 +106,9 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 		})
 
 		if err != nil {
-			lightning.Log.Warn().Str("plugin", "revolt").Strs("leftover", leftoverAttachments).Err(err).Msg("Failed to send leftover attachments to Revolt")
+			revoltLog.Warn("failed to send leftover attachments", "attachments", leftoverAttachments, "error", err)
 		} else {
 			ids = append(ids, res.ID)
-			lightning.Log.Debug().Str("plugin", "revolt").Strs("leftover", leftoverAttachments).Msg("Sent leftover attachments to Revolt")
 		}
 	}
 

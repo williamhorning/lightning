@@ -68,8 +68,6 @@ func bridgeCommand(db Database) lightning.Command {
 }
 
 func prepareChannelForBridge(db Database, opts lightning.CommandOptions) (BridgeChannel, string) {
-	lightning.Log.Trace().Str("channel", opts.ChannelID).Str("plugin", opts.Plugin).Msg("Adding channel to bridge")
-
 	if br, err := db.getBridgeByChannel(opts.ChannelID); br.ID != "" || err != nil {
 		return BridgeChannel{}, "This channel is already part of a bridge. Please leave the bridge first."
 	}
@@ -77,13 +75,13 @@ func prepareChannelForBridge(db Database, opts lightning.CommandOptions) (Bridge
 	plugin, ok := lightning.Plugins.Get(opts.Plugin)
 	if !ok {
 		return BridgeChannel{}, lightning.LogError(lightning.ErrPluginNotFound, "Failed to add channel to bridge using plugin",
-			map[string]any{"plugin": opts.Plugin, "channel": opts.ChannelID}, lightning.ChannelDisabled{}).Error()
+			map[string]any{"plugin": opts.Plugin, "channel": opts.ChannelID}, nil).Error()
 	}
 
 	data, err := plugin.SetupChannel(opts.ChannelID)
 	if err != nil {
 		return BridgeChannel{}, lightning.LogError(err, "Failed to setup channel for bridge",
-			map[string]any{"plugin": plugin.Name(), "channel": opts.ChannelID}, lightning.ChannelDisabled{}).Error()
+			map[string]any{"plugin": plugin.Name(), "channel": opts.ChannelID}, nil).Error()
 	}
 
 	return BridgeChannel{
@@ -109,10 +107,9 @@ func createCommand(db Database, opts lightning.CommandOptions) (string, error) {
 
 	if err := db.createBridge(bridge); err != nil {
 		return lightning.LogError(err, "Failed to create bridge in database",
-			map[string]any{"bridge": bridge}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"bridge": bridge}, nil).Error(), nil
 	}
 
-	lightning.Log.Debug().Str("bridge_id", bridge.ID).Str("channel", opts.ChannelID).Msg("Bridge created successfully")
 	return "Bridge created successfully! You can now join it using ||`" + opts.Prefix + "bridge join " + bridge.ID + "`||. Keep this command secret!", nil
 }
 
@@ -127,7 +124,7 @@ func joinCommand(db Database, opts lightning.CommandOptions, subscribe bool) (st
 	br, err := db.getBridge(id)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
-			map[string]any{"bridge_id": id}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"bridge_id": id}, nil).Error(), nil
 	} else if br.ID == "" {
 		return "No bridge found with the provided ID.", nil
 	}
@@ -137,10 +134,9 @@ func joinCommand(db Database, opts lightning.CommandOptions, subscribe bool) (st
 
 	if err := db.createBridge(br); err != nil {
 		return lightning.LogError(err, "Failed to update bridge in database",
-			map[string]any{"bridge": br}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"bridge": br}, nil).Error(), nil
 	}
 
-	lightning.Log.Debug().Str("bridge_id", br.ID).Str("channel", opts.ChannelID).Msg("Channel joined bridge successfully")
 	return "Bridge joined successfully!", nil
 }
 
@@ -150,7 +146,7 @@ func leaveCommand(db Database, opts lightning.CommandOptions) (string, error) {
 	br, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.ChannelID}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
 	} else if br.ID == "" {
 		return "You are not in a bridge.", nil
 	}
@@ -168,7 +164,7 @@ func leaveCommand(db Database, opts lightning.CommandOptions) (string, error) {
 
 	if err := db.createBridge(br); err != nil {
 		return lightning.LogError(err, "Failed to update bridge in database",
-			map[string]any{"bridge": br}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"bridge": br}, nil).Error(), nil
 	}
 
 	return "You have successfully left the bridge.", nil
@@ -180,7 +176,7 @@ func toggleCommand(db Database, opts lightning.CommandOptions) (string, error) {
 	br, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.ChannelID}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
 	} else if br.ID == "" {
 		return "You are not in a bridge.", nil
 	}
@@ -193,7 +189,7 @@ func toggleCommand(db Database, opts lightning.CommandOptions) (string, error) {
 
 	if err := db.createBridge(br); err != nil {
 		return lightning.LogError(err, "Failed to update bridge in database",
-			map[string]any{"bridge": br}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"bridge": br}, nil).Error(), nil
 	}
 
 	return "Bridge settings updated successfully", nil
@@ -203,7 +199,7 @@ func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
 	br, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.ChannelID}, lightning.ChannelDisabled{}).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
 	} else if br.ID == "" {
 		return "You are not in a bridge.", nil
 	}
@@ -211,7 +207,7 @@ func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
 	status := "Name: `" + br.Name + "`\n\nChannels:\n"
 
 	for i, channel := range br.Channels {
-		status += strconv.Itoa(i) + ". `" + channel.ID + "` on `" + channel.Plugin + "`"
+		status += strconv.Itoa(i+1) + ". `" + channel.ID + "` on `" + channel.Plugin + "`"
 		if channel.IsDisabled().Read {
 			status += " (subscribed)"
 		}

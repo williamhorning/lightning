@@ -72,12 +72,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 	timestamp, err := discordgo.SnowflakeTimestamp(interaction.ID)
 
 	if err != nil {
-		lightning.LogError(
-			err,
-			"Failed to parse interaction timestamp",
-			map[string]any{"interaction_id": interaction.ID},
-			lightning.ChannelDisabled{Read: false, Write: false},
-		)
+		lightning.LogError(err, "Failed to parse interaction timestamp", map[string]any{"interaction_id": interaction.ID}, nil)
 
 		timestamp = time.Now()
 	}

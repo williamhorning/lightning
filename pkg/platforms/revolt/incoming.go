@@ -43,12 +43,7 @@ func getLightningTime(m revoltgo.Message) (time.Time, error) {
 
 	id, err := ulid.Parse(m.ID)
 	if err != nil {
-		return time.Time{}, lightning.LogError(
-			err,
-			"Failed to parse ULID from Revolt message ID",
-			map[string]any{"message_id": m.ID},
-			lightning.ChannelDisabled{},
-		)
+		return time.Time{}, lightning.LogError(err, "Failed to parse ULID from Revolt message ID", map[string]any{"message_id": m.ID}, nil)
 	}
 
 	return time.UnixMilli(int64(id.Time())), nil

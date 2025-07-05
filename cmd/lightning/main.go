@@ -1,15 +1,13 @@
 package main
 
-import (
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
 func main() {
 	cmd := (&cobra.Command{
 		Use:     "lightning",
 		Short:   "extensible chatbot connecting communities",
 		Long:    "Lightning is an extensible chatbot that connects communities.\nDocs available at https://williamhorning.eu.org",
-		Version: "0.8.0-alpha.11",
+		Version: "0.8.0-alpha.12",
 		Example: "  lightning run lightning.toml",
 	})
 

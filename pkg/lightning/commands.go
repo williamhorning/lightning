@@ -9,14 +9,11 @@ import (
 var commandRegistry = make(map[string]Command)
 
 func RegisterCommand(command Command) {
-	Log.Debug().Str("command", command.Name).Msg("Registering command")
 	commandRegistry[command.Name] = command
 
 	for _, plugin := range Plugins.plugins {
 		if err := plugin.SetupCommands(commandRegistry); err != nil {
-			LogError(err, "Failed to setup commands for plugin", map[string]any{
-				"plugin": plugin.Name(),
-			}, ChannelDisabled{})
+			LogError(err, "Failed to setup commands for plugin", map[string]any{"plugin": plugin.Name()}, nil)
 		}
 	}
 }
@@ -61,7 +58,7 @@ func HelpCommand() Command {
 		Arguments:   []CommandArgument{},
 		Subcommands: []Command{},
 		Executor: func(options CommandOptions) (string, error) {
-			return "hi! i'm lightning v0.8.0-alpha.11.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help!", nil
+			return "hi! i'm lightning v0.8.0-alpha.12.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help!", nil
 		},
 	}
 }
@@ -100,8 +97,6 @@ func handleMessageCommand(event Message, prefix string) {
 		return
 	}
 
-	Log.Trace().Str("event_id", event.EventID).Str("plugin", event.Plugin).Msg("Handling command message")
-
 	content := strings.TrimPrefix(event.Content, prefix)
 	args := strings.Fields(content)
 	if len(args) == 0 {
@@ -125,7 +120,7 @@ func handleMessageCommand(event Message, prefix string) {
 				return LogError(ErrPluginNotFound, "Plugin not found for command reply", map[string]any{
 					"plugin": event.Plugin,
 					"event":  event.EventID,
-				}, ChannelDisabled{})
+				}, nil)
 			}
 
 			msg := CreateMessage(message)
@@ -137,11 +132,8 @@ func handleMessageCommand(event Message, prefix string) {
 }
 
 func handleCommandEvent(event CommandEvent) error {
-	Log.Trace().Str("event_id", event.EventID).Str("command", event.Command).Msg("Handling command event")
-
 	command, exists := GetCommand(event.Command)
 	if !exists {
-		Log.Trace().Str("command", event.Command).Msg("Command not found, using help command")
 		command = HelpCommand()
 	}
 
@@ -164,14 +156,13 @@ func handleCommandEvent(event CommandEvent) error {
 		}
 
 		if arg.Required && event.CommandOptions.Arguments[arg.Name] == "" {
-			Log.Trace().Str("argument", arg.Name).Msg("Required argument missing")
 			err := event.Reply("Please provide the " + arg.Name + " argument. Try using the `" + event.Prefix + "help` command.")
 			if err != nil {
 				return LogError(err, "Error sending missing argument response", map[string]any{
 					"argument": arg.Name,
 					"command":  command.Name,
 					"event":    event.EventID,
-				}, ChannelDisabled{})
+				}, nil)
 			}
 			return nil
 		}
@@ -183,17 +174,15 @@ func handleCommandEvent(event CommandEvent) error {
 		response = LogError(err, "Error executing command", map[string]any{
 			"command": command.Name,
 			"event":   event.EventID,
-		}, ChannelDisabled{}).Error()
+		}, nil).Error()
 	}
 
 	if err = event.Reply(response); err != nil {
 		return LogError(err, "Error sending command response", map[string]any{
 			"command": command.Name,
 			"event":   event.EventID,
-		}, ChannelDisabled{})
+		}, nil)
 	}
-
-	Log.Trace().Str("event_id", event.EventID).Str("command", command.Name).Msg("Command handled successfully")
 
 	return nil
 }

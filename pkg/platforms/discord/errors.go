@@ -7,14 +7,14 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type ErrorConfig struct {
+type errorConfig struct {
 	Code         int
 	Message      string
 	DisableRead  bool
 	DisableWrite bool
 }
 
-var discordErrors = map[int]ErrorConfig{
+var discordErrors = map[int]errorConfig{
 	30007: {30007, "too many webhooks in channel, try deleting some", false, true},
 	30058: {30058, "too many webhooks in guild, try deleting some", false, true},
 	50013: {50013, "missing permissions to make webhook", false, true},
@@ -37,8 +37,8 @@ func getError(err error, extra map[string]any, message string) error {
 			e.Code = restErr.Message.Code
 		}
 
-		return lightning.LogError(fmt.Errorf(e.Message+": %w", err), message, extra, lightning.ChannelDisabled{Read: e.DisableRead, Write: e.DisableWrite})
+		return lightning.LogError(fmt.Errorf(e.Message+": %w", err), message, extra, &lightning.ChannelDisabled{Read: e.DisableRead, Write: e.DisableWrite})
 	} else {
-		return lightning.LogError(fmt.Errorf("unknown error: %w", err), message, extra, lightning.ChannelDisabled{})
+		return lightning.LogError(fmt.Errorf("unknown error: %w", err), message, extra, nil)
 	}
 }

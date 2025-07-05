@@ -2,6 +2,7 @@ package discord
 
 import (
 	"github.com/bwmarrin/discordgo"
+	"github.com/charmbracelet/log"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -11,21 +12,11 @@ func init() {
 
 func newDiscordPlugin(config any) (lightning.Plugin, error) {
 	if cfg, ok := config.(map[string]any); !ok {
-		return nil, lightning.LogError(
-			lightning.ErrPluginConfigInvalid,
-			"Invalid config for Discord plugin",
-			nil,
-			lightning.ChannelDisabled{},
-		)
+		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Invalid config for Discord plugin", nil, nil)
 	} else {
 		token, ok := cfg["token"].(string)
 		if !ok || token == "" {
-			return nil, lightning.LogError(
-				lightning.ErrPluginConfigInvalid,
-				"Missing or invalid token in Discord plugin config",
-				nil,
-				lightning.ChannelDisabled{},
-			)
+			return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Missing or invalid token in Discord plugin config", nil, nil)
 		}
 
 		discord, err := discordgo.New("Bot " + token)
@@ -33,33 +24,30 @@ func newDiscordPlugin(config any) (lightning.Plugin, error) {
 		discord.Identify.Intents = 16813601
 		discord.StateEnabled = true
 		discord.ShouldReconnectOnError = true
-		discord.LogLevel = 2
+		discord.LogLevel = 1
+		discordgo.Logger = func(msgL, caller int, format string, a ...any) {
+			level := log.DebugLevel
+
+			switch msgL {
+			case 0:
+				level = log.ErrorLevel
+			case 1:
+				level = log.InfoLevel
+			}
+
+			lightning.Log.With("plugin", "discord").Logf(level, format, a...)
+		}
 
 		if err != nil {
-			return nil, lightning.LogError(
-				err,
-				"Failed to create Discord session",
-				nil,
-				lightning.ChannelDisabled{},
-			)
+			return nil, lightning.LogError(err, "Failed to create Discord session", nil, nil)
 		}
 
-		err = discord.Open()
-
-		if err != nil {
-			return nil, lightning.LogError(
-				err,
-				"Failed to open Discord session",
-				nil,
-				lightning.ChannelDisabled{},
-			)
+		if err = discord.Open(); err != nil {
+			return nil, lightning.LogError(err, "Failed to open Discord session", nil, nil)
 		}
 
-		app, err := discord.Application("@me")
-		lightning.Log.Info().Str("plugin", "discord").Str("username", discord.State.User.Username).Int("servers", len(discord.State.Guilds)).Msg("ready!")
-		if err == nil {
-			lightning.Log.Info().Str("plugin", "discord").Msg("invite me at https://discord.com/oauth2/authorize?client_id=" + app.ID + "%s&scope=bot&permissions=8")
-		}
+		app, _ := discord.Application("@me")
+		lightning.Log.Info("ready!", "plugin", "discord", "username", app.Name, "servers", len(discord.State.Guilds), "invite", "https://discord.com/oauth2/authorize?client_id="+app.ID+"&scope=bot&permissions=8")
 
 		return &discordPlugin{cfg, discord}, nil
 	}
@@ -144,23 +132,13 @@ func (p *discordPlugin) SetupCommands(command map[string]lightning.Command) erro
 	app, err := p.discord.Application("@me")
 
 	if err != nil {
-		return lightning.LogError(
-			err,
-			"Failed to get application info for Discord commands",
-			nil,
-			lightning.ChannelDisabled{Read: false, Write: false},
-		)
+		return lightning.LogError(err, "Failed to get application info for Discord commands", nil, nil)
 	}
 
 	_, err = p.discord.ApplicationCommandBulkOverwrite(app.ID, "", getDiscordCommand(command))
 
 	if err != nil {
-		return lightning.LogError(
-			err,
-			"Failed to setup commands in Discord",
-			map[string]any{"commands": command},
-			lightning.ChannelDisabled{Read: false, Write: false},
-		)
+		return lightning.LogError(err, "Failed to setup commands in Discord", map[string]any{"commands": command}, nil)
 	}
 
 	return nil

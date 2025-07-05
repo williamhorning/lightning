@@ -9,9 +9,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/oklog/ulid/v2"
 )
 
+var Log = log.NewWithOptions(os.Stderr, log.Options{TimeFormat: time.TimeOnly, Level: log.InfoLevel, ReportCaller: true})
 var ErrLogErrorNilError = errors.New("LogError called with nil error. Please provide a valid error")
 
 type ChannelDisabled struct {
@@ -29,7 +31,7 @@ func (e LightningError) Error() string {
 	return e.Message
 }
 
-func LogError(err error, message string, extra map[string]any, disable ChannelDisabled) LightningError {
+func LogError(err error, message string, extra map[string]any, disable *ChannelDisabled) LightningError {
 	if err == nil {
 		err = ErrLogErrorNilError
 	}
@@ -42,15 +44,17 @@ func LogError(err error, message string, extra map[string]any, disable ChannelDi
 		return lightningErr
 	}
 
+	if disable == nil {
+		disable = &ChannelDisabled{false, false}
+	}
+
 	if extra == nil {
 		extra = make(map[string]any)
 	}
 
 	id := ulid.Make().String()
 
-	Log.Error().Str("id", id).Str("message", message).Any("disabled", disable).Fields(extra).Err(err).Msg("[lightning]")
-
-	fmt.Fprintf(os.Stderr, "%+v\n", err)
+	Log.Error(message, "id", id, "read", disable.Read, "write", disable.Write, "error", err, "extra", extra)
 
 	if webhook := os.Getenv("LIGHTNING_ERROR_WEBHOOK"); webhook != "" {
 		body, err := json.Marshal(map[string]any{
@@ -69,18 +73,18 @@ func LogError(err error, message string, extra map[string]any, disable ChannelDi
 		})
 
 		if err != nil {
-			Log.Error().Err(err).Msg("Error marshaling error webhook body")
+			Log.Error("Error marshaling error webhook body", "error", err, "id", id)
 		} else {
 			resp, err := http.Post(webhook, "application/json", bytes.NewReader(body))
 			if err != nil {
-				Log.Error().Err(err).Msg("Error sending error webhook request")
+				Log.Error("Error sending error webhook request", "error", err, "id", id)
 			} else {
 				if err := resp.Body.Close(); err != nil {
-					Log.Error().Err(err).Msg("Error closing response body")
+					Log.Error("Error closing response body after sending error webhook", "error", err, "id", id)
 				}
 			}
 		}
 	}
 
-	return LightningError{id, disable, "Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\n```\n" + id + "\n\n" + message + "\n```"}
+	return LightningError{id, *disable, "Something went wrong! Take a look at [the docs](https://williamhorning.eu.org/lightning).\n\n```\n" + id + "\n\n" + message + "\n```"}
 }

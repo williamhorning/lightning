@@ -24,23 +24,23 @@ func migrate(cmd *cobra.Command, args []string) {
 
 	sourceDB, err := sourceConfig.GetDatabase()
 	if err != nil {
-		lightning.LogError(err, "error connecting to source database", nil, lightning.ChannelDisabled{})
+		lightning.LogError(err, "error connecting to source database", nil, nil)
 		os.Exit(1)
 	}
 
 	destDB, err := destConfig.GetDatabase()
 	if err != nil {
-		lightning.LogError(err, "error connecting to destination database", nil, lightning.ChannelDisabled{})
+		lightning.LogError(err, "error connecting to destination database", nil, nil)
 		os.Exit(1)
 	}
 
 	if err := migrateBridges(sourceDB, destDB); err != nil {
-		lightning.LogError(err, "error migrating bridges", nil, lightning.ChannelDisabled{})
+		lightning.LogError(err, "error migrating bridges", nil, nil)
 		os.Exit(1)
 	}
 
 	if err := migrateMessages(sourceDB, destDB); err != nil {
-		lightning.LogError(err, "error migrating messages", nil, lightning.ChannelDisabled{})
+		lightning.LogError(err, "error migrating messages", nil, nil)
 		os.Exit(1)
 	}
 
@@ -48,7 +48,7 @@ func migrate(cmd *cobra.Command, args []string) {
 }
 
 func getDatabaseConfig(name string) bridge.DatabaseConfig {
-	fmt.Printf("Enter %s database type (postgres/redis): ", name)
+	fmt.Printf("Enter %s database type (postgres): ", name)
 	var dbType string
 	fmt.Scanln(&dbType)
 

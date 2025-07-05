@@ -1,14 +1,8 @@
 package bridge
 
-import (
-	"errors"
-	"os"
-	"time"
+import "errors"
 
-	"github.com/briandowns/spinner"
-)
-
-var ErrUnsupportedDatabaseType = errors.New("unsupported database type, must be 'postgres' or 'redis'")
+var ErrUnsupportedDatabaseType = errors.New("unsupported database type, must be 'postgres'")
 
 type Database interface {
 	createBridge(bridge Bridge) error
@@ -32,15 +26,7 @@ func (config DatabaseConfig) GetDatabase() (Database, error) {
 	switch config.Type {
 	case "postgres":
 		return newPostgresDatabase(config.Connection)
-	case "redis":
-		return newRedisDatabase(config.Connection)
 	default:
 		return nil, ErrUnsupportedDatabaseType
 	}
-}
-
-func startSpinner() *spinner.Spinner {
-	spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond, spinner.WithWriter(os.Stderr))
-	spin.Start()
-	return spin
 }

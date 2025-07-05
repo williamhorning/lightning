@@ -1,8 +1,6 @@
 package guilded
 
-import (
-	"time"
-)
+import "time"
 
 type guildedChatEmbedAuthor struct {
 	IconUrl *string `json:"icon_url,omitempty"`

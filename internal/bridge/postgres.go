@@ -148,7 +148,7 @@ func (p *postgresDatabase) getMessage(id string) (BridgeMessageCollection, error
 }
 
 func (p *postgresDatabase) GetAllBridges() ([]Bridge, error) {
-	defer startSpinner().Stop()
+	bridgeLog.Info("fetching all bridges from the database...")
 
 	rows, err := p.conn.Query(p.ctx, `SELECT id, name, channels, settings FROM bridges`)
 	if err != nil {
@@ -165,12 +165,12 @@ func (p *postgresDatabase) GetAllBridges() ([]Bridge, error) {
 		bridges = append(bridges, bridge)
 	}
 
+	bridgeLog.Info("fetched all bridges in the database", "count", len(bridges))
 	return bridges, rows.Err()
 }
 
 func (p *postgresDatabase) GetAllMessages() ([]BridgeMessageCollection, error) {
-	defer startSpinner().Stop()
-
+	bridgeLog.Info("fetching all messages from the database...")
 	rows, err := p.conn.Query(p.ctx, `
 		SELECT id, name, bridge_id, channels, messages, settings
 		FROM bridge_messages
@@ -189,23 +189,23 @@ func (p *postgresDatabase) GetAllMessages() ([]BridgeMessageCollection, error) {
 		messages = append(messages, message)
 	}
 
+	bridgeLog.Info("fetched all messages in the database", "count", len(messages))
 	return messages, rows.Err()
 }
 
 func (p *postgresDatabase) SetAllBridges(bridges []Bridge) error {
-	defer startSpinner().Stop()
-
+	bridgeLog.Info("setting all bridges in the database...")
 	for _, bridge := range bridges {
 		if err := p.createBridge(bridge); err != nil {
 			return err
 		}
 	}
+	bridgeLog.Info("set all bridges in the database", "count", len(bridges))
 	return nil
 }
 
 func (p *postgresDatabase) SetAllMessages(messages []BridgeMessageCollection) error {
-	defer startSpinner().Stop()
-
+	bridgeLog.Info("setting all messages in the database...")
 	batch := &pgx.Batch{}
 	for _, message := range messages {
 		channels, err := json.Marshal(message.Channels)
@@ -234,6 +234,8 @@ func (p *postgresDatabase) SetAllMessages(messages []BridgeMessageCollection) er
 			return err
 		}
 	}
+
+	bridgeLog.Info("set all messages in the database", "count", len(messages))
 	return nil
 }
 

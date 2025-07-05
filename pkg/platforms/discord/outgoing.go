@@ -69,12 +69,7 @@ func (o *discordOutgoingMessage) Message() *discordgo.MessageSend {
 func getWebhookFromChannel(options *lightning.SendOptions) (id string, token string, err error) {
 	webhookData, ok := options.ChannelData.(map[string]any)
 	if !ok {
-		return "", "", lightning.LogError(
-			errors.New("invalid webhook data for Discord channel"),
-			"Failed to use webhook for Discord",
-			map[string]any{"channel": options.ChannelID},
-			lightning.ChannelDisabled{Read: false, Write: true},
-		)
+		return "", "", lightning.LogError(errors.New("invalid webhook data for Discord channel"), "Failed to use webhook for Discord", map[string]any{"channel": options.ChannelID}, &lightning.ChannelDisabled{Read: false, Write: true})
 	}
 
 	id, _ = webhookData["id"].(string)

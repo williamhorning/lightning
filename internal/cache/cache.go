@@ -1,4 +1,4 @@
-package lightning
+package cache
 
 import (
 	"sync"
@@ -10,14 +10,14 @@ type cacheItem[T any] struct {
 	ExpiresAt time.Time
 }
 
-type ExpiringCache[K comparable, V any] struct {
+type Expiring[K comparable, V any] struct {
 	items map[K]cacheItem[V]
 	mu    sync.RWMutex
 	ttl   time.Duration
 }
 
-func NewExpiringCache[K comparable, V any](ttl time.Duration) *ExpiringCache[K, V] {
-	cache := &ExpiringCache[K, V]{
+func New[K comparable, V any](ttl time.Duration) *Expiring[K, V] {
+	cache := &Expiring[K, V]{
 		items: make(map[K]cacheItem[V]),
 		ttl:   ttl,
 	}
@@ -26,7 +26,7 @@ func NewExpiringCache[K comparable, V any](ttl time.Duration) *ExpiringCache[K, 
 	return cache
 }
 
-func (c *ExpiringCache[K, V]) Get(key K) (V, bool) {
+func (c *Expiring[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
 	item, exists := c.items[key]
 	c.mu.RUnlock()
@@ -47,7 +47,7 @@ func (c *ExpiringCache[K, V]) Get(key K) (V, bool) {
 	return item.Value, true
 }
 
-func (c *ExpiringCache[K, V]) Set(key K, value V) {
+func (c *Expiring[K, V]) Set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -57,14 +57,14 @@ func (c *ExpiringCache[K, V]) Set(key K, value V) {
 	}
 }
 
-func (c *ExpiringCache[K, V]) Delete(key K) {
+func (c *Expiring[K, V]) Delete(key K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	delete(c.items, key)
 }
 
-func (c *ExpiringCache[K, V]) Cleanup() {
+func (c *Expiring[K, V]) Cleanup() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -76,10 +76,8 @@ func (c *ExpiringCache[K, V]) Cleanup() {
 	}
 }
 
-func (c *ExpiringCache[K, V]) startCleanupRoutine() {
-	cleanupInterval := max(c.ttl/2, time.Second)
-
-	ticker := time.NewTicker(cleanupInterval)
+func (c *Expiring[K, V]) startCleanupRoutine() {
+	ticker := time.NewTicker(max(c.ttl/2, time.Second))
 	defer ticker.Stop()
 
 	for range ticker.C {

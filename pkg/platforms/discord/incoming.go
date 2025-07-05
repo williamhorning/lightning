@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 var allowedTypes = []discordgo.MessageType{0, 7, 19, 20, 23}
-var webhookCache = lightning.NewExpiringCache[string, bool](30 * time.Second)
+var webhookCache = cache.New[string, bool](30 * time.Second)
 
 func getLightningMessage(s *discordgo.Session, m *discordgo.Message) *lightning.Message {
 	if !slices.Contains(allowedTypes, m.Type) {
@@ -127,7 +128,7 @@ func getLightningContent(s *discordgo.Session, m *discordgo.Message) string {
 		if user, err := s.User(userID); err == nil {
 			return "@" + user.DisplayName()
 		}
-		return "@" + match
+		return "@" + userID
 	})
 
 	content = channelMention.ReplaceAllStringFunc(content, func(match string) string {
@@ -135,7 +136,7 @@ func getLightningContent(s *discordgo.Session, m *discordgo.Message) string {
 		if channel, err := s.State.Channel(channelID); err == nil {
 			return "#" + channel.Name
 		}
-		return "#" + match
+		return "#" + channelID
 	})
 
 	content = roleMention.ReplaceAllStringFunc(content, func(match string) string {
@@ -147,7 +148,7 @@ func getLightningContent(s *discordgo.Session, m *discordgo.Message) string {
 				}
 			}
 		}
-		return "@&" + match
+		return "@&" + roleID
 	})
 
 	return emojiMention.ReplaceAllStringFunc(content, func(match string) string {

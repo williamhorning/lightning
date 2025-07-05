@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func guildedMakeRequest(token, method, endpoint string, body *io.Reader) (*http.Response, error) {
@@ -58,28 +57,24 @@ func (s *guildedSocketManager) OnReady(handler func(*guildedWelcomeMessage)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.readyHandler = handler
-	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered ready handler")
 }
 
 func (s *guildedSocketManager) OnMessageCreated(handler func(*guildedChatMessageCreated)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.messageCreatedHandler = handler
-	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered message created handler")
 }
 
 func (s *guildedSocketManager) OnMessageUpdated(handler func(*guildedChatMessageUpdated)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.messageUpdatedHandler = handler
-	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered message updated handler")
 }
 
 func (s *guildedSocketManager) OnMessageDeleted(handler func(*guildedChatMessageDeleted)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.messageDeletedHandler = handler
-	lightning.Log.Trace().Str("plugin", "guilded").Msg("Registered message deleted handler")
 }
 
 func (s *guildedSocketManager) Connect() error {
@@ -153,16 +148,16 @@ func (s *guildedSocketManager) readMessages() {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				lightning.Log.Error().Err(err).Msg("Error reading from WebSocket")
+				guildedLog.Error("error reading from socket", "error", err)
 			} else {
-				lightning.Log.Info().Msg("WebSocket closed")
+				guildedLog.Debug("socket closed normally")
 			}
 			return
 		}
 
 		var data guildedSocketEventEnvelope
 		if err := json.Unmarshal(message, &data); err != nil {
-			lightning.Log.Error().Err(err).Msg("Error parsing WebSocket message")
+			guildedLog.Error("error parsing Guilded WebSocket message", "error", err, "message", string(message))
 			continue
 		}
 
@@ -178,47 +173,33 @@ func (s *guildedSocketManager) handleReconnect() {
 	for {
 		attempts++
 
-		lightning.Log.Info().
-			Int("attempt", attempts).
-			Dur("backoff", backoff).
-			Msg("Attempting to reconnect to Guilded WebSocket")
-
+		guildedLog.Info("Attempting to reconnect to Guilded WebSocket", "attempt", attempts, "backoff", backoff)
 		time.Sleep(backoff)
 
 		err := s.Connect()
 		if err == nil {
-			lightning.Log.Info().Msg("Guilded WebSocket reconnection successful")
+			guildedLog.Info("Guilded WebSocket reconnection successful")
 			return
 		}
 
-		lightning.Log.Error().
-			Err(err).
-			Int("attempt", attempts).
-			Msg("Failed to reconnect to Guilded WebSocket")
-
 		backoff = min(time.Duration(float64(backoff)*1.5), maxBackoff)
+		guildedLog.Error("Failed to reconnect to Guilded WebSocket", "attempt", attempts, "backoff", backoff, "error", err)
 	}
 }
 
 func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
 	if data.T == nil {
-		lightning.Log.Trace().Msg("Received event with nil type")
 		return
 	}
 
 	eventType := *data.T
-	lightning.Log.Trace().
-		Str("plugin", "guilded").
-		Str("event_type", eventType).
-		Msg("Processing socket event")
-
 	switch eventType {
 	case "ready":
 		if s.readyHandler != nil {
 			var welcome guildedWelcomeMessage
 			welcomeJSON, _ := json.Marshal(data.D)
 			if err := json.Unmarshal(welcomeJSON, &welcome); err != nil {
-				lightning.Log.Error().Err(err).Msg("Failed to parse ready event")
+				guildedLog.Error("Failed to parse ready event", "data", data.D, "error", err)
 				return
 			}
 			go s.readyHandler(&welcome)
@@ -228,10 +209,9 @@ func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
 			var msg guildedChatMessageCreated
 			msgJSON, _ := json.Marshal(data.D)
 			if err := json.Unmarshal(msgJSON, &msg); err != nil {
-				lightning.Log.Error().Err(err).Msg("Failed to parse message created event")
+				guildedLog.Error("Failed to parse message created event", "data", data.D, "error", err)
 				return
 			}
-			lightning.Log.Trace().Str("plugin", "guilded").Msg("Calling message created handler")
 			go s.messageCreatedHandler(&msg)
 		}
 	case "ChatMessageUpdated":
@@ -239,7 +219,7 @@ func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
 			var msg guildedChatMessageUpdated
 			msgJSON, _ := json.Marshal(data.D)
 			if err := json.Unmarshal(msgJSON, &msg); err != nil {
-				lightning.Log.Error().Err(err).Msg("Failed to parse message updated event")
+				guildedLog.Error("Failed to parse message updated event", "data", data.D, "error", err)
 				return
 			}
 			go s.messageUpdatedHandler(&msg)
@@ -249,12 +229,10 @@ func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
 			var msg guildedChatMessageDeleted
 			msgJSON, _ := json.Marshal(data.D)
 			if err := json.Unmarshal(msgJSON, &msg); err != nil {
-				lightning.Log.Error().Err(err).Msg("Failed to parse message deleted event")
+				guildedLog.Error("Failed to parse message deleted event", "data", data.D, "error", err)
 				return
 			}
 			go s.messageDeletedHandler(&msg)
 		}
-	default:
-		lightning.Log.Trace().Str("event", eventType).Msg("Unhandled event type")
 	}
 }
