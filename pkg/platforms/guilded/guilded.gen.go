@@ -3,9 +3,9 @@ package guilded
 import "time"
 
 type guildedChatEmbedAuthor struct {
-	IconUrl *string `json:"icon_url,omitempty"`
+	IconURL *string `json:"icon_url,omitempty"`
 	Name    *string `json:"name,omitempty"`
-	Url     *string `json:"url,omitempty"`
+	URL     *string `json:"url,omitempty"`
 }
 
 type guildedChatEmbedField struct {
@@ -15,12 +15,12 @@ type guildedChatEmbedField struct {
 }
 
 type guildedChatEmbedFooter struct {
-	IconUrl *string `json:"icon_url,omitempty"`
+	IconURL *string `json:"icon_url,omitempty"`
 	Text    string  `json:"text"`
 }
 
 type guildedChatEmbedMedia struct {
-	Url *string `json:"url,omitempty"`
+	URL *string `json:"url,omitempty"`
 }
 
 type guildedChatEmbed struct {
@@ -33,7 +33,7 @@ type guildedChatEmbed struct {
 	Thumbnail   *guildedChatEmbedMedia   `json:"thumbnail,omitempty"`
 	Timestamp   *time.Time               `json:"timestamp,omitempty"`
 	Title       *string                  `json:"title,omitempty"`
-	Url         *string                  `json:"url,omitempty"`
+	URL         *string                  `json:"url,omitempty"`
 }
 
 type guildedChatMessage struct {
@@ -44,7 +44,7 @@ type guildedChatMessage struct {
 	CreatedByWebhookID    *string             `json:"createdByWebhookID,omitempty"`
 	Embeds                *[]guildedChatEmbed `json:"embeds,omitempty"`
 	GroupID               *string             `json:"groupID,omitempty"`
-	HiddenLinkPreviewUrls *[]string           `json:"hiddenLinkPreviewUrls,omitempty"`
+	HiddenLinkPreviewURLs *[]string           `json:"hiddenLinkPreviewURLs,omitempty"`
 	ID                    string              `json:"id"`
 	IsPinned              *bool               `json:"isPinned,omitempty"`
 	IsPrivate             *bool               `json:"isPrivate,omitempty"`
@@ -145,14 +145,14 @@ type guildedSocketEventEnvelope struct {
 	T  *string         `json:"t,omitempty"`
 }
 
-type guildedUrlSignature struct {
+type guildedURLSignature struct {
 	RetryAfter *int    `json:"retryAfter,omitempty"`
 	Signature  *string `json:"signature,omitempty"`
-	Url        string  `json:"url"`
+	URL        string  `json:"url"`
 }
 
-type guildedUrlSignatureResponse struct {
-	URLSignatures []guildedUrlSignature `json:"urlSignatures"`
+type guildedURLSignatureResponse struct {
+	URLSignatures []guildedURLSignature `json:"urlSignatures"`
 }
 
 type guildedUser struct {

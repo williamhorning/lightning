@@ -48,14 +48,14 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 		var image *guildedChatEmbedMedia
 		if embed.Image != nil && embed.Image.URL != "" {
 			image = &guildedChatEmbedMedia{
-				Url: &embed.Image.URL,
+				URL: &embed.Image.URL,
 			}
 		}
 
 		var thumbnail *guildedChatEmbedMedia
 		if embed.Thumbnail != nil && embed.Thumbnail.URL != "" {
 			thumbnail = &guildedChatEmbedMedia{
-				Url: &embed.Thumbnail.URL,
+				URL: &embed.Thumbnail.URL,
 			}
 		}
 		var timestamp *time.Time
@@ -70,7 +70,7 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 				Text: embed.Footer.Text,
 			}
 			if embed.Footer.IconURL != nil {
-				footer.IconUrl = embed.Footer.IconURL
+				footer.IconURL = embed.Footer.IconURL
 			}
 		}
 
@@ -78,10 +78,10 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 		if embed.Author != nil {
 			author = &guildedChatEmbedAuthor{
 				Name: &embed.Author.Name,
-				Url:  embed.Author.URL,
+				URL:  embed.Author.URL,
 			}
 			if embed.Author.IconURL != nil {
-				author.IconUrl = embed.Author.IconURL
+				author.IconURL = embed.Author.IconURL
 			}
 		}
 
@@ -111,7 +111,7 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 			Author:      author,
 			Fields:      fields,
 			Timestamp:   timestamp,
-			Url:         embed.URL,
+			URL:         embed.URL,
 		})
 	}
 
@@ -141,7 +141,7 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 				guildedEmbeds = append(guildedEmbeds, guildedChatEmbed{
 					Author: &guildedChatEmbedAuthor{
 						Name:    &title,
-						IconUrl: author.ProfilePicture,
+						IconURL: author.ProfilePicture,
 					},
 					Description: messageResp.Message.Content,
 				})

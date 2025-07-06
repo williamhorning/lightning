@@ -71,7 +71,7 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 			continue
 		}
 
-		var signatureResp guildedUrlSignatureResponse
+		var signatureResp guildedURLSignatureResponse
 		if err := json.Unmarshal(body, &signatureResp); err != nil {
 			continue
 		}
@@ -287,13 +287,13 @@ func getIncomingEmbeds(embeds *[]guildedChatEmbed) []lightning.Embed {
 		if embed.Author != nil {
 			author = &lightning.EmbedAuthor{
 				Name: "",
-				URL:  embed.Author.Url,
+				URL:  embed.Author.URL,
 			}
 			if embed.Author.Name != nil {
 				author.Name = *embed.Author.Name
 			}
-			if embed.Author.IconUrl != nil {
-				author.IconURL = embed.Author.IconUrl
+			if embed.Author.IconURL != nil {
+				author.IconURL = embed.Author.IconURL
 			}
 		}
 
@@ -302,22 +302,22 @@ func getIncomingEmbeds(embeds *[]guildedChatEmbed) []lightning.Embed {
 			footer = &lightning.EmbedFooter{
 				Text: embed.Footer.Text,
 			}
-			if embed.Footer.IconUrl != nil {
-				footer.IconURL = embed.Footer.IconUrl
+			if embed.Footer.IconURL != nil {
+				footer.IconURL = embed.Footer.IconURL
 			}
 		}
 
 		var image *lightning.Media
-		if embed.Image != nil && embed.Image.Url != nil {
+		if embed.Image != nil && embed.Image.URL != nil {
 			image = &lightning.Media{
-				URL: *embed.Image.Url,
+				URL: *embed.Image.URL,
 			}
 		}
 
 		var thumbnail *lightning.Media
-		if embed.Thumbnail != nil && embed.Thumbnail.Url != nil {
+		if embed.Thumbnail != nil && embed.Thumbnail.URL != nil {
 			thumbnail = &lightning.Media{
-				URL: *embed.Thumbnail.Url,
+				URL: *embed.Thumbnail.URL,
 			}
 		}
 
@@ -342,7 +342,7 @@ func getIncomingEmbeds(embeds *[]guildedChatEmbed) []lightning.Embed {
 		incomingEmbeds = append(incomingEmbeds, lightning.Embed{
 			Title:       embed.Title,
 			Description: embed.Description,
-			URL:         embed.Url,
+			URL:         embed.URL,
 			Color:       embed.Color,
 			Author:      author,
 			Fields:      fields,
