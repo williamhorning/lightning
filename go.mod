@@ -23,5 +23,3 @@ require (
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )
-
-retract v0.0.0-20250621020242-b31a16a87e8a // licenses not properly included, not a proper release version
