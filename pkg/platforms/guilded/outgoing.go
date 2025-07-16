@@ -3,9 +3,9 @@ package guilded
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
@@ -17,21 +17,21 @@ func getValidUsername(author lightning.MessageAuthor) string {
 		return author.Nickname
 	} else if usernameRegex.MatchString(author.Username) {
 		return author.Username
-	} else {
-		return author.ID
 	}
+
+	return author.ID
 }
 
-func getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions, token string) *guildedPayload {
+func (p *guildedPlugin) getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions) *guildedPayload {
 	base := &guildedPayload{
 		Content:         message.Content,
 		AvatarURL:       *message.Author.ProfilePicture,
 		Username:        getValidUsername(message.Author),
 		ReplyMessageIDs: message.RepliedTo,
-		Embeds:          getOutgoingEmbeds(message, opts != nil, token),
+		Embeds:          p.getOutgoingEmbeds(message, opts != nil),
 	}
 
-	if len(base.Content) <= 0 && len(base.Embeds) <= 0 {
+	if len(base.Content) == 0 && len(base.Embeds) == 0 {
 		base.Content = "\u2800"
 	}
 
@@ -42,75 +42,21 @@ func getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions, 
 
 	return base
 }
-func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []guildedChatEmbed {
+
+func (p *guildedPlugin) getOutgoingEmbeds(message lightning.Message, incl bool) []guildedChatEmbed {
 	guildedEmbeds := make([]guildedChatEmbed, 0)
+
 	for _, embed := range message.Embeds {
-		var image *guildedChatEmbedMedia
-		if embed.Image != nil && embed.Image.URL != "" {
-			image = &guildedChatEmbedMedia{
-				URL: &embed.Image.URL,
-			}
-		}
-
-		var thumbnail *guildedChatEmbedMedia
-		if embed.Thumbnail != nil && embed.Thumbnail.URL != "" {
-			thumbnail = &guildedChatEmbedMedia{
-				URL: &embed.Thumbnail.URL,
-			}
-		}
-		var timestamp *time.Time
-		if embed.Timestamp != nil {
-			t := time.Unix(*embed.Timestamp, 0)
-			timestamp = &t
-		}
-
-		var footer *guildedChatEmbedFooter
-		if embed.Footer != nil {
-			footer = &guildedChatEmbedFooter{
-				Text: embed.Footer.Text,
-			}
-			if embed.Footer.IconURL != nil {
-				footer.IconURL = embed.Footer.IconURL
-			}
-		}
-
-		var author *guildedChatEmbedAuthor
-		if embed.Author != nil {
-			author = &guildedChatEmbedAuthor{
-				Name: &embed.Author.Name,
-				URL:  embed.Author.URL,
-			}
-			if embed.Author.IconURL != nil {
-				author.IconURL = embed.Author.IconURL
-			}
-		}
-
-		var fields *[]guildedChatEmbedField
-
-		if len(embed.Fields) > 0 {
-			convertedFields := make([]guildedChatEmbedField, len(embed.Fields))
-
-			for i, field := range embed.Fields {
-				convertedFields[i] = guildedChatEmbedField{
-					Inline: &field.Inline,
-					Name:   field.Name,
-					Value:  field.Value,
-				}
-			}
-
-			fields = &convertedFields
-		}
-
 		guildedEmbeds = append(guildedEmbeds, guildedChatEmbed{
 			Title:       embed.Title,
 			Description: embed.Description,
 			Color:       embed.Color,
-			Image:       image,
-			Thumbnail:   thumbnail,
-			Footer:      footer,
-			Author:      author,
-			Fields:      fields,
-			Timestamp:   timestamp,
+			Image:       getEmbedImage(&embed),
+			Thumbnail:   getEmbedThumbnail(&embed),
+			Footer:      getEmbedFooter(&embed),
+			Author:      getEmbedAuthor(&embed),
+			Fields:      getEmbedFields(&embed),
+			Timestamp:   embed.Timestamp,
 			URL:         embed.URL,
 		})
 	}
@@ -128,26 +74,111 @@ func getOutgoingEmbeds(message lightning.Message, incl bool, token string) []gui
 			Description: &attachmentStr,
 		})
 	}
+
 	if incl && len(message.RepliedTo) > 0 {
-		resp, err := guildedMakeRequest(token, "GET", "/channels/"+message.ChannelID+"/messages/"+message.RepliedTo[0], nil)
-
-		if err == nil {
-			var messageResp guildedChatMessageResponse
-
-			body, err := io.ReadAll(resp.Body)
-			if err == nil && json.Unmarshal(body, &messageResp) == nil {
-				author := getIncomingAuthor(token, &messageResp.Message)
-				title := "reply to " + author.Nickname
-				guildedEmbeds = append(guildedEmbeds, guildedChatEmbed{
-					Author: &guildedChatEmbedAuthor{
-						Name:    &title,
-						IconURL: author.ProfilePicture,
-					},
-					Description: messageResp.Message.Content,
-				})
-			}
-		}
+		guildedEmbeds = p.appendReplyEmbed(guildedEmbeds, message)
 	}
 
 	return guildedEmbeds
+}
+
+func getEmbedImage(embed *lightning.Embed) *guildedChatEmbedMedia {
+	if embed.Image != nil && embed.Image.URL != "" {
+		return &guildedChatEmbedMedia{
+			URL: &embed.Image.URL,
+		}
+	}
+
+	return nil
+}
+
+func getEmbedThumbnail(embed *lightning.Embed) *guildedChatEmbedMedia {
+	if embed.Thumbnail != nil && embed.Thumbnail.URL != "" {
+		return &guildedChatEmbedMedia{
+			URL: &embed.Thumbnail.URL,
+		}
+	}
+
+	return nil
+}
+
+func getEmbedFooter(embed *lightning.Embed) *guildedChatEmbedFooter {
+	if embed.Footer != nil {
+		footer := &guildedChatEmbedFooter{
+			Text: embed.Footer.Text,
+		}
+		if embed.Footer.IconURL != nil {
+			footer.IconURL = embed.Footer.IconURL
+		}
+
+		return footer
+	}
+
+	return nil
+}
+
+func getEmbedAuthor(embed *lightning.Embed) *guildedChatEmbedAuthor {
+	if embed.Author != nil {
+		author := &guildedChatEmbedAuthor{
+			Name: &embed.Author.Name,
+			URL:  embed.Author.URL,
+		}
+		if embed.Author.IconURL != nil {
+			author.IconURL = embed.Author.IconURL
+		}
+
+		return author
+	}
+
+	return nil
+}
+
+func getEmbedFields(embed *lightning.Embed) *[]guildedChatEmbedField {
+	if len(embed.Fields) > 0 {
+		convertedFields := make([]guildedChatEmbedField, len(embed.Fields))
+		for i, field := range embed.Fields {
+			convertedFields[i] = guildedChatEmbedField{
+				Inline: &field.Inline,
+				Name:   field.Name,
+				Value:  field.Value,
+			}
+		}
+
+		return &convertedFields
+	}
+
+	return nil
+}
+
+func (p *guildedPlugin) appendReplyEmbed(embeds []guildedChatEmbed, message lightning.Message) []guildedChatEmbed {
+	resp, err := guildedMakeRequest(p.token, "GET",
+		"/channels/"+message.ChannelID+"/messages/"+message.RepliedTo[0], nil)
+	if err != nil {
+		return embeds
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return embeds
+	}
+
+	if resp.Body.Close() != nil {
+		slog.Warn("guilded: failed to close request body when getting reply embed")
+	}
+
+	var messageResp guildedChatMessageResponse
+	if json.Unmarshal(body, &messageResp) != nil {
+		return embeds
+	}
+
+	author := p.getIncomingAuthor(&messageResp.Message)
+	title := "reply to " + author.Nickname
+
+	return append(embeds, guildedChatEmbed{
+		Author: &guildedChatEmbedAuthor{
+			Name:    &title,
+			IconURL: author.ProfilePicture,
+		},
+		Description: messageResp.Message.Content,
+	})
 }

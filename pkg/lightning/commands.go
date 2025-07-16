@@ -1,175 +1,92 @@
 package lightning
 
 import (
-	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
 
-var commandRegistry = make(map[string]Command)
+// AddCommand takes a [Command] and registers it with the built-in
+// text command handler and any platform-specific command systems.
+func (b *Bot) AddCommand(command Command) {
+	b.commands[command.Name] = command
 
-func RegisterCommand(command Command) {
-	commandRegistry[command.Name] = command
-
-	for _, plugin := range Plugins.plugins {
-		if err := plugin.SetupCommands(commandRegistry); err != nil {
-			LogError(err, "Failed to setup commands for plugin", map[string]any{"plugin": plugin.Name()}, nil)
+	for _, plugin := range b.plugins {
+		if err := plugin.SetupCommands(b.commands); err != nil {
+			err := LogError(err, "Failed to setup commands for plugin",
+				map[string]any{"plugin": plugin.Name()}, nil)
+			slog.Warn("lightning: commands for plugin might not be available", "err", err)
 		}
 	}
 }
 
-func GetCommand(name string) (Command, bool) {
-	command, exists := commandRegistry[name]
-	return command, exists
-}
-
-type CommandArgument struct {
-	Name        string
-	Description string
-	Required    bool
-}
-
-type CommandOptions struct {
-	BaseMessage
-	Arguments map[string]string
-	Prefix    string
-}
-
-type Command struct {
-	Name        string
-	Description string
-	Arguments   []CommandArgument
-	Subcommands []Command
-	Executor    func(options CommandOptions) (string, error)
-}
-
-type CommandEvent struct {
-	CommandOptions
-	Command    string
-	Subcommand *string
-	Options    *[]string
-	Reply      func(message string) error
-}
-
-func HelpCommand() Command {
-	return Command{
-		Name:        "help",
-		Description: "get help with the bot",
-		Arguments:   []CommandArgument{},
-		Subcommands: []Command{},
-		Executor: func(options CommandOptions) (string, error) {
-			return "hi! i'm lightning v0.8.0-alpha.12.\ncheck out [the docs](https://williamhorning.eu.org/lightning/) for help!", nil
-		},
-	}
-}
-
-func PingCommand() Command {
-	return Command{
-		Name:        "ping",
-		Description: "check if the bot is alive",
-		Arguments:   []CommandArgument{},
-		Subcommands: []Command{},
-		Executor: func(options CommandOptions) (string, error) {
-			return fmt.Sprintf("Pong! 🏓 %dms", (time.Since(options.Time)).Milliseconds()), nil
-		},
-	}
-}
-
-func SetupCommands(prefix string) {
-	RegisterCommand(HelpCommand())
-	RegisterCommand(PingCommand())
-
-	go func() {
-		for event := range Plugins.ListenCommands() {
-			handleCommandEvent(event)
+func handleMessageCommand(prefix string) func(bot *Bot, event *Message) {
+	return func(bot *Bot, event *Message) {
+		if !strings.HasPrefix(event.Content, prefix) {
+			return
 		}
-	}()
 
-	go func() {
-		for event := range Plugins.ListenMessages() {
-			handleMessageCommand(event, prefix)
+		content := strings.TrimPrefix(event.Content, prefix)
+
+		args := strings.Fields(content)
+		if len(args) == 0 {
+			args = []string{"help"}
 		}
-	}()
-}
 
-func handleMessageCommand(event Message, prefix string) {
-	if !strings.HasPrefix(event.Content, prefix) {
-		return
-	}
+		commandName := args[0]
+		options := args[1:]
 
-	content := strings.TrimPrefix(event.Content, prefix)
-	args := strings.Fields(content)
-	if len(args) == 0 {
-		args = []string{"help"}
-	}
-
-	commandName := args[0]
-	options := args[1:]
-
-	handleCommandEvent(CommandEvent{
-		CommandOptions: CommandOptions{
-			Arguments:   make(map[string]string),
-			BaseMessage: event.BaseMessage,
-			Prefix:      prefix,
-		},
-		Command: commandName,
-		Options: &options,
-		Reply: func(message string) error {
-			plugin, exists := Plugins.Get(event.Plugin)
-			if !exists {
-				return LogError(ErrPluginNotFound, "Plugin not found for command reply", map[string]any{
-					"plugin": event.Plugin,
-					"event":  event.EventID,
+		handleCommandEvent(bot, &CommandEvent{
+			CommandOptions: CommandOptions{
+				Arguments:   make(map[string]string),
+				BaseMessage: event.BaseMessage,
+				Prefix:      prefix,
+			},
+			Command: commandName,
+			Options: options,
+			Reply: func(message string) error {
+				_, err := bot.SendMessage(Message{
+					Content: message,
+					Author:  bot.author,
+					BaseMessage: BaseMessage{
+						ChannelID: event.ChannelID,
+						Time:      time.Now(),
+						Plugin:    event.Plugin,
+					},
 				}, nil)
-			}
 
-			msg := CreateMessage(message)
-			msg.ChannelID = event.ChannelID
-			_, err := plugin.SendMessage(msg, nil)
-			return err
-		},
-	})
+				return err
+			},
+		})
+	}
 }
 
-func handleCommandEvent(event CommandEvent) error {
-	command, exists := GetCommand(event.Command)
+func handleCommandEvent(bot *Bot, event *CommandEvent) {
+	event.Bot = bot
+
+	command, exists := bot.commands[event.Command]
 	if !exists {
-		command = HelpCommand()
+		command = bot.commands["help"]
 	}
 
-	if event.Options != nil && len(*event.Options) > 0 {
-		event.Subcommand = &(*event.Options)[0]
-		*event.Options = (*event.Options)[1:]
+	if len(event.Options) != 0 {
+		event.Subcommand = &(event.Options)[0]
+		event.Options = (event.Options)[1:]
 	}
 
 	for _, subcommand := range command.Subcommands {
 		if event.Subcommand != nil && subcommand.Name == *event.Subcommand {
 			command = subcommand
+
 			break
 		}
 	}
 
-	for _, arg := range command.Arguments {
-		if event.CommandOptions.Arguments[arg.Name] == "" && event.Options != nil && len(*event.Options) > 0 {
-			event.CommandOptions.Arguments[arg.Name] = (*event.Options)[0]
-			*event.Options = (*event.Options)[1:]
-		}
-
-		if arg.Required && event.CommandOptions.Arguments[arg.Name] == "" {
-			err := event.Reply("Please provide the " + arg.Name + " argument. Try using the `" + event.Prefix + "help` command.")
-			if err != nil {
-				return LogError(err, "Error sending missing argument response", map[string]any{
-					"argument": arg.Name,
-					"command":  command.Name,
-					"event":    event.EventID,
-				}, nil)
-			}
-			return nil
-		}
+	if !processCommandArguments(command, event) {
+		return
 	}
 
 	response, err := command.Executor(event.CommandOptions)
-
 	if err != nil {
 		response = LogError(err, "Error executing command", map[string]any{
 			"command": command.Name,
@@ -178,11 +95,40 @@ func handleCommandEvent(event CommandEvent) error {
 	}
 
 	if err = event.Reply(response); err != nil {
-		return LogError(err, "Error sending command response", map[string]any{
+		err := LogError(err, "Error sending command response", map[string]any{
 			"command": command.Name,
 			"event":   event.EventID,
 		}, nil)
+		slog.Warn("lightning: failed to respond to command", "err", err)
+	}
+}
+
+func processCommandArguments(command Command, event *CommandEvent) bool {
+	for _, arg := range command.Arguments {
+		if event.Arguments[arg.Name] != "" {
+			continue
+		}
+
+		if len(event.Options) > 0 {
+			event.Arguments[arg.Name] = (event.Options)[0]
+			event.Options = (event.Options)[1:]
+		}
+
+		if event.Arguments[arg.Name] != "" || !arg.Required {
+			continue
+		}
+
+		err := event.Reply(
+			"Please provide the " + arg.Name + " argument. Try using the `" + event.Prefix + "help` command.",
+		)
+		if err != nil {
+			err := LogError(err, "Error sending missing argument response",
+				map[string]any{"argument": arg.Name, "command": command.Name, "event": event.EventID}, nil)
+			slog.Warn("lightning: failed to respond to command", "err", err)
+		}
+
+		return false
 	}
 
-	return nil
+	return true
 }

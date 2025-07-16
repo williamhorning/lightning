@@ -3,43 +3,51 @@ package discord
 import (
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-var allowedTypes = []discordgo.MessageType{0, 7, 19, 20, 23}
-var webhookCache = cache.New[string, bool](30 * time.Second)
-
-func getLightningMessage(s *discordgo.Session, m *discordgo.Message) *lightning.Message {
-	if !slices.Contains(allowedTypes, m.Type) {
+func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightning.Message {
+	if !slices.Contains([]discordgo.MessageType{
+		discordgo.MessageTypeDefault,
+		discordgo.MessageTypeGuildMemberJoin,
+		discordgo.MessageTypeReply,
+		discordgo.MessageTypeChatInputCommand,
+		discordgo.MessageTypeContextMenuCommand,
+	}, message.Type) {
 		return nil
 	}
 
-	if exists, _ := webhookCache.Get(m.WebhookID); exists {
+	if exists, _ := p.webhookCache.Get(message.WebhookID); exists {
 		return nil
+	}
+
+	if message.Type == discordgo.MessageTypeGuildMemberJoin {
+		message.Content = "**joined on Discord**"
 	}
 
 	return &lightning.Message{
 		BaseMessage: lightning.BaseMessage{
-			EventID:   m.ID,
-			ChannelID: m.ChannelID,
+			EventID:   message.ID,
+			ChannelID: message.ChannelID,
 			Plugin:    "bolt-discord",
-			Time:      m.Timestamp,
+			Time:      message.Timestamp,
 		},
-		Attachments: getLightningAttachments(m.Attachments, m.StickerItems),
-		Author:      getLightningAuthor(s, m),
-		Content:     getLightningForward(s, m) + getLightningContent(s, m),
-		Embeds:      getLightningEmbeds(m.Embeds),
-		RepliedTo:   getLightningReplies(m),
+		Attachments: getLightningAttachments(message.Attachments, message.StickerItems),
+		Author:      getLightningAuthor(p.discord, message),
+		Content:     getLightningForward(p.discord, message) + getLightningContent(p.discord, message),
+		Embeds:      getLightningEmbeds(message.Embeds),
+		RepliedTo:   getLightningReplies(message),
 	}
 }
 
-func getLightningAttachments(attachments []*discordgo.MessageAttachment, stickers []*discordgo.StickerItem) []lightning.Attachment {
+func getLightningAttachments(
+	attachments []*discordgo.MessageAttachment,
+	stickers []*discordgo.StickerItem,
+) []lightning.Attachment {
 	if len(attachments) == 0 {
 		return nil
 	}
@@ -49,7 +57,7 @@ func getLightningAttachments(attachments []*discordgo.MessageAttachment, sticker
 		result = append(result, lightning.Attachment{
 			URL:  a.URL,
 			Name: a.Filename,
-			Size: float64(a.Size) / 1048576, // bytes -> MiB
+			Size: int64(a.Size),
 		})
 	}
 
@@ -75,35 +83,36 @@ func getLightningAttachments(attachments []*discordgo.MessageAttachment, sticker
 	return result
 }
 
-func getLightningAuthor(s *discordgo.Session, m *discordgo.Message) lightning.MessageAuthor {
-	profilePicture := m.Author.AvatarURL("")
+func getLightningAuthor(session *discordgo.Session, message *discordgo.Message) lightning.MessageAuthor {
+	profilePicture := message.Author.AvatarURL("")
 	author := lightning.MessageAuthor{
-		ID:             m.Author.ID,
-		Nickname:       m.Author.DisplayName(),
-		Username:       m.Author.Username,
+		ID:             message.Author.ID,
+		Nickname:       message.Author.DisplayName(),
+		Username:       message.Author.Username,
 		Color:          "#5865F2",
 		ProfilePicture: &profilePicture,
 	}
 
-	if m.GuildID == "" {
+	if message.GuildID == "" {
 		return author
 	}
 
-	if m.Member == nil {
-		if member, err := s.State.Member(m.GuildID, m.Author.ID); err == nil {
-			m.Member = member
-		} else {
+	if message.Member == nil {
+		member, err := session.State.Member(message.GuildID, message.Author.ID)
+		if err != nil {
 			return author
 		}
+
+		message.Member = member
 	}
 
-	if m.Member.GuildID == "" {
-		m.Member.GuildID = m.GuildID
+	if message.Member.GuildID == "" {
+		message.Member.GuildID = message.GuildID
 	}
 
-	m.Member.User = m.Author
-	author.Nickname = m.Member.DisplayName()
-	profilePicture = m.Member.AvatarURL("")
+	message.Member.User = message.Author
+	author.Nickname = message.Member.DisplayName()
+	profilePicture = message.Member.AvatarURL("")
 
 	return author
 }
@@ -115,39 +124,43 @@ var (
 	emojiMention   = regexp.MustCompile(`<a?:\w+:(\d+)>`)
 )
 
-func getLightningContent(s *discordgo.Session, m *discordgo.Message) string {
-	content := userMention.ReplaceAllStringFunc(m.Content, func(match string) string {
+func getLightningContent(session *discordgo.Session, message *discordgo.Message) string {
+	content := userMention.ReplaceAllStringFunc(message.Content, func(match string) string {
 		userID := userMention.FindStringSubmatch(match)[1]
 
-		if m.GuildID != "" {
-			if member, err := s.State.Member(m.GuildID, userID); err == nil {
+		if message.GuildID != "" {
+			if member, err := session.State.Member(message.GuildID, userID); err == nil {
 				return "@" + member.DisplayName()
 			}
 		}
 
-		if user, err := s.User(userID); err == nil {
+		if user, err := session.User(userID); err == nil {
 			return "@" + user.DisplayName()
 		}
+
 		return "@" + userID
 	})
 
 	content = channelMention.ReplaceAllStringFunc(content, func(match string) string {
 		channelID := channelMention.FindStringSubmatch(match)[1]
-		if channel, err := s.State.Channel(channelID); err == nil {
+		if channel, err := session.State.Channel(channelID); err == nil {
 			return "#" + channel.Name
 		}
+
 		return "#" + channelID
 	})
 
 	content = roleMention.ReplaceAllStringFunc(content, func(match string) string {
 		roleID := roleMention.FindStringSubmatch(match)[1]
-		if guild, err := s.State.Guild(m.GuildID); err == nil {
+
+		if guild, err := session.State.Guild(message.GuildID); err == nil {
 			for _, role := range guild.Roles {
 				if role.ID == roleID {
 					return "@" + role.Name
 				}
 			}
 		}
+
 		return "@&" + roleID
 	})
 
@@ -157,99 +170,122 @@ func getLightningContent(s *discordgo.Session, m *discordgo.Message) string {
 }
 
 func getLightningEmbeds(embeds []*discordgo.MessageEmbed) []lightning.Embed {
-	if len(embeds) == 0 {
-		return nil
-	}
-
 	result := make([]lightning.Embed, 0, len(embeds))
-	for _, e := range embeds {
-		embed := lightning.Embed{}
-
-		if e.Title != "" {
-			embed.Title = &e.Title
+	for _, embed := range embeds {
+		lightningEmbed := lightning.Embed{
+			Author:    getLightningEmbedAuthor(embed),
+			Fields:    getLightningEmbedFields(embed),
+			Footer:    getLightningFooter(embed),
+			Timestamp: getLightningEmbedTime(embed),
 		}
 
-		if e.Timestamp != "" {
-			if timestamp, err := strconv.ParseInt(e.Timestamp, 10, 64); err == nil {
-				embed.Timestamp = &timestamp
-			}
+		if embed.Title != "" {
+			lightningEmbed.Title = &embed.Title
 		}
 
-		if e.URL != "" {
-			embed.URL = &e.URL
+		if embed.URL != "" {
+			lightningEmbed.URL = &embed.URL
 		}
 
-		if e.Color != 0 {
-			embed.Color = &e.Color
+		if embed.Color != 0 {
+			lightningEmbed.Color = &embed.Color
 		}
 
-		if e.Description != "" {
-			embed.Description = &e.Description
+		if embed.Description != "" {
+			lightningEmbed.Description = &embed.Description
 		}
 
-		if e.Footer != nil {
-			footer := &lightning.EmbedFooter{Text: e.Footer.Text}
-			if e.Footer.IconURL != "" {
-				footer.IconURL = &e.Footer.IconURL
-			}
-			embed.Footer = footer
+		if embed.Image != nil && embed.Image.URL != "" {
+			lightningEmbed.Image = &lightning.Media{URL: embed.Image.URL}
 		}
 
-		if e.Image != nil && e.Image.URL != "" {
-			embed.Image = &lightning.Media{URL: e.Image.URL}
+		if embed.Thumbnail != nil && embed.Thumbnail.URL != "" {
+			lightningEmbed.Thumbnail = &lightning.Media{URL: embed.Thumbnail.URL}
 		}
 
-		if e.Thumbnail != nil && e.Thumbnail.URL != "" {
-			embed.Thumbnail = &lightning.Media{URL: e.Thumbnail.URL}
-		}
-
-		if e.Author != nil {
-			author := &lightning.EmbedAuthor{Name: e.Author.Name}
-			if e.Author.URL != "" {
-				author.URL = &e.Author.URL
-			}
-			if e.Author.IconURL != "" {
-				author.IconURL = &e.Author.IconURL
-			}
-			embed.Author = author
-		}
-
-		if len(e.Fields) > 0 {
-			fields := make([]lightning.EmbedField, len(e.Fields))
-			for i, field := range e.Fields {
-				fields[i] = lightning.EmbedField{
-					Name:   field.Name,
-					Value:  field.Value,
-					Inline: field.Inline,
-				}
-			}
-			embed.Fields = fields
-		}
-
-		result = append(result, embed)
+		result = append(result, lightningEmbed)
 	}
 
 	return result
 }
 
-func getLightningReplies(m *discordgo.Message) []string {
-	if m.MessageReference == nil || m.MessageReference.MessageID == "" ||
-		m.MessageReference.Type != discordgo.MessageReferenceTypeDefault {
-		return []string{}
+func getLightningFooter(embed *discordgo.MessageEmbed) *lightning.EmbedFooter {
+	if embed.Footer != nil {
+		footer := &lightning.EmbedFooter{Text: embed.Footer.Text}
+		if embed.Footer.IconURL != "" {
+			footer.IconURL = &embed.Footer.IconURL
+		}
+
+		return footer
 	}
-	return []string{m.MessageReference.MessageID}
+
+	return nil
 }
 
-func getLightningForward(s *discordgo.Session, m *discordgo.Message) string {
-	if m.MessageReference == nil || m.MessageReference.MessageID == "" ||
-		m.MessageReference.Type != discordgo.MessageReferenceTypeForward || m.MessageSnapshots == nil || len(m.MessageSnapshots) == 0 {
+func getLightningEmbedAuthor(embed *discordgo.MessageEmbed) *lightning.EmbedAuthor {
+	if embed.Author != nil {
+		author := &lightning.EmbedAuthor{Name: embed.Author.Name}
+		if embed.Author.URL != "" {
+			author.URL = &embed.Author.URL
+		}
+
+		if embed.Author.IconURL != "" {
+			author.IconURL = &embed.Author.IconURL
+		}
+
+		return author
+	}
+
+	return nil
+}
+
+func getLightningEmbedFields(embed *discordgo.MessageEmbed) []lightning.EmbedField {
+	if len(embed.Fields) > 0 {
+		fields := make([]lightning.EmbedField, len(embed.Fields))
+		for i, field := range embed.Fields {
+			fields[i] = lightning.EmbedField{
+				Name:   field.Name,
+				Value:  field.Value,
+				Inline: field.Inline,
+			}
+		}
+
+		return fields
+	}
+
+	return nil
+}
+
+func getLightningEmbedTime(embed *discordgo.MessageEmbed) *time.Time {
+	if embed.Timestamp != "" {
+		if t, err := time.Parse(time.RFC3339, embed.Timestamp); err == nil {
+			return &t
+		}
+	}
+
+	return nil
+}
+
+func getLightningReplies(message *discordgo.Message) []string {
+	if message.MessageReference == nil || message.MessageReference.MessageID == "" ||
+		message.MessageReference.Type != discordgo.MessageReferenceTypeDefault {
+		return []string{}
+	}
+
+	return []string{message.MessageReference.MessageID}
+}
+
+func getLightningForward(session *discordgo.Session, message *discordgo.Message) string {
+	if message.MessageReference == nil || message.MessageReference.MessageID == "" ||
+		message.MessageReference.Type != discordgo.MessageReferenceTypeForward ||
+		message.MessageSnapshots == nil || len(message.MessageSnapshots) == 0 {
 		return ""
 	}
 
 	snapshot := ""
 
-	for _, snap := range m.MessageSnapshots {
-		snapshot += "> *Forwarded:*\n> " + strings.ReplaceAll(getLightningContent(s, snap.Message), "\n", "\n> ")
+	for _, snap := range message.MessageSnapshots {
+		snapshot += "> *Forwarded:*\n> " + strings.ReplaceAll(getLightningContent(session, snap.Message), "\n", "\n> ")
 	}
 
 	return snapshot

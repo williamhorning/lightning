@@ -1,36 +1,52 @@
 package bridge
 
-import "github.com/williamhorning/lightning/pkg/lightning"
+import (
+	"fmt"
+	"log/slog"
+	"time"
 
-var bridgeLog = lightning.Log.WithPrefix("bridge")
+	"github.com/williamhorning/lightning/pkg/lightning"
+)
 
-func Setup(db Database) {
-	bridgeLog.Info("Setting up bridge system")
-	lightning.RegisterCommand(bridgeCommand(db))
+// Setup the bridge system with the given database.
+func Setup(bot *lightning.Bot, database Database) {
+	slog.Info("bridge: setting up")
 
-	go func() {
-		for event := range lightning.Plugins.ListenMessages() {
-			if err := handleBridgeMessage(db, "create_message", event); err != nil {
-				bridgeLog.Error("Failed to handle bridge message creation", "error", err, "event", event.EventID)
-			}
+	bot.AddCommand(lightning.Command{
+		Name:        "help",
+		Description: "get help with the bot",
+		Executor: func(_ lightning.CommandOptions) (string, error) {
+			return "hi, i'm lightning v0.8.0-alpha.12! [docs](https://williamhorning.eu.org/lightning/)!", nil
+		},
+	})
+
+	bot.AddCommand(lightning.Command{
+		Name:        "ping",
+		Description: "check if the bot is alive",
+		Executor: func(options lightning.CommandOptions) (string, error) {
+			return fmt.Sprintf("Pong! 🏓 %dms", (time.Since(options.Time)).Milliseconds()), nil
+		},
+	})
+
+	bot.AddCommand(bridgeCommand(database))
+
+	bot.AddHandler(func(_ *lightning.Bot, event *lightning.Message) {
+		if err := handleBridgeMessage(bot, database, "create", *event); err != nil {
+			slog.Error("bridge: message creation failed", "error", err, "event", event.EventID)
 		}
-	}()
+	})
 
-	go func() {
-		for event := range lightning.Plugins.ListenEdits() {
-			if err := handleBridgeMessage(db, "edit_message", event); err != nil {
-				bridgeLog.Error("Failed to handle bridge message edit", "error", err, "event", event.EventID)
-			}
+	bot.AddHandler(func(_ *lightning.Bot, event *lightning.EditedMessage) {
+		if err := handleBridgeMessage(bot, database, "edit", *event); err != nil {
+			slog.Error("bridge: message editing failed", "error", err, "event", event.Message.EventID)
 		}
-	}()
+	})
 
-	go func() {
-		for event := range lightning.Plugins.ListenDeletes() {
-			if err := handleBridgeMessage(db, "delete_message", event); err != nil {
-				bridgeLog.Error("Failed to handle bridge message deletion", "error", err, "event", event.EventID)
-			}
+	bot.AddHandler(func(_ *lightning.Bot, event *lightning.DeletedMessage) {
+		if err := handleBridgeMessage(bot, database, "delete", *event); err != nil {
+			slog.Error("bridge: message deletion failed", "error", err, "event", event.EventID)
 		}
-	}()
+	})
 
-	bridgeLog.Info("Bridge system setup!")
+	slog.Info("bridge: set up!")
 }

@@ -1,32 +1,81 @@
+// Package main is the entrypoint for Lightning, the bridge bot thing.
 package main
 
-import "github.com/spf13/cobra"
+import (
+	"cmp"
+	"flag"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/lmittmann/tint"
+	"github.com/williamhorning/lightning/internal/bridge"
+	"github.com/williamhorning/lightning/pkg/lightning"
+	"github.com/williamhorning/lightning/pkg/platforms/discord"
+	"github.com/williamhorning/lightning/pkg/platforms/guilded"
+	"github.com/williamhorning/lightning/pkg/platforms/revolt"
+	"github.com/williamhorning/lightning/pkg/platforms/telegram"
+)
 
 func main() {
-	cmd := (&cobra.Command{
-		Use:     "lightning",
-		Short:   "extensible chatbot connecting communities",
-		Long:    "Lightning is an extensible chatbot that connects communities.\nDocs available at https://williamhorning.eu.org",
-		Version: "0.8.0-alpha.12",
-		Example: "  lightning run lightning.toml",
+	config := flag.String("config", "lightning.toml", "path to the configuration file")
+	flag.Parse()
+
+	slog.SetDefault(slog.New(
+		tint.NewHandler(os.Stderr, &tint.Options{
+			Level:      slog.LevelDebug,
+			TimeFormat: time.Kitchen,
+		}),
+	))
+
+	cfg, ok := bridge.GetConfig(*config)
+	if !ok {
+		os.Exit(1)
+	}
+
+	profileURL := "https://williamhorning.eu.org/assets/lightning/logo_color.svg"
+
+	bot := lightning.NewBot(lightning.BotOptions{
+		Author: lightning.MessageAuthor{
+			Username:       "lightning",
+			Nickname:       "lightning",
+			ID:             "lightning",
+			ProfilePicture: &profileURL,
+			Color:          "#487C7E",
+		},
+		Prefix: cfg.CommandPrefix,
 	})
 
-	cmd.AddCommand(&cobra.Command{
-		Use:     "migrate",
-		Short:   "migrate databases",
-		Long:    "Migrate from one database to another, or from one version to another",
-		Example: "  lightning migrate",
-		Run:     migrate,
-	})
+	if err := cmp.Or(
+		bot.AddPluginType("discord", discord.New),
+		bot.AddPluginType("guilded", guilded.New),
+		bot.AddPluginType("revolt", revolt.New),
+		bot.AddPluginType("telegram", telegram.New),
+	); err != nil {
+		slog.Error("failed to setup platform plugins", "err", err)
+		os.Exit(1)
+	}
 
-	cmd.AddCommand(&cobra.Command{
-		Use:     "run",
-		Short:   "run a lightning instance",
-		Long:    "Run a lightning instance with the specified configuration file",
-		Args:    cobra.RangeArgs(0, 1),
-		Example: "  lightning run lightning.toml",
-		Run:     run,
-	})
+	database, err := cfg.DatabaseConfig.GetDatabase()
+	if err != nil {
+		slog.Error("failed to setup database", "err", err)
+		os.Exit(1)
+	}
 
-	cmd.Execute()
+	bridge.Setup(bot, database)
+
+	for plugin, cfg := range cfg.Plugins {
+		if err := bot.UsePluginType(plugin, cfg); err != nil {
+			slog.Error("failed to setup a plugin", "err", err)
+			os.Exit(1)
+		}
+	}
+
+	quitChannel := make(chan os.Signal, 1)
+	signal.Notify(quitChannel, os.Interrupt, syscall.SIGTERM)
+	<-quitChannel
+
+	slog.Error("bot stopped", "err", lightning.LogError(nil, "bot stopped", nil, nil))
 }

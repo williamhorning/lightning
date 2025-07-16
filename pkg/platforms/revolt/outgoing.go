@@ -3,42 +3,55 @@ package revolt
 import (
 	"context"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/sentinelb51/revoltgo"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func toEdit(message revoltgo.MessageSend) revoltgo.MessageEditData {
-	return revoltgo.MessageEditData{
-		Content: message.Content,
-		Embeds:  message.Embeds,
-	}
-}
-
-func getOutgoingMessage(s *revoltgo.Session, message lightning.Message, skipFiles bool, useMasquerade bool) revoltgo.MessageSend {
+func getOutgoing(
+	token string,
+	message lightning.Message,
+	skipFiles,
+	useMasquerade,
+	allowEveryone bool,
+) revoltMessageSend {
 	content := message.Content
 
 	if content == "" && len(message.Embeds) == 0 && len(message.Attachments) == 0 {
 		content = "*empty message*"
-	} else if len([]rune(content)) > 2000 {
+	}
+
+	if !allowEveryone {
+		content = strings.ReplaceAll(content, "@everyone", "@\u2800everyone")
+		content = strings.ReplaceAll(content, "@online", "@\u2800online")
+	}
+
+	if len([]rune(content)) > 2000 {
 		content = string([]rune(content)[:1997]) + "..."
 	}
 
-	return revoltgo.MessageSend{
-		Attachments:  getOutgoingAttachments(s, message.Attachments, skipFiles),
-		Content:      content,
-		Embeds:       getOutgoingEmbeds(message.Embeds),
-		Replies:      getOutgoingReplies(message.RepliedTo),
-		Masquerade:   getOutgoingMasquerade(message.Author, useMasquerade),
-		Interactions: nil,
+	msg := revoltMessageSend{
+		Content: content,
+		Embeds:  getOutgoingEmbeds(message.Embeds),
+		Replies: getOutgoingReplies(message.RepliedTo),
 	}
+
+	if !skipFiles {
+		msg.Attachments = getOutgoingAttachments(token, message.Attachments)
+	}
+
+	if useMasquerade {
+		msg.Masquerade = getOutgoingMasquerade(message.Author)
+	}
+
+	return msg
 }
 
-func getOutgoingAttachments(s *revoltgo.Session, attachments []lightning.Attachment, skip bool) []string {
-	if skip || len(attachments) == 0 {
+func getOutgoingAttachments(token string, attachments []lightning.Attachment) []string {
+	if len(attachments) == 0 {
 		return nil
 	}
 
@@ -46,119 +59,120 @@ func getOutgoingAttachments(s *revoltgo.Session, attachments []lightning.Attachm
 
 	for _, attachment := range attachments {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		req, err := http.NewRequestWithContext(ctx, "GET", attachment.URL, nil)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, attachment.URL, nil)
 		if err != nil {
 			cancel()
+
 			continue
 		}
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			cancel()
+
 			continue
 		}
 
-		file, err := s.AttachmentUpload(&revoltgo.File{
-			Name:   attachment.Name,
-			Reader: &cancelableReadCloser{resp.Body, cancel},
-		})
+		file, err := uploadFile(token, "attachments", attachment.Name, resp.Body)
+		if err == nil {
+			attachmentIDs = append(attachmentIDs, file)
+		}
 
+		err = resp.Body.Close()
 		if err != nil {
-			cancel()
-			continue
+			slog.Warn("revolt: failed to close body", "err", err)
 		}
 
-		attachmentIDs = append(attachmentIDs, file.ID)
+		cancel()
 	}
 
 	return attachmentIDs
 }
 
-type cancelableReadCloser struct {
-	io.ReadCloser
-	cancel context.CancelFunc
-}
-
-func (c *cancelableReadCloser) Close() error {
-	err := c.ReadCloser.Close()
-	c.cancel()
-	return err
-}
-
-func getOutgoingEmbeds(embeds []lightning.Embed) []*revoltgo.MessageEmbed {
-	if len(embeds) == 0 {
-		return nil
-	}
-
-	result := make([]*revoltgo.MessageEmbed, 0, len(embeds))
+func getOutgoingEmbeds(embeds []lightning.Embed) []*revoltMessageEmbed {
+	result := make([]*revoltMessageEmbed, 0, len(embeds))
 
 	for _, embed := range embeds {
-		revoltEmbed := &revoltgo.MessageEmbed{}
-
-		if embed.Title != nil {
-			revoltEmbed.Title = *embed.Title
-		}
-
-		description := ""
-		if embed.Description != nil {
-			description = *embed.Description
-		}
-
-		if len(embed.Fields) > 0 {
-			for _, field := range embed.Fields {
-				if description != "" {
-					description += "\n\n"
-				}
-				description += fmt.Sprintf("**%s**\n%s", field.Name, field.Value)
-			}
-		}
-
-		if description != "" {
-			revoltEmbed.Description = description
-		}
-
-		if embed.URL != nil {
-			revoltEmbed.URL = *embed.URL
-		}
-
-		if embed.Color != nil {
-			revoltEmbed.Colour = fmt.Sprintf("#%06x", *embed.Color)
-		}
-
-		if embed.Image != nil {
-			revoltEmbed.Image = &revoltgo.MessageEmbedImage{
-				URL:    embed.Image.URL,
-				Width:  embed.Image.Width,
-				Height: embed.Image.Height,
-			}
-		}
-
-		if embed.Video != nil {
-			revoltEmbed.Video = &revoltgo.MessageEmbedVideo{
-				URL:    embed.Video.URL,
-				Width:  embed.Video.Width,
-				Height: embed.Video.Height,
-			}
-		}
-
-		if embed.Thumbnail != nil && len([]rune(embed.Thumbnail.URL)) > 0 && len([]rune(embed.Thumbnail.URL)) <= 128 {
-			revoltEmbed.IconURL = embed.Thumbnail.URL
-		}
-
-		result = append(result, revoltEmbed)
+		result = append(result, convertOutgoingEmbed(embed))
 	}
 
 	return result
 }
 
-func getOutgoingReplies(replyIDs []string) []*revoltgo.MessageReplies {
+func convertOutgoingEmbed(embed lightning.Embed) *revoltMessageEmbed {
+	revoltEmbed := &revoltMessageEmbed{
+		Description: getEmbedDescription(embed),
+	}
+
+	if embed.Title != nil {
+		revoltEmbed.Title = *embed.Title
+	}
+
+	if embed.URL != nil {
+		revoltEmbed.URL = *embed.URL
+	}
+
+	if embed.Color != nil {
+		revoltEmbed.Color = fmt.Sprintf("#%06x", *embed.Color)
+	}
+
+	setEmbedMedia(revoltEmbed, embed)
+
+	return revoltEmbed
+}
+
+func getEmbedDescription(embed lightning.Embed) string {
+	description := ""
+	if embed.Description != nil {
+		description = *embed.Description
+	}
+
+	if len(embed.Fields) == 0 {
+		return description
+	}
+
+	for _, field := range embed.Fields {
+		if description != "" {
+			description += "\n\n"
+		}
+
+		description += "**" + field.Name + "**\n" + field.Value
+	}
+
+	return description
+}
+
+func setEmbedMedia(revoltEmbed *revoltMessageEmbed, embed lightning.Embed) {
+	if embed.Image != nil {
+		revoltEmbed.Image = &revoltMessageEmbedImage{
+			URL:    embed.Image.URL,
+			Width:  embed.Image.Width,
+			Height: embed.Image.Height,
+		}
+	}
+
+	if embed.Video != nil {
+		revoltEmbed.Video = &revoltMessageEmbedVideo{
+			URL:    embed.Video.URL,
+			Width:  embed.Video.Width,
+			Height: embed.Video.Height,
+		}
+	}
+
+	if embed.Thumbnail != nil && len([]rune(embed.Thumbnail.URL)) > 0 && len([]rune(embed.Thumbnail.URL)) <= 128 {
+		revoltEmbed.IconURL = embed.Thumbnail.URL
+	}
+}
+
+func getOutgoingReplies(replyIDs []string) []*revoltMessageReplies {
 	if len(replyIDs) == 0 {
 		return nil
 	}
 
-	replies := make([]*revoltgo.MessageReplies, len(replyIDs))
+	replies := make([]*revoltMessageReplies, len(replyIDs))
 	for i, id := range replyIDs {
-		replies[i] = &revoltgo.MessageReplies{
+		replies[i] = &revoltMessageReplies{
 			ID:      id,
 			Mention: false,
 		}
@@ -167,29 +181,24 @@ func getOutgoingReplies(replyIDs []string) []*revoltgo.MessageReplies {
 	return replies
 }
 
-func getOutgoingMasquerade(author lightning.MessageAuthor, useMasquerade bool) *revoltgo.MessageMasquerade {
-	if !useMasquerade {
-		return nil
-	}
-
+func getOutgoingMasquerade(author lightning.MessageAuthor) *revoltMessageMasquerade {
 	avatar := ""
-	if author.ProfilePicture != nil && len([]rune(*author.ProfilePicture)) > 1 && len([]rune(*author.ProfilePicture)) <= 256 {
+	if author.ProfilePicture != nil && len([]rune(*author.ProfilePicture)) > 1 &&
+		len([]rune(*author.ProfilePicture)) <= 256 {
 		avatar = *author.ProfilePicture
 	}
 
-	return &revoltgo.MessageMasquerade{
-		Colour: author.Color,
-		Name:   getMasqueradeUsername(author.Nickname),
+	return &revoltMessageMasquerade{
+		Color: author.Color,
+		Name: func() string {
+			runes := []rune(author.Nickname)
+
+			if len(runes) > 32 {
+				return string(runes[:32])
+			}
+
+			return author.Nickname
+		}(),
 		Avatar: avatar,
 	}
-}
-
-func getMasqueradeUsername(name string) string {
-	runes := []rune(name)
-
-	if len(runes) > 32 {
-		return string(runes[:32])
-	}
-
-	return name
 }

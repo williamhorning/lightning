@@ -2,9 +2,11 @@ package guilded
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"path"
 	"regexp"
@@ -12,20 +14,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-const assetCacheTTL = 24 * time.Hour
-const defaultCacheTTL = 30 * time.Second
+const (
+	assetCacheTTL   = 24 * time.Hour
+	defaultCacheTTL = 30 * time.Second
+)
 
-var attachmentRegex = regexp.MustCompile(`!\[.*?\]\(https:\/\/cdn\.gldcdn\.com\/ContentMedia(GenericFiles)?\/.*\)`)
-var emojiRegex = regexp.MustCompile(`<(:\w+:)\d+>`)
-
-var assetsCache = cache.New[string, lightning.Attachment](assetCacheTTL)
-var membersCache = cache.New[string, guildedServerMember](defaultCacheTTL)
-var webhooksCache = cache.New[string, guildedWebhook](defaultCacheTTL)
-var webhookIDsCache = cache.New[string, bool](defaultCacheTTL)
+var (
+	attachmentRegex = regexp.MustCompile(`!\[.*?\]\(https:\/\/cdn\.gldcdn\.com\/ContentMedia(GenericFiles)?\/.*\)`)
+	emojiRegex      = regexp.MustCompile(`<(:\w+:)\d+>`)
+)
 
 func extractURLFromMarkdown(markdown string) string {
 	startIDx := strings.LastIndex(markdown, "(")
@@ -34,11 +34,12 @@ func extractURLFromMarkdown(markdown string) string {
 	if startIDx != -1 && endIDx != -1 && startIDx < endIDx {
 		return markdown[startIDx+1 : endIDx]
 	}
+
 	return ""
 }
 
-func getIncomingAttachments(token string, markdownURLs []string) []lightning.Attachment {
-	var attachments []lightning.Attachment
+func (p *guildedPlugin) getIncomingAttachments(markdownURLs []string) []lightning.Attachment {
+	attachments := make([]lightning.Attachment, 0)
 
 	for _, markdownURL := range markdownURLs {
 		url := extractURLFromMarkdown(markdownURL)
@@ -46,37 +47,15 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 			continue
 		}
 
-		if cached, exists := assetsCache.Get(url); exists {
+		if cached, exists := p.assetsCache.Get(url); exists {
 			attachments = append(attachments, cached)
+
 			continue
 		}
 
-		requestBody := map[string][]string{
-			"urls": {url},
-		}
-		jsonBody, err := json.Marshal(requestBody)
-		if err != nil {
-			continue
-		}
+		signatureResp := getSignature(url, p.token)
 
-		var bodyReader io.Reader = bytes.NewReader(jsonBody)
-		resp, err := guildedMakeRequest(token, http.MethodPost, "/url-signatures", &bodyReader)
-		if err != nil {
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			continue
-		}
-
-		var signatureResp guildedURLSignatureResponse
-		if err := json.Unmarshal(body, &signatureResp); err != nil {
-			continue
-		}
-
-		if len(signatureResp.URLSignatures) == 0 {
+		if signatureResp == nil || len(signatureResp.URLSignatures) == 0 {
 			continue
 		}
 
@@ -85,57 +64,100 @@ func getIncomingAttachments(token string, markdownURLs []string) []lightning.Att
 			continue
 		}
 
-		filename := path.Base(*signed.Signature)
-		if idx := strings.Index(filename, "?"); idx > 0 {
-			filename = filename[:idx]
-		}
-		if filename == "" {
-			filename = "unknown"
-		}
-
-		headResp, err := http.Head(*signed.Signature)
-		if err != nil {
-			continue
-		}
-
-		contentLength := headResp.Header.Get("Content-Length")
-		size := 0.0
-		if contentLength != "" {
-			if sizeBytes, err := strconv.ParseInt(contentLength, 10, 64); err == nil {
-				size = float64(sizeBytes) / 1048576
-			}
-		}
-		headResp.Body.Close()
-
 		attachment := lightning.Attachment{
-			Name: filename,
+			Name: getFilename(*signed.Signature),
 			URL:  *signed.Signature,
-			Size: size,
+			Size: getContentLength(*signed.Signature),
 		}
 
-		assetsCache.Set(url, attachment)
-
+		p.assetsCache.Set(url, attachment)
 		attachments = append(attachments, attachment)
 	}
 
 	return attachments
 }
 
-func getIncomingMessage(token string, msg *guildedChatMessage) *lightning.Message {
+func getFilename(url string) string {
+	filename := path.Base(url)
+	if idx := strings.Index(filename, "?"); idx > 0 {
+		filename = filename[:idx]
+	}
+
+	if filename == "" {
+		filename = "unknown"
+	}
+
+	return filename
+}
+
+func getContentLength(url string) int64 {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodHead, url, nil)
+	if err != nil {
+		return 0.0
+	}
+
+	headResp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0.0
+	}
+
+	contentLength := headResp.Header.Get("Content-Length")
+	size := int64(0)
+
+	if contentLength != "" {
+		var sizeBytes int64
+		if sizeBytes, err = strconv.ParseInt(contentLength, 10, 64); err == nil {
+			size = sizeBytes
+		}
+	}
+
+	if err = headResp.Body.Close(); err != nil {
+		slog.Warn("guilded: failed to close request body when getting content length")
+	}
+
+	return size
+}
+
+func getSignature(url, token string) *guildedURLSignatureResponse {
+	jsonBody, err := json.Marshal(map[string][]string{"urls": {url}})
+	if err != nil {
+		return nil
+	}
+
+	var reader io.Reader = bytes.NewReader(jsonBody)
+
+	resp, err := guildedMakeRequest(token, http.MethodPost, "/url-signatures", reader)
+	if err != nil {
+		return nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	err = resp.Body.Close()
+	if err != nil {
+		slog.Warn("guilded: failed to close request body when getting signature")
+	}
+
+	var signatureResp guildedURLSignatureResponse
+	if err := json.Unmarshal(body, &signatureResp); err != nil {
+		return nil
+	}
+
+	return &signatureResp
+}
+
+func (p *guildedPlugin) getIncomingMessage(msg *guildedChatMessage) *lightning.Message {
 	if msg.ServerID == nil {
 		return nil
 	}
 
 	if msg.CreatedByWebhookID != nil {
-		if exists, _ := webhookIDsCache.Get(*msg.CreatedByWebhookID); exists {
+		if exists, _ := p.webhookIDsCache.Get(*msg.CreatedByWebhookID); exists {
 			return nil
 		}
-	}
-
-	timestamp := msg.CreatedAt
-
-	if msg.UpdatedAt != nil {
-		timestamp = *msg.UpdatedAt
 	}
 
 	content := ""
@@ -159,17 +181,17 @@ func getIncomingMessage(token string, msg *guildedChatMessage) *lightning.Messag
 			EventID:   msg.ID,
 			ChannelID: msg.ChannelID,
 			Plugin:    "bolt-guilded",
-			Time:      timestamp,
+			Time:      msg.CreatedAt,
 		},
-		Attachments: getIncomingAttachments(token, urls),
-		Author:      getIncomingAuthor(token, msg),
+		Attachments: p.getIncomingAttachments(urls),
+		Author:      p.getIncomingAuthor(msg),
 		Content:     content,
 		Embeds:      getIncomingEmbeds(msg.Embeds),
 		RepliedTo:   repliedTo,
 	}
 }
 
-func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageAuthor {
+func (p *guildedPlugin) getIncomingAuthor(msg *guildedChatMessage) lightning.MessageAuthor {
 	defaultAuthor := lightning.MessageAuthor{
 		Nickname: "Guilded User",
 		Username: "GuildedUser",
@@ -180,99 +202,149 @@ func getIncomingAuthor(token string, msg *guildedChatMessage) lightning.MessageA
 		defaultAuthor.ID = msg.CreatedBy
 	}
 
-	try := func() (lightning.MessageAuthor, error) {
-		if msg.CreatedByWebhookID == nil {
-			key := *msg.ServerID + "/" + msg.CreatedBy
-
-			if cached, exists := membersCache.Get(key); exists {
-				return lightning.MessageAuthor{
-					Nickname:       getNickname(cached),
-					Username:       cached.User.Name,
-					ID:             msg.CreatedBy,
-					ProfilePicture: cached.User.Avatar,
-				}, nil
-			}
-
-			endpoint := fmt.Sprintf("/servers/%s/members/%s", *msg.ServerID, msg.CreatedBy)
-			resp, err := guildedMakeRequest(token, http.MethodGet, endpoint, nil)
-			if err != nil {
-				return lightning.MessageAuthor{}, err
-			}
-			defer resp.Body.Close()
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return lightning.MessageAuthor{}, err
-			}
-
-			var memberResp guildedServerMemberResponse
-			if err := json.Unmarshal(body, &memberResp); err != nil {
-				return lightning.MessageAuthor{}, err
-			}
-
-			membersCache.Set(key, memberResp.Member)
-
-			author := memberResp.Member
-			return lightning.MessageAuthor{
-				Nickname:       getNickname(author),
-				Username:       author.User.Name,
-				ID:             msg.CreatedBy,
-				ProfilePicture: author.User.Avatar,
-			}, nil
-
-		} else {
-			key := *msg.ServerID + "/" + *msg.CreatedByWebhookID
-
-			if cached, exists := webhooksCache.Get(key); exists {
-				return lightning.MessageAuthor{
-					Nickname:       cached.Name,
-					Username:       cached.Name,
-					ID:             cached.ID,
-					ProfilePicture: cached.Avatar,
-				}, nil
-			}
-
-			endpoint := fmt.Sprintf("/servers/%s/webhooks/%s", *msg.ServerID, *msg.CreatedByWebhookID)
-			resp, err := guildedMakeRequest(token, http.MethodGet, endpoint, nil)
-			if err != nil {
-				return lightning.MessageAuthor{}, err
-			}
-			defer resp.Body.Close()
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return lightning.MessageAuthor{}, err
-			}
-
-			var webhookResp guildedWebhookResponse
-			if err := json.Unmarshal(body, &webhookResp); err != nil {
-				return lightning.MessageAuthor{}, err
-			}
-
-			webhooksCache.Set(key, webhookResp.Webhook)
-
-			webhook := webhookResp.Webhook
-			return lightning.MessageAuthor{
-				Nickname:       webhook.Name,
-				Username:       webhook.Name,
-				ID:             webhook.ID,
-				ProfilePicture: webhook.Avatar,
-			}, nil
-		}
-	}
-
-	author, err := try()
+	author, err := p.getAuthor(msg)
 	if err != nil {
 		return defaultAuthor
 	}
+
 	return author
 }
 
-func getNickname(member guildedServerMember) string {
-	if member.Nickname != nil {
-		return *member.Nickname
+func (p *guildedPlugin) getAuthor(msg *guildedChatMessage) (lightning.MessageAuthor, error) {
+	if msg.CreatedByWebhookID == nil {
+		return p.getMemberAuthor(msg)
 	}
-	return member.User.Name
+
+	return p.getWebhookAuthor(msg)
+}
+
+func (p *guildedPlugin) getMemberAuthor(msg *guildedChatMessage) (lightning.MessageAuthor, error) {
+	key := *msg.ServerID + "/" + msg.CreatedBy
+
+	if cached, exists := p.membersCache.Get(key); exists {
+		return cached.toAuthor(), nil
+	}
+
+	endpoint := "/servers/" + *msg.ServerID + "/members/" + msg.CreatedBy
+
+	resp, err := guildedMakeRequest(p.token, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return lightning.MessageAuthor{}, err
+	}
+
+	var memberResp guildedServerMemberResponse
+	if err := parseResponse(resp, &memberResp); err != nil {
+		return lightning.MessageAuthor{}, err
+	}
+
+	p.membersCache.Set(key, memberResp.Member)
+
+	return memberResp.Member.toAuthor(), nil
+}
+
+func (p *guildedPlugin) getWebhookAuthor(msg *guildedChatMessage) (lightning.MessageAuthor, error) {
+	key := *msg.ServerID + "/" + *msg.CreatedByWebhookID
+
+	if cached, exists := p.webhooksCache.Get(key); exists {
+		return cached.toAuthor(), nil
+	}
+
+	endpoint := fmt.Sprintf("/servers/%s/webhooks/%s", *msg.ServerID, *msg.CreatedByWebhookID)
+
+	resp, err := guildedMakeRequest(p.token, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return lightning.MessageAuthor{}, err
+	}
+
+	var webhookResp guildedWebhookResponse
+	if err := parseResponse(resp, &webhookResp); err != nil {
+		return lightning.MessageAuthor{}, err
+	}
+
+	p.webhooksCache.Set(key, webhookResp.Webhook)
+
+	return webhookResp.Webhook.toAuthor(), nil
+}
+
+func parseResponse(resp *http.Response, result any) error {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return lightning.LogError(err, "guilded failed to read response body", nil, nil)
+	}
+
+	if resp.Body.Close() != nil {
+		slog.Warn("guilded: failed to close request body")
+	}
+
+	if err := json.Unmarshal(body, result); err != nil {
+		return lightning.LogError(err, "guilded failed to unmarshal request body", nil, nil)
+	}
+
+	return nil
+}
+
+func processEmbedAuthor(author *guildedChatEmbedAuthor) *lightning.EmbedAuthor {
+	if author == nil {
+		return nil
+	}
+
+	result := &lightning.EmbedAuthor{
+		Name: "",
+		URL:  author.URL,
+	}
+
+	if author.Name != nil {
+		result.Name = *author.Name
+	}
+
+	if author.IconURL != nil {
+		result.IconURL = author.IconURL
+	}
+
+	return result
+}
+
+func processEmbedFooter(footer *guildedChatEmbedFooter) *lightning.EmbedFooter {
+	if footer == nil {
+		return nil
+	}
+
+	result := &lightning.EmbedFooter{
+		Text: footer.Text,
+	}
+
+	if footer.IconURL != nil {
+		result.IconURL = footer.IconURL
+	}
+
+	return result
+}
+
+func processEmbedMedia(media *guildedChatEmbedMedia) *lightning.Media {
+	if media == nil || media.URL == nil {
+		return nil
+	}
+
+	return &lightning.Media{
+		URL: *media.URL,
+	}
+}
+
+func processEmbedFields(fields *[]guildedChatEmbedField) []lightning.EmbedField {
+	if fields == nil {
+		return nil
+	}
+
+	result := make([]lightning.EmbedField, len(*fields))
+	for i, field := range *fields {
+		result[i] = lightning.EmbedField{
+			Name:   field.Name,
+			Value:  field.Value,
+			Inline: field.Inline != nil && *field.Inline,
+		}
+	}
+
+	return result
 }
 
 func getIncomingEmbeds(embeds *[]guildedChatEmbed) []lightning.Embed {
@@ -283,73 +355,17 @@ func getIncomingEmbeds(embeds *[]guildedChatEmbed) []lightning.Embed {
 	incomingEmbeds := make([]lightning.Embed, 0)
 
 	for _, embed := range *embeds {
-		var author *lightning.EmbedAuthor
-		if embed.Author != nil {
-			author = &lightning.EmbedAuthor{
-				Name: "",
-				URL:  embed.Author.URL,
-			}
-			if embed.Author.Name != nil {
-				author.Name = *embed.Author.Name
-			}
-			if embed.Author.IconURL != nil {
-				author.IconURL = embed.Author.IconURL
-			}
-		}
-
-		var footer *lightning.EmbedFooter
-		if embed.Footer != nil {
-			footer = &lightning.EmbedFooter{
-				Text: embed.Footer.Text,
-			}
-			if embed.Footer.IconURL != nil {
-				footer.IconURL = embed.Footer.IconURL
-			}
-		}
-
-		var image *lightning.Media
-		if embed.Image != nil && embed.Image.URL != nil {
-			image = &lightning.Media{
-				URL: *embed.Image.URL,
-			}
-		}
-
-		var thumbnail *lightning.Media
-		if embed.Thumbnail != nil && embed.Thumbnail.URL != nil {
-			thumbnail = &lightning.Media{
-				URL: *embed.Thumbnail.URL,
-			}
-		}
-
-		var fields []lightning.EmbedField
-		if embed.Fields != nil {
-			fields = make([]lightning.EmbedField, len(*embed.Fields))
-			for i, field := range *embed.Fields {
-				fields[i] = lightning.EmbedField{
-					Name:   field.Name,
-					Value:  field.Value,
-					Inline: field.Inline != nil && *field.Inline,
-				}
-			}
-		}
-
-		var timestamp *int64
-		if embed.Timestamp != nil {
-			ts := embed.Timestamp.Unix()
-			timestamp = &ts
-		}
-
 		incomingEmbeds = append(incomingEmbeds, lightning.Embed{
 			Title:       embed.Title,
 			Description: embed.Description,
 			URL:         embed.URL,
 			Color:       embed.Color,
-			Author:      author,
-			Fields:      fields,
-			Footer:      footer,
-			Image:       image,
-			Thumbnail:   thumbnail,
-			Timestamp:   timestamp,
+			Author:      processEmbedAuthor(embed.Author),
+			Fields:      processEmbedFields(embed.Fields),
+			Footer:      processEmbedFooter(embed.Footer),
+			Image:       processEmbedMedia(embed.Image),
+			Thumbnail:   processEmbedMedia(embed.Thumbnail),
+			Timestamp:   embed.Timestamp,
 		})
 	}
 

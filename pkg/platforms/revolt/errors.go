@@ -1,37 +1,53 @@
 package revolt
 
 import (
+	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func extractStatusAndBody(err error) (int, string) {
-	msg := err.Error()
+type revoltPermissionsError struct{}
 
-	if !strings.HasPrefix(msg, "bad status code ") {
-		return 0, ""
-	}
+func (revoltPermissionsError) Error() string {
+	return "insufficient permissions in Revolt channel, please check them"
+}
 
-	msg = msg[16:]
-	statusCode, _ := strconv.Atoi(msg[:3])
-	return statusCode, msg[5:]
+type revoltStatusError struct {
+	msg  string
+	code int
+}
+
+func (e revoltStatusError) Error() string {
+	return strconv.Itoa(e.code) + ": " + e.msg
 }
 
 func getRevoltError(err error, extra map[string]any, message string, edit bool) error {
-	statusCode, body := extractStatusAndBody(err)
-
-	extra["status_code"] = statusCode
-	extra["body"] = body
-
-	if statusCode == 403 {
-		return lightning.LogError(err, "insufficient permissions, please check them", extra, &lightning.ChannelDisabled{Read: false, Write: true})
-	} else if statusCode == 404 && edit {
-		return nil
-	} else if statusCode == 404 {
-		return lightning.LogError(err, "resource not found", extra, &lightning.ChannelDisabled{Read: false, Write: true})
-	} else {
-		return lightning.LogError(err, message, extra, nil)
+	if errors.Is(err, revoltPermissionsError{}) {
+		return lightning.LogError(err, err.Error(), nil, &lightning.ChannelDisabled{Read: false, Write: true})
 	}
+
+	var revoltErr revoltStatusError
+	if errors.As(err, &revoltErr) {
+		switch revoltErr.code {
+		case 403:
+			return lightning.LogError(
+				err,
+				"insufficient permissions, please check them",
+				extra,
+				&lightning.ChannelDisabled{Read: false, Write: true},
+			)
+		case 404:
+			if edit {
+				return nil
+			}
+
+			return lightning.LogError(err, "revolt: resource not found",
+				extra, &lightning.ChannelDisabled{Read: false, Write: true})
+		default:
+			return lightning.LogError(err, message, extra, nil)
+		}
+	}
+
+	return lightning.LogError(err, message, extra, nil)
 }

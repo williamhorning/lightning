@@ -1,11 +1,14 @@
 package bridge
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 const (
@@ -57,229 +60,153 @@ const (
 
 type postgresDatabase struct {
 	conn *pgxpool.Pool
-	ctx  context.Context
 }
 
-func newPostgresDatabase(connection string) (Database, error) {
-	ctx := context.Background()
-	conn, err := pgxpool.New(ctx, connection)
+func newPostgresDatabase(connection string) (*postgresDatabase, error) {
+	conn, err := pgxpool.New(context.Background(), connection)
 	if err != nil {
-		return nil, err
+		return nil, lightning.LogError(err, "failed to make pgxpool", nil, nil)
 	}
 
-	_, err = conn.Exec(ctx, sqlCreateTables)
+	_, err = conn.Exec(context.Background(), sqlCreateTables)
 	if err != nil {
 		conn.Close()
-		return nil, err
+
+		return nil, lightning.LogError(err, "failed to setup schema", nil, nil)
 	}
 
-	return &postgresDatabase{conn, ctx}, nil
+	return &postgresDatabase{conn}, nil
 }
 
-func (p *postgresDatabase) createBridge(bridge Bridge) error {
-	channels, err := json.Marshal(bridge.Channels)
+func (p *postgresDatabase) createBridge(bridge bridge) error {
+	channels, channelsErr := json.Marshal(bridge.Channels)
+	settings, settingsErr := json.Marshal(bridge.Settings)
+
+	err := cmp.Or(channelsErr, settingsErr)
 	if err != nil {
-		return err
+		return lightning.LogError(err, "failed to marshal bridge", map[string]any{"br": bridge}, nil)
 	}
 
-	settings, err := json.Marshal(bridge.Settings)
+	_, err = p.conn.Exec(context.Background(), sqlInsertBridge, bridge.ID, bridge.Name, channels, settings)
 	if err != nil {
-		return err
+		return lightning.LogError(err, "failed to create bridge", nil, nil)
 	}
 
-	_, err = p.conn.Exec(p.ctx, sqlInsertBridge, bridge.ID, bridge.Name, channels, settings)
-	return err
+	return nil
 }
 
-func (p *postgresDatabase) getBridge(id string) (Bridge, error) {
-	row := p.conn.QueryRow(p.ctx, `
+func (p *postgresDatabase) getBridge(id string) (bridge, error) {
+	row := p.conn.QueryRow(context.Background(), `
 		SELECT id, name, channels, settings 
 		FROM bridges 
 		WHERE id = $1
 	`, id)
+
 	return handleBridgeRow(row)
 }
 
-func (p *postgresDatabase) getBridgeByChannel(channelID string) (Bridge, error) {
-	row := p.conn.QueryRow(p.ctx, `
+func (p *postgresDatabase) getBridgeByChannel(channelID string) (bridge, error) {
+	row := p.conn.QueryRow(context.Background(), `
 		SELECT id, name, channels, settings FROM bridges 
 		WHERE EXISTS (
 			SELECT 1 FROM jsonb_array_elements(channels) AS ch
 			WHERE ch->>'id' = $1
 		)`, channelID)
+
 	return handleBridgeRow(row)
 }
 
-func (p *postgresDatabase) createMessage(message BridgeMessageCollection) error {
-	channels, err := json.Marshal(message.Channels)
+func (p *postgresDatabase) createMessage(message bridgeMessageCollection) error {
+	channels, channelsErr := json.Marshal(message.Channels)
+	messages, messagesErr := json.Marshal(message.Messages)
+	settings, settingsErr := json.Marshal(message.Settings)
+
+	err := cmp.Or(channelsErr, messagesErr, settingsErr)
 	if err != nil {
-		return err
+		return lightning.LogError(err, "failed to marshal message", map[string]any{"msg": message}, nil)
 	}
 
-	messages, err := json.Marshal(message.Messages)
+	_, err = p.conn.Exec(
+		context.Background(),
+		sqlInsertMessage,
+		message.ID,
+		message.Name,
+		message.BridgeID,
+		channels,
+		messages,
+		settings,
+	)
 	if err != nil {
-		return err
+		return lightning.LogError(err, "failed to create message", nil, nil)
 	}
 
-	settings, err := json.Marshal(message.Settings)
-	if err != nil {
-		return err
-	}
-
-	_, err = p.conn.Exec(p.ctx, sqlInsertMessage, message.ID, message.Name, message.BridgeID, channels, messages, settings)
-	return err
+	return nil
 }
 
 func (p *postgresDatabase) deleteMessage(id string) error {
-	_, err := p.conn.Exec(p.ctx, `DELETE FROM bridge_messages WHERE id = $1`, id)
-	return err
+	_, err := p.conn.Exec(context.Background(), `DELETE FROM bridge_messages WHERE id = $1`, id)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return lightning.LogError(err, "failed to delete message", map[string]any{"id": id}, nil)
+	}
+
+	return nil
 }
 
-func (p *postgresDatabase) getMessage(id string) (BridgeMessageCollection, error) {
-	row := p.conn.QueryRow(p.ctx, `
+func (p *postgresDatabase) getMessage(msgID string) (bridgeMessageCollection, error) {
+	row := p.conn.QueryRow(context.Background(), `
 		SELECT id, name, bridge_id, channels, messages, settings FROM bridge_messages
 		WHERE id = $1 OR EXISTS (
 			SELECT 1 FROM jsonb_array_elements(messages) AS msg
 			CROSS JOIN jsonb_array_elements_text(msg->'id') AS id_element
 			WHERE id_element = $1
 		)
-	`, id)
+	`, msgID)
+
 	return handleMessageRow(row)
 }
 
-func (p *postgresDatabase) GetAllBridges() ([]Bridge, error) {
-	bridgeLog.Info("fetching all bridges from the database...")
+func handleBridgeRow(row pgx.Row) (bridge, error) {
+	var (
+		bridgeValue                bridge
+		channelsJSON, settingsJSON []byte
+	)
 
-	rows, err := p.conn.Query(p.ctx, `SELECT id, name, channels, settings FROM bridges`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var bridges []Bridge
-	for rows.Next() {
-		bridge, err := handleBridgeRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		bridges = append(bridges, bridge)
+	if err := row.Scan(&bridgeValue.ID, &bridgeValue.Name, &channelsJSON, &settingsJSON); err != nil &&
+		!errors.Is(err, pgx.ErrNoRows) {
+		return bridge{}, lightning.LogError(err, "failed to get bridge row", nil, nil)
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		return bridge{}, nil
 	}
 
-	bridgeLog.Info("fetched all bridges in the database", "count", len(bridges))
-	return bridges, rows.Err()
+	if err := cmp.Or(
+		json.Unmarshal(channelsJSON, &bridgeValue.Channels),
+		json.Unmarshal(settingsJSON, &bridgeValue.Settings),
+	); err != nil {
+		return bridge{}, lightning.LogError(err, "failed to unmarshal bridge row", nil, nil)
+	}
+
+	return bridgeValue, nil
 }
 
-func (p *postgresDatabase) GetAllMessages() ([]BridgeMessageCollection, error) {
-	bridgeLog.Info("fetching all messages from the database...")
-	rows, err := p.conn.Query(p.ctx, `
-		SELECT id, name, bridge_id, channels, messages, settings
-		FROM bridge_messages
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+func handleMessageRow(row pgx.Row) (bridgeMessageCollection, error) {
+	var (
+		message                                  bridgeMessageCollection
+		channelsJSON, messagesJSON, settingsJSON []byte
+	)
 
-	var messages []BridgeMessageCollection
-	for rows.Next() {
-		message, err := handleMessageRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		messages = append(messages, message)
+	err := row.Scan(&message.ID, &message.Name, &message.BridgeID, &channelsJSON, &messagesJSON, &settingsJSON)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return bridgeMessageCollection{}, lightning.LogError(err, "failed to get message row", nil, nil)
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		return bridgeMessageCollection{}, nil
 	}
 
-	bridgeLog.Info("fetched all messages in the database", "count", len(messages))
-	return messages, rows.Err()
-}
-
-func (p *postgresDatabase) SetAllBridges(bridges []Bridge) error {
-	bridgeLog.Info("setting all bridges in the database...")
-	for _, bridge := range bridges {
-		if err := p.createBridge(bridge); err != nil {
-			return err
-		}
-	}
-	bridgeLog.Info("set all bridges in the database", "count", len(bridges))
-	return nil
-}
-
-func (p *postgresDatabase) SetAllMessages(messages []BridgeMessageCollection) error {
-	bridgeLog.Info("setting all messages in the database...")
-	batch := &pgx.Batch{}
-	for _, message := range messages {
-		channels, err := json.Marshal(message.Channels)
-		if err != nil {
-			return err
-		}
-
-		messagesJSON, err := json.Marshal(message.Messages)
-		if err != nil {
-			return err
-		}
-
-		settings, err := json.Marshal(message.Settings)
-		if err != nil {
-			return err
-		}
-
-		batch.Queue(sqlInsertMessage, message.ID, message.Name, message.BridgeID, channels, messagesJSON, settings)
-	}
-
-	br := p.conn.SendBatch(p.ctx, batch)
-	defer br.Close()
-
-	for range messages {
-		if _, err := br.Exec(); err != nil {
-			return err
-		}
-	}
-
-	bridgeLog.Info("set all messages in the database", "count", len(messages))
-	return nil
-}
-
-func handleBridgeRow(row pgx.Row) (Bridge, error) {
-	var bridge Bridge
-	var channelsJSON, settingsJSON []byte
-
-	if err := row.Scan(&bridge.ID, &bridge.Name, &channelsJSON, &settingsJSON); err != nil && err != pgx.ErrNoRows {
-		return Bridge{}, err
-	} else if err == pgx.ErrNoRows {
-		return Bridge{}, nil
-	}
-
-	if err := json.Unmarshal(channelsJSON, &bridge.Channels); err != nil {
-		return Bridge{}, err
-	}
-
-	if err := json.Unmarshal(settingsJSON, &bridge.Settings); err != nil {
-		return Bridge{}, err
-	}
-
-	return bridge, nil
-}
-
-func handleMessageRow(row pgx.Row) (BridgeMessageCollection, error) {
-	var message BridgeMessageCollection
-	var channelsJSON, messagesJSON, settingsJSON []byte
-
-	if err := row.Scan(&message.ID, &message.Name, &message.BridgeID, &channelsJSON, &messagesJSON, &settingsJSON); err != nil && err != pgx.ErrNoRows {
-		return BridgeMessageCollection{}, err
-	} else if err == pgx.ErrNoRows {
-		return BridgeMessageCollection{}, nil
-	}
-
-	if err := json.Unmarshal(channelsJSON, &message.Channels); err != nil {
-		return BridgeMessageCollection{}, err
-	}
-
-	if err := json.Unmarshal(messagesJSON, &message.Messages); err != nil {
-		return BridgeMessageCollection{}, err
-	}
-
-	if err := json.Unmarshal(settingsJSON, &message.Settings); err != nil {
-		return BridgeMessageCollection{}, err
+	if err := cmp.Or(
+		json.Unmarshal(channelsJSON, &message.Channels),
+		json.Unmarshal(messagesJSON, &message.Messages),
+		json.Unmarshal(settingsJSON, &message.Settings),
+	); err != nil {
+		return bridgeMessageCollection{}, lightning.LogError(err, "failed to unmarshal message row", nil, nil)
 	}
 
 	return message, nil

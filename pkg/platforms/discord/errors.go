@@ -1,44 +1,69 @@
 package discord
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type errorConfig struct {
-	Code         int
-	Message      string
-	DisableRead  bool
-	DisableWrite bool
+type discordInvalidWebhookError struct{}
+
+func (discordInvalidWebhookError) Error() string {
+	return "invalid webhook data for Discord channel"
 }
 
-var discordErrors = map[int]errorConfig{
-	30007: {30007, "too many webhooks in channel, try deleting some", false, true},
-	30058: {30058, "too many webhooks in guild, try deleting some", false, true},
-	50013: {50013, "missing permissions to make webhook", false, true},
-	10003: {10003, "unknown channel, disabling channel", true, true},
-	10015: {10015, "unknown message, disabling channel", false, true},
-	50027: {50027, "invalid webhook token, disabling channel", false, true},
-	0:     {0, "unknown RESTError, not disabling channel", false, false},
+type discordAPIError struct {
+	Message string
+	Disable lightning.ChannelDisabled
+	Code    int
+}
+
+func (e *discordAPIError) Error() string {
+	return "Discord API Error " + strconv.Itoa(e.Code) + ": " + e.Message
 }
 
 func getError(err error, extra map[string]any, message string) error {
-	if restErr, ok := err.(*discordgo.RESTError); ok {
-		if restErr.Message.Code == 10008 {
+	var restErr *discordgo.RESTError
+	if errors.As(err, &restErr) {
+		if restErr.Message.Code == discordgo.ErrCodeUnknownMessage {
 			return nil
 		}
 
-		e, found := discordErrors[restErr.Message.Code]
-
-		if !found {
-			e = discordErrors[0]
-			e.Code = restErr.Message.Code
+		newError := &discordAPIError{
+			Code:    restErr.Message.Code,
+			Disable: lightning.ChannelDisabled{},
 		}
 
-		return lightning.LogError(fmt.Errorf(e.Message+": %w", err), message, extra, &lightning.ChannelDisabled{Read: e.DisableRead, Write: e.DisableWrite})
-	} else {
-		return lightning.LogError(fmt.Errorf("unknown error: %w", err), message, extra, nil)
+		switch restErr.Message.Code {
+		case discordgo.ErrCodeUnknownChannel:
+			newError.Disable.Read = true
+			newError.Message = "unknown channel, disabling channel"
+		case discordgo.ErrCodeMaximumNumberOfWebhooksReached:
+			newError.Disable.Write = true
+			newError.Message = "too many webhooks in channel, try deleting some"
+		case discordgo.ErrCodeMissingPermissions:
+			newError.Disable.Write = true
+			newError.Message = "missing permissions to make webhook"
+		case discordgo.ErrCodeUnknownWebhook:
+			newError.Disable.Write = true
+			newError.Message = "unknown message, disabling channel"
+		case discordgo.ErrCodeInvalidWebhookTokenProvided:
+			newError.Disable.Write = true
+			newError.Message = "invalid webhook token, disabling channel"
+		default:
+			newError.Message = "unknown RESTError, not disabling channel"
+		}
+
+		return lightning.LogError(
+			newError,
+			message,
+			extra,
+			&newError.Disable,
+		)
 	}
+
+	return lightning.LogError(fmt.Errorf("unknown error: %w", err), message, extra, nil)
 }

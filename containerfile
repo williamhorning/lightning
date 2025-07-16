@@ -1,11 +1,3 @@
-# build the cli
-FROM golang:1.24-alpine AS builder
-
-WORKDIR /app
-COPY . .
-RUN go build -o lightning ./cmd/lightning/*.go
-
-# build the final image
 FROM scratch
 
 # metadata
@@ -18,13 +10,15 @@ LABEL org.opencontainers.image.version="0.8.0-alpha.12"
 LABEL org.opencontainers.image.source="https://github.com/williamhorning/lightning"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# copy stuff over
+# Use build arg to determine architecture
+ARG TARGETARCH=amd64
+
+# copy pre-built binaries and certificates
 USER 1001:1001
-COPY --from=builder /app/lightning /lightning
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY ./lightning-${TARGETARCH} /lightning
+COPY --from=gcr.io/distroless/static:nonroot /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 VOLUME [ "/data" ]
 WORKDIR /data
 
 # run the bot
 ENTRYPOINT ["/lightning"]
-CMD [ "run" ]

@@ -2,10 +2,8 @@ package discord
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,21 +14,21 @@ import (
 const (
 	maxContentLength    = 2000
 	maxButtonReplies    = 5
-	defaultMaxFileMiB   = float64(10)
-	boostTier2FileMax   = 50
-	boostTier3FileMax   = 100
+	defaultMaxFileSize  = int64(10485760)
+	boostTier2FileMax   = 52428800
+	boostTier3FileMax   = 104857600
 	fileDownloadTimeout = 10 * time.Second
 )
 
 type discordOutgoingMessage struct {
 	AllowedMentions *discordgo.MessageAllowedMentions
+	Reference       *discordgo.MessageReference
 	AvatarURL       string
-	Components      []discordgo.MessageComponent
 	Content         string
+	Username        string
+	Components      []discordgo.MessageComponent
 	Embeds          []*discordgo.MessageEmbed
 	Files           []*discordgo.File
-	Reference       *discordgo.MessageReference
-	Username        string
 }
 
 func (o *discordOutgoingMessage) Webhook() *discordgo.WebhookParams {
@@ -66,30 +64,63 @@ func (o *discordOutgoingMessage) Message() *discordgo.MessageSend {
 	}
 }
 
-func getWebhookFromChannel(options *lightning.SendOptions) (id string, token string, err error) {
+func (p *discordPlugin) getWebhookFromChannel(channel string, options *lightning.SendOptions) (string, string, error) {
 	webhookData, ok := options.ChannelData.(map[string]any)
 	if !ok {
-		return "", "", lightning.LogError(errors.New("invalid webhook data for Discord channel"), "Failed to use webhook for Discord", map[string]any{"channel": options.ChannelID}, &lightning.ChannelDisabled{Read: false, Write: true})
+		return "", "", lightning.LogError(
+			discordInvalidWebhookError{},
+			"Failed to use webhook for Discord",
+			map[string]any{"channel": channel},
+			&lightning.ChannelDisabled{Read: false, Write: true},
+		)
 	}
 
-	id, _ = webhookData["id"].(string)
-	token, _ = webhookData["token"].(string)
+	webhookID, ok := webhookData["id"].(string)
 
-	webhookCache.Set(id, true)
+	if !ok || webhookID == "" {
+		return "", "", lightning.LogError(
+			discordInvalidWebhookError{},
+			"Failed to use webhook for Discord",
+			map[string]any{"channel": channel},
+			&lightning.ChannelDisabled{Read: false, Write: true},
+		)
+	}
 
-	return id, token, nil
+	webhookToken, ok := webhookData["token"].(string)
+
+	if !ok || webhookID == "" {
+		return "", "", lightning.LogError(
+			discordInvalidWebhookError{},
+			"Failed to use webhook for Discord",
+			map[string]any{"channel": channel},
+			&lightning.ChannelDisabled{Read: false, Write: true},
+		)
+	}
+
+	p.webhookCache.Set(webhookID, true)
+
+	return webhookID, webhookToken, nil
 }
 
-func getOutgoingMessage(session *discordgo.Session, message lightning.Message, opts *lightning.SendOptions, button bool) *discordOutgoingMessage {
+func getOutgoingMessage(
+	session *discordgo.Session,
+	message lightning.Message,
+	opts *lightning.SendOptions,
+	button bool,
+) *discordOutgoingMessage {
 	msg := discordOutgoingMessage{
 		AllowedMentions: getOutgoingMention(opts),
 		AvatarURL:       getOutgoingProfile(message),
-		Components:      getOutgoingComponents(session, message, button),
 		Content:         getOutgoingContent(message),
 		Embeds:          getOutgoingEmbeds(message),
 		Files:           getOutgoingFiles(session, message),
-		Reference:       getOutgoingReference(message, button),
 		Username:        message.Author.Nickname,
+	}
+
+	if button {
+		msg.Components = getOutgoingComponents(session, message)
+	} else {
+		msg.Reference = getOutgoingReference(message)
 	}
 
 	if msg.Content == "" && len(msg.Embeds) == 0 && len(msg.Files) == 0 {
@@ -103,6 +134,7 @@ func getOutgoingMention(opts *lightning.SendOptions) *discordgo.MessageAllowedMe
 	if opts == nil || opts.AllowEveryonePings {
 		return nil
 	}
+
 	return &discordgo.MessageAllowedMentions{
 		Parse: []discordgo.AllowedMentionType{
 			discordgo.AllowedMentionTypeRoles,
@@ -115,6 +147,7 @@ func getOutgoingProfile(message lightning.Message) string {
 	if message.Author.ProfilePicture != nil {
 		return *message.Author.ProfilePicture
 	}
+
 	return discordgo.EndpointDefaultUserAvatar(1)
 }
 
@@ -122,15 +155,19 @@ func getOutgoingContent(message lightning.Message) string {
 	if len(message.Content) > maxContentLength {
 		return string([]rune(message.Content)[:maxContentLength-3]) + "..."
 	}
+
 	return message.Content
 }
 
-func getOutgoingComponents(session *discordgo.Session, message lightning.Message, button bool) []discordgo.MessageComponent {
-	if !button || message.RepliedTo == nil || len(message.RepliedTo) == 0 {
+func getOutgoingComponents(
+	session *discordgo.Session,
+	message lightning.Message,
+) []discordgo.MessageComponent {
+	if len(message.RepliedTo) == 0 {
 		return nil
 	}
 
-	var buttons []discordgo.MessageComponent
+	buttons := make([]discordgo.MessageComponent, 0)
 
 	for i, replyID := range message.RepliedTo {
 		if i >= maxButtonReplies || replyID == "" {
@@ -161,69 +198,78 @@ func getOutgoingComponents(session *discordgo.Session, message lightning.Message
 		buttons = append(buttons, btn)
 	}
 
-	if len(buttons) == 0 {
-		return nil
-	}
-
 	return []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: buttons},
 	}
 }
 
 func getOutgoingEmbeds(message lightning.Message) []*discordgo.MessageEmbed {
-	if len(message.Embeds) == 0 {
-		return nil
-	}
-
-	var embeds []*discordgo.MessageEmbed
+	embeds := make([]*discordgo.MessageEmbed, 0)
 
 	for _, embed := range message.Embeds {
 		discordEmbed := &discordgo.MessageEmbed{}
-
-		if embed.Title != nil {
-			discordEmbed.Title = *embed.Title
-		}
-		if embed.Timestamp != nil {
-			discordEmbed.Timestamp = strconv.FormatInt(*embed.Timestamp, 10)
-		}
-		if embed.URL != nil {
-			discordEmbed.URL = *embed.URL
-		}
-		if embed.Color != nil {
-			discordEmbed.Color = *embed.Color
-		}
-
-		if embed.Footer != nil {
-			footer := &discordgo.MessageEmbedFooter{Text: embed.Footer.Text}
-			if embed.Footer.IconURL != nil {
-				footer.IconURL = *embed.Footer.IconURL
-			}
-			discordEmbed.Footer = footer
-		}
-
-		if embed.Image != nil && embed.Image.URL != "" {
-			discordEmbed.Image = &discordgo.MessageEmbedImage{URL: embed.Image.URL}
-		}
-
-		if embed.Thumbnail != nil && embed.Thumbnail.URL != "" {
-			discordEmbed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: embed.Thumbnail.URL}
-		}
-
-		if embed.Author != nil {
-			author := &discordgo.MessageEmbedAuthor{Name: embed.Author.Name}
-			if embed.Author.URL != nil {
-				author.URL = *embed.Author.URL
-			}
-			if embed.Author.IconURL != nil {
-				author.IconURL = *embed.Author.IconURL
-			}
-			discordEmbed.Author = author
-		}
-
+		setEmbedBasicProperties(discordEmbed, embed)
+		setEmbedFooter(discordEmbed, embed)
+		setEmbedMedia(discordEmbed, embed)
+		setEmbedAuthor(discordEmbed, embed)
 		embeds = append(embeds, discordEmbed)
 	}
 
 	return embeds
+}
+
+func setEmbedBasicProperties(discordEmbed *discordgo.MessageEmbed, embed lightning.Embed) {
+	if embed.Title != nil {
+		discordEmbed.Title = *embed.Title
+	}
+
+	if embed.Timestamp != nil {
+		discordEmbed.Timestamp = embed.Timestamp.Format(time.RFC3339)
+	}
+
+	if embed.URL != nil {
+		discordEmbed.URL = *embed.URL
+	}
+
+	if embed.Color != nil {
+		discordEmbed.Color = *embed.Color
+	}
+}
+
+func setEmbedFooter(discordEmbed *discordgo.MessageEmbed, embed lightning.Embed) {
+	if embed.Footer != nil {
+		footer := &discordgo.MessageEmbedFooter{Text: embed.Footer.Text}
+		if embed.Footer.IconURL != nil {
+			footer.IconURL = *embed.Footer.IconURL
+		}
+
+		discordEmbed.Footer = footer
+	}
+}
+
+func setEmbedMedia(discordEmbed *discordgo.MessageEmbed, embed lightning.Embed) {
+	if embed.Image != nil && embed.Image.URL != "" {
+		discordEmbed.Image = &discordgo.MessageEmbedImage{URL: embed.Image.URL}
+	}
+
+	if embed.Thumbnail != nil && embed.Thumbnail.URL != "" {
+		discordEmbed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: embed.Thumbnail.URL}
+	}
+}
+
+func setEmbedAuthor(discordEmbed *discordgo.MessageEmbed, embed lightning.Embed) {
+	if embed.Author != nil {
+		author := &discordgo.MessageEmbedAuthor{Name: embed.Author.Name}
+		if embed.Author.URL != nil {
+			author.URL = *embed.Author.URL
+		}
+
+		if embed.Author.IconURL != nil {
+			author.IconURL = *embed.Author.IconURL
+		}
+
+		discordEmbed.Author = author
+	}
 }
 
 func getOutgoingFiles(session *discordgo.Session, message lightning.Message) []*discordgo.File {
@@ -231,68 +277,90 @@ func getOutgoingFiles(session *discordgo.Session, message lightning.Message) []*
 		return nil
 	}
 
-	maxFileSizeMiB := defaultMaxFileMiB
+	maxFileSize := getMaxFileSize(session, message)
 
-	if ch, err := session.State.Channel(message.ChannelID); err == nil && ch.GuildID != "" {
-		if guild, err := session.State.Guild(ch.GuildID); err == nil {
-			switch guild.PremiumTier {
-			case 2:
-				maxFileSizeMiB = boostTier2FileMax
-			case 3:
-				maxFileSizeMiB = boostTier3FileMax
-			}
-		}
-	}
-
-	var files []*discordgo.File
+	files := make([]*discordgo.File, 0)
 
 	for _, attachment := range message.Attachments {
-		if attachment.Size > maxFileSizeMiB {
+		file := getFile(&attachment, maxFileSize)
+
+		if file == nil {
 			continue
 		}
 
-		name := attachment.Name
-		if name == "" {
-			parts := strings.Split(attachment.URL, "/")
-			name = parts[len(parts)-1]
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), fileDownloadTimeout)
-		req, err := http.NewRequestWithContext(ctx, "GET", attachment.URL, nil)
-		if err != nil {
-			cancel()
-			continue
-		}
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			cancel()
-			continue
-		}
-
-		files = append(files, &discordgo.File{
-			Name:        name,
-			ContentType: resp.Header.Get("Content-Type"),
-			Reader:      &cancelableReadCloser{resp.Body, cancel},
-		})
+		files = append(files, file)
 	}
 
 	return files
 }
 
+func getMaxFileSize(session *discordgo.Session, message lightning.Message) int64 {
+	maxFileSize := defaultMaxFileSize
+
+	if ch, err := session.State.Channel(message.ChannelID); err == nil && ch.GuildID != "" {
+		if guild, err := session.State.Guild(ch.GuildID); err == nil {
+			switch guild.PremiumTier {
+			case discordgo.PremiumTier2:
+				maxFileSize = boostTier2FileMax
+			case discordgo.PremiumTier3:
+				maxFileSize = boostTier3FileMax
+			case discordgo.PremiumTier1, discordgo.PremiumTierNone:
+			default:
+			}
+		}
+	}
+
+	return maxFileSize
+}
+
+func getFile(attachment *lightning.Attachment, maxFileSize int64) *discordgo.File {
+	if attachment.Size > maxFileSize {
+		return nil
+	}
+
+	if attachment.Name == "" {
+		parts := strings.Split(attachment.URL, "/")
+		attachment.Name = parts[len(parts)-1]
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), fileDownloadTimeout)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, attachment.URL, nil)
+	if err != nil {
+		cancel()
+
+		return nil
+	}
+
+	resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // see cancelableReadCloser
+	if err != nil {
+		cancel()
+
+		return nil
+	}
+
+	return &discordgo.File{
+		Name:        attachment.Name,
+		ContentType: resp.Header.Get("Content-Type"),
+		Reader:      &cancelableReadCloser{resp.Body, cancel},
+	}
+}
+
 type cancelableReadCloser struct {
 	io.ReadCloser
+
 	cancel context.CancelFunc
 }
 
 func (c *cancelableReadCloser) Close() error {
 	err := c.ReadCloser.Close()
 	c.cancel()
-	return err
+
+	return lightning.LogError(err, "discord failed to close reader", nil, nil)
 }
 
-func getOutgoingReference(message lightning.Message, button bool) *discordgo.MessageReference {
-	if button || message.RepliedTo == nil || len(message.RepliedTo) == 0 {
+func getOutgoingReference(message lightning.Message) *discordgo.MessageReference {
+	if len(message.RepliedTo) == 0 {
 		return nil
 	}
 

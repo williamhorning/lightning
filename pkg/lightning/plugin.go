@@ -1,93 +1,55 @@
 package lightning
 
-import (
-	"errors"
-	"sync"
-)
-
-var (
-	ErrPluginAlreadyRegistered = errors.New("plugin (or type) already registered: this is a bug or misconfiguration")
-	ErrPluginNotFound          = errors.New("plugin not found internally: this is a bug or misconfiguration")
-	ErrPluginConfigInvalid     = errors.New("plugin config is invalid")
-	Plugins                    = &PluginRegistry{
-		make(map[string]Plugin),
-		sync.RWMutex{},
-		make(map[string]PluginConstructor),
-		sync.RWMutex{},
-		make(map[string]struct{}),
-		[]chan Message{},
-		[]chan Message{},
-		[]chan BaseMessage{},
-		[]chan CommandEvent{},
-		sync.RWMutex{},
-	}
-)
-
+// PluginConstructor makes a [Plugin] with the specified config.
 type PluginConstructor func(config any) (Plugin, error)
 
+// A Plugin provides methods used by [Bot] to allow bots to not worry
+// about platform specifics, as each Plugin handles that.
 type Plugin interface {
 	Name() string
 	SetupChannel(channel string) (any, error)
 	SendMessage(message Message, opts *SendOptions) ([]string, error)
 	EditMessage(message Message, ids []string, opts *SendOptions) error
-	DeleteMessage(ids []string, opts *SendOptions) error
+	DeleteMessage(channel string, ids []string) error
 	SetupCommands(command map[string]Command) error
 	ListenMessages() <-chan Message
-	ListenEdits() <-chan Message
+	ListenEdits() <-chan EditedMessage
 	ListenDeletes() <-chan BaseMessage
 	ListenCommands() <-chan CommandEvent
 }
 
-type SendOptions struct {
-	AllowEveryonePings bool
-	ChannelID          string
-	ChannelData        any
-}
+// AddPluginType takes in a [PluginConstructor] and registers it so you can later
+// use it. It only returns an error if the plugin type is already registered.
+func (b *Bot) AddPluginType(name string, constructor PluginConstructor) error {
+	b.typesMutex.Lock()
+	defer b.typesMutex.Unlock()
 
-type PluginRegistry struct {
-	plugins         map[string]Plugin
-	pluginsLock     sync.RWMutex
-	pluginTypes     map[string]PluginConstructor
-	pluginTypesLock sync.RWMutex
-	handledEvents   map[string]struct{}
-	messages        []chan Message
-	edits           []chan Message
-	deletes         []chan BaseMessage
-	commands        []chan CommandEvent
-	eventMutex      sync.RWMutex
-}
-
-func (pr *PluginRegistry) RegisterType(name string, constructor PluginConstructor) {
-	pr.pluginTypesLock.Lock()
-	defer pr.pluginTypesLock.Unlock()
-
-	if _, exists := pr.pluginTypes[name]; exists {
-		panic(LogError(ErrPluginAlreadyRegistered, "Plugin type already registered", map[string]any{"name": name}, nil))
+	if _, exists := b.types[name]; exists {
+		return LogError(PluginRegisteredError{}, "Plugin type already registered", map[string]any{"name": name}, nil)
 	}
 
-	pr.pluginTypes[name] = constructor
+	b.types[name] = constructor
+
+	return nil
 }
 
-func (pr *PluginRegistry) Get(name string) (Plugin, bool) {
-	pr.pluginsLock.RLock()
-	defer pr.pluginsLock.RUnlock()
-	plugin, exists := pr.plugins[name]
-	return plugin, exists
-}
+// UsePluginType takes in a plugin name and config to use a plugin with your bot.
+// It only returns an error if a plugin already exists *or* if the plugin type is
+// not found.
+func (b *Bot) UsePluginType(name string, config any) error {
+	b.typesMutex.RLock()
+	defer b.typesMutex.RUnlock()
 
-func (pr *PluginRegistry) RegisterPlugin(name string, config any) error {
-	pr.pluginTypesLock.RLock()
-	pr.pluginsLock.Lock()
-	defer pr.pluginTypesLock.RUnlock()
-	defer pr.pluginsLock.Unlock()
+	b.pluginMutex.Lock()
+	defer b.pluginMutex.Unlock()
 
-	if _, exists := pr.plugins[name]; exists {
-		return ErrPluginAlreadyRegistered
+	if _, exists := b.plugins[name]; exists {
+		return PluginRegisteredError{}
 	}
 
-	constructor, exists := pr.pluginTypes[name]
+	constructor, exists := b.types[name]
 	if !exists {
-		return ErrPluginNotFound
+		return MissingPluginError{}
 	}
 
 	instance, err := constructor(config)
@@ -95,72 +57,37 @@ func (pr *PluginRegistry) RegisterPlugin(name string, config any) error {
 		return err
 	}
 
-	pr.plugins[instance.Name()] = instance
+	b.plugins[instance.Name()] = instance
 
-	go distributeEvents(pr, "create", instance, instance.ListenMessages(), &pr.messages)
-	go distributeEvents(pr, "edit", instance, instance.ListenEdits(), &pr.edits)
-	go distributeEvents(pr, "delete", instance, instance.ListenDeletes(), &pr.deletes)
-	go distributeEvents(pr, "command", instance, instance.ListenCommands(), &pr.commands)
+	ensureHandlers(b)
+
+	go func() {
+		msgChan := instance.ListenMessages()
+		for msg := range msgChan {
+			b.messageChannel <- msg
+		}
+	}()
+
+	go func() {
+		editChan := instance.ListenEdits()
+		for msg := range editChan {
+			b.editChannel <- msg
+		}
+	}()
+
+	go func() {
+		delChan := instance.ListenDeletes()
+		for msg := range delChan {
+			b.delChannel <- msg
+		}
+	}()
+
+	go func() {
+		cmdChan := instance.ListenCommands()
+		for cmd := range cmdChan {
+			b.commandChannel <- cmd
+		}
+	}()
+
 	return nil
-}
-
-func (pr *PluginRegistry) SetHandled(plugin string, event string, ev string) {
-	pr.eventMutex.Lock()
-	defer pr.eventMutex.Unlock()
-	pr.handledEvents[ev+"-"+plugin+"-"+event] = struct{}{}
-}
-
-func (pr *PluginRegistry) ListenMessages() <-chan Message {
-	return createEventChannel(pr, 1000, &pr.messages)
-}
-
-func (pr *PluginRegistry) ListenEdits() <-chan Message {
-	return createEventChannel(pr, 1000, &pr.edits)
-}
-
-func (pr *PluginRegistry) ListenDeletes() <-chan BaseMessage {
-	return createEventChannel(pr, 1000, &pr.deletes)
-}
-
-func (pr *PluginRegistry) ListenCommands() <-chan CommandEvent {
-	return createEventChannel(pr, 1000, &pr.commands)
-}
-
-func distributeEvents[T any](pr *PluginRegistry, ev string, plugin Plugin, source <-chan T, destinations *[]chan T) {
-	for event := range source {
-		key := ev + "-" + plugin.Name() + "-"
-
-		switch v := any(event).(type) {
-		case Message:
-			key += v.EventID
-		case BaseMessage:
-			key += v.EventID
-		case CommandEvent:
-			key += v.EventID
-		}
-
-		if _, exists := pr.handledEvents[key]; exists {
-			continue
-		}
-
-		pr.SetHandled(plugin.Name(), ev, key)
-
-		pr.eventMutex.RLock()
-		for _, ch := range *destinations {
-			select {
-			case ch <- event:
-			default:
-				Log.Warn("skipped event, channel full or closed", "plugin", plugin.Name(), "event", ev, "key", key)
-			}
-		}
-		pr.eventMutex.RUnlock()
-	}
-}
-
-func createEventChannel[T any](pr *PluginRegistry, bufferSize int, channelList *[]chan T) <-chan T {
-	ch := make(chan T, bufferSize)
-	pr.eventMutex.Lock()
-	defer pr.eventMutex.Unlock()
-	*channelList = append(*channelList, ch)
-	return ch
 }

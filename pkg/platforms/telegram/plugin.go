@@ -1,70 +1,80 @@
+// Package telegram provides a [lightning.Plugin] implementation for Telegram.
+// It additionally provides a file proxy to proxy Telegram attachments to other
+// platforms, as Telegram files require a token to fetch, and that shouldn't be
+// exposed to other platforms.
+//
+// To use Telegram support with lightning, see [New]
+//
+//	bot := lightning.NewBot(lightning.BotOptions{
+//		// ...
+//	}
+//
+//	bot.AddPluginType("telegram", telegram.New)
+//
+//	bot.UsePluginType("telegram", map[string]any{
+//		// ...
+//	})
 package telegram
 
 import (
+	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func init() {
-	lightning.Plugins.RegisterType("telegram", newTelegramPlugin)
-}
-
-func newTelegramPlugin(config any) (lightning.Plugin, error) {
-	cfg, ok := config.(map[string]any)
-	if !ok {
-		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Invalid config for Telegram plugin", nil, nil)
+// New creates a new [lightning.Plugin] that provides Telegram support for Lightning
+//
+// It only takes in a map with the following structure:
+//
+//	map[string]any{
+//		"token": "", // a string with your Telegram bot token. You can get this from BotFather
+//		"proxy_port": 0, // the port to use for the built-in Telegram file proxy
+//		"proxy_url": "", // the publicly accessible url of the Telegram file proxy
+//	}
+//
+// Note that you must have a working file proxy at `proxy_url`, otherwise files will not
+// work with other plugins.
+func New(config any) (lightning.Plugin, error) {
+	cfg, err := getTelegramConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
-	token, ok := cfg["token"].(string)
-	if !ok || token == "" {
-		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Missing or invalid token in Telegram plugin config", nil, nil)
-	}
-
-	proxyPort, ok := cfg["proxy_port"].(int64)
-	if !ok || proxyPort < 0 {
-		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Missing or invalid proxy port in Telegram plugin config", nil, nil)
-	}
-
-	proxyURL, ok := cfg["proxy_url"].(string)
-	if !ok || proxyURL == "" {
-		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Missing or invalid proxy URL in Telegram plugin config", nil, nil)
-	}
-
-	telegram, err := gotgbot.NewBot(token, nil)
+	telegram, err := gotgbot.NewBot(cfg.token, nil)
 	if err != nil {
 		return nil, lightning.LogError(err, "Failed to setup Telegram bot", nil, nil)
 	}
 
-	commandChannel := make(chan lightning.CommandEvent, 1000)
-	messageChannel := make(chan lightning.Message, 1000)
-	editChannel := make(chan lightning.Message, 1000)
+	commands := make(chan lightning.CommandEvent, 1000)
+	messages := make(chan lightning.Message, 1000)
+	edits := make(chan lightning.EditedMessage, 1000)
 
-	dispatch := ext.NewDispatcher(&ext.DispatcherOpts{
-		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
-			lightning.LogError(err, "Error in Telegram plugin", nil, nil)
-			return ext.DispatcherActionNoop
-		},
-		MaxRoutines: ext.DefaultMaxRoutines,
-	})
+	dispatch := ext.NewDispatcher(nil)
 
 	dispatch.AddHandler(handlers.Message{
 		AllowEdited:   true,
 		AllowChannel:  true,
 		AllowBusiness: true,
-		Filter:        message.All,
+		Filter: func(_ *gotgbot.Message) bool {
+			return true
+		},
 		Response: func(b *gotgbot.Bot, ctx *ext.Context) error {
-			msg := getMessage(b, ctx, proxyURL)
+			msg := getMessage(b, ctx, cfg.proxyURL)
 			if ctx.EditedMessage != nil {
-				editChannel <- msg
+				edits <- lightning.EditedMessage{
+					Message: msg,
+					Edited:  time.UnixMilli(ctx.EditedMessage.GetDate() * 1000),
+				}
 			} else {
-				messageChannel <- msg
+				messages <- msg
 			}
+
 			return nil
 		},
 	})
@@ -76,9 +86,9 @@ func newTelegramPlugin(config any) (lightning.Plugin, error) {
 		return nil, lightning.LogError(err, "Failed to start Telegram updater", nil, nil)
 	}
 
-	lightning.Log.With("plugin", "telegram").Info("ready! invite me at https://t.me/" + telegram.Username)
+	slog.Info("telegram: ready! invite me at https://t.me/" + telegram.Username)
 
-	plugin := &telegramPlugin{commandChannel, messageChannel, editChannel, dispatch, proxyURL, proxyPort, telegram, updater}
+	plugin := &telegramPlugin{commands, messages, edits, dispatch, &cfg, telegram, updater}
 
 	go plugin.startProxy()
 
@@ -88,26 +98,26 @@ func newTelegramPlugin(config any) (lightning.Plugin, error) {
 type telegramPlugin struct {
 	commandChannel chan lightning.CommandEvent
 	messageChannel chan lightning.Message
-	editChannel    chan lightning.Message
+	editChannel    chan lightning.EditedMessage
 	dispatch       *ext.Dispatcher
-	proxyURL       string
-	proxyPort      int64
+	cfg            *telegramConfig
 	telegram       *gotgbot.Bot
 	updater        *ext.Updater
 }
 
-func (p *telegramPlugin) Name() string {
+func (*telegramPlugin) Name() string {
 	return "bolt-telegram"
 }
 
-func (p *telegramPlugin) SetupChannel(channel string) (any, error) {
+func (*telegramPlugin) SetupChannel(channel string) (any, error) {
 	return channel, nil
 }
 
 func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
-		return []string{}, lightning.LogError(err, "Failed to parse channel ID", map[string]any{"channel_id": message.ChannelID}, &lightning.ChannelDisabled{Read: false, Write: true})
+		return []string{}, lightning.LogError(err, "Failed to parse channel ID",
+			map[string]any{"channel_id": message.ChannelID}, &lightning.ChannelDisabled{Read: false, Write: true})
 	}
 
 	content := parseContent(message, opts)
@@ -117,7 +127,9 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 	}
 
 	if len(message.RepliedTo) > 0 {
-		replyID, err := strconv.ParseInt(message.RepliedTo[0], 10, 64)
+		var replyID int64
+
+		replyID, err = strconv.ParseInt(message.RepliedTo[0], 10, 64)
 		if err == nil && replyID > 0 {
 			sendOpts.ReplyParameters = &gotgbot.ReplyParameters{
 				MessageId:                replyID,
@@ -127,9 +139,9 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 	}
 
 	msg, err := p.telegram.SendMessage(channel, content, sendOpts)
-
 	if err != nil {
-		return []string{}, lightning.LogError(err, "Failed to send message to Telegram", map[string]any{"channel_id": opts.ChannelID, "content": content, "reply_opts": sendOpts.ReplyParameters}, nil)
+		return []string{}, lightning.LogError(err, "failed to send telegram message",
+			map[string]any{"channel": message.ChannelID, "content": content, "reply": sendOpts.ReplyParameters}, nil)
 	}
 
 	ids := []string{strconv.FormatInt(msg.MessageId, 10)}
@@ -144,9 +156,10 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 }
 
 func (p *telegramPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
-	channel, err := strconv.ParseInt(opts.ChannelID, 10, 64)
+	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
-		return lightning.LogError(err, "Failed to parse channel ID", map[string]any{"channel_id": opts.ChannelID}, &lightning.ChannelDisabled{Read: false, Write: true})
+		return lightning.LogError(err, "Failed to parse channel ID", map[string]any{"channel_id": message.ChannelID},
+			&lightning.ChannelDisabled{Read: false, Write: true})
 	}
 
 	msgID, err := strconv.ParseInt(ids[0], 10, 64)
@@ -155,32 +168,42 @@ func (p *telegramPlugin) EditMessage(message lightning.Message, ids []string, op
 	}
 
 	content := parseContent(message, opts)
-	_, _, err = p.telegram.EditMessageText(content, &gotgbot.EditMessageTextOpts{ChatId: channel, MessageId: msgID, ParseMode: gotgbot.ParseModeMarkdownV2})
 
-	if err != nil && strings.Contains("message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message", err.Error()) {
+	_, _, err = p.telegram.EditMessageText(
+		content,
+		&gotgbot.EditMessageTextOpts{ChatId: channel, MessageId: msgID, ParseMode: gotgbot.ParseModeMarkdownV2},
+	)
+	if err != nil &&
+		strings.Contains(err.Error(), "specified new message content and reply markup are exactly the same") {
 		return nil
 	}
 
-	return err
+	return lightning.LogError(err, "Failed to edit message on Telegram",
+		map[string]any{"channel_id": message.ChannelID, "content": content}, nil)
 }
 
-func (p *telegramPlugin) DeleteMessage(ids []string, opts *lightning.SendOptions) error {
-	channel, err := strconv.ParseInt(opts.ChannelID, 10, 64)
+func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
+	channel, err := strconv.ParseInt(channelID, 10, 64)
 	if err != nil {
-		return lightning.LogError(err, "Failed to parse channel ID", map[string]any{"channel_id": opts.ChannelID}, &lightning.ChannelDisabled{Read: false, Write: true})
+		return lightning.LogError(err, "Failed to parse channel ID", map[string]any{"channel_id": channelID},
+			&lightning.ChannelDisabled{Read: false, Write: true})
 	}
 
 	messageIDs := make([]int64, 0, len(ids))
 	for _, id := range ids {
-		if msgID, err := strconv.ParseInt(id, 10, 64); err == nil {
-			messageIDs = append(messageIDs, msgID)
-		} else {
+		var msgID int64
+
+		msgID, err = strconv.ParseInt(id, 10, 64)
+		if err != nil {
 			return lightning.LogError(err, "Failed to parse message ID", map[string]any{"id": id}, nil)
 		}
+
+		messageIDs = append(messageIDs, msgID)
 	}
 
 	_, err = p.telegram.DeleteMessages(channel, messageIDs, nil)
-	return err
+
+	return lightning.LogError(err, "Failed to delete message on Telegram", map[string]any{"channel_id": channelID}, nil)
 }
 
 func (p *telegramPlugin) SetupCommands(commands map[string]lightning.Command) error {
@@ -198,6 +221,7 @@ func (p *telegramPlugin) SetupCommands(commands map[string]lightning.Command) er
 
 		handler := handlers.NewCommand(telegramName, func(b *gotgbot.Bot, ctx *ext.Context) error {
 			p.commandChannel <- getCommand(cmd.Name, b, ctx)
+
 			return nil
 		})
 		handler.SetAllowChannel(true)
@@ -205,19 +229,20 @@ func (p *telegramPlugin) SetupCommands(commands map[string]lightning.Command) er
 	}
 
 	_, err := p.telegram.SetMyCommands(cmds, nil)
-	return err
+
+	return lightning.LogError(err, "Failed to setup commands on Telegram", nil, nil)
 }
 
 func (p *telegramPlugin) ListenMessages() <-chan lightning.Message {
 	return p.messageChannel
 }
 
-func (p *telegramPlugin) ListenEdits() <-chan lightning.Message {
+func (p *telegramPlugin) ListenEdits() <-chan lightning.EditedMessage {
 	return p.editChannel
 }
 
-func (p *telegramPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	return make(chan lightning.BaseMessage)
+func (*telegramPlugin) ListenDeletes() <-chan lightning.BaseMessage {
+	return nil
 }
 
 func (p *telegramPlugin) ListenCommands() <-chan lightning.CommandEvent {

@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -47,16 +48,19 @@ func getDiscordCommand(command map[string]lightning.Command) []*discordgo.Applic
 }
 
 func getLightningCommand(session *discordgo.Session, interaction *discordgo.InteractionCreate) *lightning.CommandEvent {
-	if interaction.Type != discordgo.InteractionApplicationCommand || interaction.Data.Type() != discordgo.InteractionApplicationCommand {
+	if interaction.Type != discordgo.InteractionApplicationCommand ||
+		interaction.Data.Type() != discordgo.InteractionApplicationCommand {
 		return nil
 	}
 
 	args := make(map[string]string)
-	data := interaction.Data.(discordgo.ApplicationCommandInteractionData)
-	var subcommand *string = nil
+	data := interaction.ApplicationCommandData() // see check above
+
+	var subcommand *string
 
 	for _, option := range data.Options {
-		if option.Type == discordgo.ApplicationCommandOptionSubCommand {
+		switch option.Type { //nolint:exhaustive // we only have string and subcommand options
+		case discordgo.ApplicationCommandOptionSubCommand:
 			subcommand = &option.Name
 
 			for _, subOption := range option.Options {
@@ -64,15 +68,17 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 					args[subOption.Name] = subOption.StringValue()
 				}
 			}
-		} else if option.Type == discordgo.ApplicationCommandOptionString {
+		case discordgo.ApplicationCommandOptionString:
 			args[option.Name] = option.StringValue()
+		default:
 		}
 	}
 
 	timestamp, err := discordgo.SnowflakeTimestamp(interaction.ID)
-
 	if err != nil {
-		lightning.LogError(err, "Failed to parse interaction timestamp", map[string]any{"interaction_id": interaction.ID}, nil)
+		slog.Warn("discord: failed to parse interaction timestamp", "err",
+			lightning.LogError(err, "failed to parse interaction timestamp",
+				map[string]any{"interaction_id": interaction.ID}, nil))
 
 		timestamp = time.Now()
 	}

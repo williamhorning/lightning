@@ -16,6 +16,15 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      - name: Build binaries
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o lightning-amd64 ./cmd/lightning/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o lightning-arm64 ./cmd/lightning/main.go          
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: login to ghcr
@@ -32,6 +41,9 @@ jobs:
           archs: amd64, arm64
           tags: latest ${{github.ref_name}}
           containerfiles: ./containerfile
+          build-args: |
+            TARGETARCH=amd64
+            TARGETARCH=arm64
       - name: push to ghcr.io
         uses: redhat-actions/push-to-registry@v2
         with:

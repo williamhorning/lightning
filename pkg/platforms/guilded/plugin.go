@@ -1,94 +1,139 @@
+// Package guilded provides a [lightning.Plugin] implementation for Guilded.
+// To use Guilded support with lightning, see [New]
+//
+//	bot := lightning.NewBot(lightning.BotOptions{
+//		// ...
+//	}
+//
+//	bot.AddPluginType("guilded", guilded.New)
+//
+//	bot.UsePluginType("guilded", map[string]any{
+//		// ...
+//	})
 package guilded
 
-import "github.com/williamhorning/lightning/pkg/lightning"
+import (
+	"log/slog"
 
-var guildedLog = lightning.Log.With("plugin", "guilded")
+	"github.com/williamhorning/lightning/internal/cache"
+	"github.com/williamhorning/lightning/pkg/lightning"
+)
 
-func init() {
-	lightning.Plugins.RegisterType("guilded", newGuildedPlugin)
-}
+// New creates a new [lightning.Plugin] that provides Guilded support for Lightning
+//
+// It only takes in a map with the following structure:
+//
+//	map[string]any{
+//		"token": "", // a string with your Guilded bot token
+//	}
+func New(config any) (lightning.Plugin, error) {
+	cfg, ok := config.(map[string]any)
 
-func newGuildedPlugin(config any) (lightning.Plugin, error) {
-	if cfg, ok := config.(map[string]any); !ok {
-		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Invalid config for Guilded plugin", nil, nil)
-	} else {
-		token := cfg["token"].(string)
-
-		socket := guildedNewSocketManager(token)
-		plugin := &guildedPlugin{token, socket}
-
-		socket.OnReady(func(msg *guildedWelcomeMessage) {
-			guildedLog.Info("ready!", "username", msg.User.Name)
-		})
-
-		if err := socket.Connect(); err != nil {
-			return nil, lightning.LogError(err, "Failed to connect to Guilded socket", nil, nil)
-		}
-
-		return plugin, nil
+	if !ok {
+		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid config for Guilded plugin", nil, nil)
 	}
+
+	token, ok := cfg["token"].(string)
+
+	if !ok {
+		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid token for Guilded plugin", nil, nil)
+	}
+
+	socket := guildedNewSocketManager(token)
+	plugin := &guildedPlugin{
+		socket, cache.New[string, lightning.Attachment](assetCacheTTL),
+		cache.New[string, guildedServerMember](defaultCacheTTL),
+		cache.New[string, guildedWebhook](defaultCacheTTL),
+		cache.New[string, bool](defaultCacheTTL), token,
+	}
+
+	socket.OnReady(func(msg *guildedWelcomeMessage) {
+		slog.Info("guilded: ready!", "username", msg.User.Name)
+	})
+
+	if err := socket.Connect(); err != nil {
+		return nil, lightning.LogError(err, "Failed to connect to Guilded socket", nil, nil)
+	}
+
+	return plugin, nil
 }
 
 type guildedPlugin struct {
-	token  string
-	socket *guildedSocketManager
+	socket          *guildedSocketManager
+	assetsCache     *cache.Expiring[string, lightning.Attachment]
+	membersCache    *cache.Expiring[string, guildedServerMember]
+	webhooksCache   *cache.Expiring[string, guildedWebhook]
+	webhookIDsCache *cache.Expiring[string, bool]
+	token           string
 }
 
-func (p *guildedPlugin) Name() string {
+func (*guildedPlugin) Name() string {
 	return "bolt-guilded"
 }
 
-func (p *guildedPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
+func (*guildedPlugin) EditMessage(_ lightning.Message, _ []string, _ *lightning.SendOptions) error {
 	return nil
 }
 
-func (p *guildedPlugin) DeleteMessage(ids []string, opts *lightning.SendOptions) error {
-	for _, id := range ids {
-		_, err := guildedMakeRequest(p.token, "DELETE", "/channels/"+opts.ChannelID+"/messages/"+id, nil)
+func (p *guildedPlugin) DeleteMessage(channel string, ids []string) error {
+	for _, msgID := range ids {
+		resp, err := guildedMakeRequest(p.token, "DELETE", "/channels/"+channel+"/messages/"+msgID, nil)
+
+		if resp.Body.Close() != nil {
+			slog.Warn("guilded: failed to close request body when deleting message")
+		}
 
 		if err != nil {
-			return lightning.LogError(err, "Failed to delete message", map[string]any{"messageID": id, "channelID": opts.ChannelID}, nil)
+			return lightning.LogError(
+				err,
+				"Failed to delete message",
+				map[string]any{"messageID": msgID, "channelID": channel},
+				nil,
+			)
 		}
 	}
 
 	return nil
 }
 
-func (p *guildedPlugin) SetupCommands(command map[string]lightning.Command) error {
+func (*guildedPlugin) SetupCommands(_ map[string]lightning.Command) error {
 	return nil
 }
 
 func (p *guildedPlugin) ListenMessages() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 1000)
+	channel := make(chan lightning.Message, 1000)
 
 	p.socket.OnMessageCreated(func(msg *guildedChatMessageCreated) {
-		message := getIncomingMessage(p.token, &msg.Message)
+		message := p.getIncomingMessage(&msg.Message)
 		if message != nil {
-			ch <- *message
+			channel <- *message
 		}
 	})
 
-	return ch
+	return channel
 }
 
-func (p *guildedPlugin) ListenEdits() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 1000)
+func (p *guildedPlugin) ListenEdits() <-chan lightning.EditedMessage {
+	channel := make(chan lightning.EditedMessage, 1000)
 
 	p.socket.OnMessageUpdated(func(msg *guildedChatMessageUpdated) {
-		message := getIncomingMessage(p.token, &msg.Message)
+		message := p.getIncomingMessage(&msg.Message)
 		if message != nil {
-			ch <- *message
+			channel <- lightning.EditedMessage{
+				Message: *message,
+				Edited:  *msg.Message.UpdatedAt,
+			}
 		}
 	})
 
-	return ch
+	return channel
 }
 
 func (p *guildedPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	ch := make(chan lightning.BaseMessage, 1000)
+	channel := make(chan lightning.BaseMessage, 1000)
 
 	p.socket.OnMessageDeleted(func(msg *guildedChatMessageDeleted) {
-		ch <- lightning.BaseMessage{
+		channel <- lightning.BaseMessage{
 			EventID:   msg.Message.ID,
 			ChannelID: msg.Message.ChannelID,
 			Plugin:    "bolt-guilded",
@@ -96,9 +141,9 @@ func (p *guildedPlugin) ListenDeletes() <-chan lightning.BaseMessage {
 		}
 	})
 
-	return ch
+	return channel
 }
 
-func (p *guildedPlugin) ListenCommands() <-chan lightning.CommandEvent {
-	return make(chan lightning.CommandEvent)
+func (*guildedPlugin) ListenCommands() <-chan lightning.CommandEvent {
+	return nil
 }

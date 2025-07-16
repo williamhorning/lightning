@@ -1,87 +1,85 @@
+// Package revolt provides a [lightning.Plugin] implementation for Revolt.
+// To use Revolt support with lightning, see [New]
+//
+//	bot := lightning.NewBot(lightning.BotOptions{
+//		// ...
+//	}
+//
+//	bot.AddPluginType("revolt", revolt.New)
+//
+//	bot.UsePluginType("revolt", map[string]any{
+//		// ...
+//	})
 package revolt
 
 import (
-	"errors"
+	"log/slog"
 	"time"
 
-	"github.com/sentinelb51/revoltgo"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-var revoltLog = lightning.Log.With("plugin", "revolt")
-
-func init() {
-	lightning.Plugins.RegisterType("revolt", newRevoltPlugin)
-}
-
-func newRevoltPlugin(config any) (lightning.Plugin, error) {
-	if cfg, ok := config.(map[string]any); !ok {
-		return nil, lightning.LogError(lightning.ErrPluginConfigInvalid, "Invalid config for Revolt plugin", nil, nil)
-	} else {
-		revolt := revoltgo.New(cfg["token"].(string))
-
-		if err := revolt.Open(); err != nil {
-			return nil, lightning.LogError(err, "Failed to open Revolt session", nil, nil)
-		}
-
-		revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventReady) {
-			revoltLog.Info("ready!", "username", s.State.Self().Username, "servers", len(m.Servers))
-			revoltLog.Info("Invite me at https://revolt.chat/invite/" + s.State.Self().ID)
-		})
-
-		revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventError) {
-			revoltLog.Error("socket error", "error", m.Error)
-		})
-
-		revolt.ReconnectInterval = 100 * time.Millisecond
-
-		return &revoltPlugin{cfg, revolt}, nil
+// New creates a new [lightning.Plugin] that provides Revolt support for Lightning
+//
+// It only takes in a map with the following structure:
+//
+//	map[string]any{
+//		"token": "", // a string with your Revolt bot token
+//	}
+func New(config any) (lightning.Plugin, error) {
+	cfg, ok := config.(map[string]any)
+	if !ok {
+		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid config for Revolt plugin", nil, nil)
 	}
+
+	token, ok := cfg["token"].(string)
+	if !ok {
+		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid token for Revolt plugin", nil, nil)
+	}
+
+	cache := newRevoltCache()
+	socket := revoltNewSocketManager(token)
+	plugin := &revoltPlugin{cache, nil, socket, token}
+	plugin.self = plugin.getUser("@me")
+
+	if plugin.self == nil {
+		return nil, lightning.LogError(lightning.PluginConfigError{}, "failed to get self for Revolt plugin", nil, nil)
+	}
+
+	socket.OnReady(func(ready *revoltEventReady) {
+		plugin.setCache(ready)
+		slog.Info("revolt: ready!", "username", plugin.self.Username, "servers", len(ready.Servers))
+		slog.Info("revolt: invite me at https://revolt.chat/invite/" + plugin.self.ID)
+	})
+
+	if err := socket.Connect(); err != nil {
+		return nil, lightning.LogError(err, "Failed to connect to Revolt socket", nil, nil)
+	}
+
+	return plugin, nil
 }
 
 type revoltPlugin struct {
-	config map[string]any
-	revolt *revoltgo.Session
+	revoltCache
+
+	self   *revoltUser
+	socket *revoltSocketManager
+
+	token string
 }
 
-func (p *revoltPlugin) Name() string {
+func (*revoltPlugin) Name() string {
 	return "bolt-revolt"
 }
 
-const correctPermissionValue = uint(485495808)
-
-func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
-	permissions, err := p.revolt.State.ChannelPermissions(p.revolt.State.Self(), p.revolt.State.Channel(channel))
-
-	if err != nil {
-		return nil, lightning.LogError(
-			err,
-			"Failed to get channel permissions in Revolt",
-			map[string]any{"channel": channel},
-			nil,
-		)
-	}
-
-	revoltLog.Debug("revolt permissions", "channel", channel, "permissions", permissions)
-
-	if (permissions & correctPermissionValue) != correctPermissionValue {
-		return nil, lightning.LogError(
-			errors.New("insufficient permissions in Revolt channel"),
-			"Missing required permissions. Please add all permissions to a role, assign that role to the bot, and rejoin the bridge",
-			map[string]any{
-				"channel":              channel,
-				"current_permissions":  permissions,
-				"expected_permissions": correctPermissionValue,
-			},
-			nil,
-		)
-	}
-
-	return channel, nil
-}
-
 func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
-	msg := getOutgoingMessage(p.revolt, message, false, opts != nil)
+	allowEveryone := false
+
+	if opts != nil {
+		allowEveryone = opts.AllowEveryonePings
+	}
+
+	msg := getOutgoing(p.token, message, false, opts != nil, allowEveryone)
 	leftoverAttachments := make([]string, 0)
 
 	if len(msg.Attachments) > 5 {
@@ -89,26 +87,23 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 		msg.Attachments = msg.Attachments[:5]
 	}
 
-	res, err := p.revolt.ChannelMessageSend(message.ChannelID, msg)
-
+	res, err := sendRevoltMessage(p.token, message.ChannelID, msg)
 	if err != nil {
 		return nil, getRevoltError(err, map[string]any{"msg": msg}, "Failed to send message to Revolt", false)
 	}
 
-	ids := []string{res.ID}
+	ids := []string{res}
 
 	if len(leftoverAttachments) > 0 {
-		res, err := p.revolt.ChannelMessageSend(message.ChannelID, revoltgo.MessageSend{
+		res, err := sendRevoltMessage(p.token, message.ChannelID, revoltMessageSend{
 			Attachments: leftoverAttachments,
-			Content:     "",
 			Masquerade:  msg.Masquerade,
 			Replies:     msg.Replies,
 		})
-
 		if err != nil {
-			revoltLog.Warn("failed to send leftover attachments", "attachments", leftoverAttachments, "error", err)
+			slog.Warn("revolt: failed to send leftover attachments", "attachments", leftoverAttachments, "error", err)
 		} else {
-			ids = append(ids, res.ID)
+			ids = append(ids, res)
 		}
 	}
 
@@ -116,8 +111,8 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 }
 
 func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
-	_, err := p.revolt.ChannelMessageEdit(opts.ChannelID, ids[0], toEdit(getOutgoingMessage(p.revolt, message, true, true)))
-
+	err := editRevoltMessage(p.token, message.ChannelID, ids[0],
+		getOutgoing(p.token, message, true, true, opts.AllowEveryonePings).toEdit())
 	if err != nil {
 		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to edit message on Revolt", true)
 	}
@@ -125,51 +120,50 @@ func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts
 	return nil
 }
 
-func (p *revoltPlugin) DeleteMessage(ids []string, opts *lightning.SendOptions) error {
-	for _, id := range ids {
-		err := p.revolt.ChannelMessageDelete(opts.ChannelID, id)
-
-		if err != nil {
-			return getRevoltError(err, map[string]any{"ids": ids}, "Failed to delete message on Revolt", true)
-		}
+func (p *revoltPlugin) DeleteMessage(channel string, ids []string) error {
+	if err := bulkDeleteRevoltMessages(p.token, channel, revoltChannelMessageBulkDeleteData{IDs: ids}); err != nil {
+		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to delete messages on Revolt", true)
 	}
 
 	return nil
 }
 
-func (p *revoltPlugin) SetupCommands(command map[string]lightning.Command) error {
+func (*revoltPlugin) SetupCommands(_ map[string]lightning.Command) error {
 	return nil
 }
 
 func (p *revoltPlugin) ListenMessages() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 1000)
+	channel := make(chan lightning.Message, 1000)
 
-	p.revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventMessage) {
-		if msg := getLightningMessage(s, m.Message); msg != nil {
-			ch <- *msg
+	p.socket.OnMessageCreated(func(m *revoltEventMessage) {
+		if msg := p.getIncomingMessage(m.revoltMessage); msg != nil {
+			channel <- *msg
 		}
 	})
 
-	return ch
+	return channel
 }
 
-func (p *revoltPlugin) ListenEdits() <-chan lightning.Message {
-	ch := make(chan lightning.Message, 1000)
+func (p *revoltPlugin) ListenEdits() <-chan lightning.EditedMessage {
+	channel := make(chan lightning.EditedMessage, 1000)
 
-	p.revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventMessageUpdate) {
-		if msg := getLightningMessage(s, m.Data); msg != nil {
-			ch <- *msg
+	p.socket.OnMessageUpdated(func(m *revoltEventMessageUpdate) {
+		if msg := p.getIncomingMessage(m.Data); msg != nil {
+			channel <- lightning.EditedMessage{
+				Message: *msg,
+				Edited:  m.Data.Edited,
+			}
 		}
 	})
 
-	return ch
+	return channel
 }
 
 func (p *revoltPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	ch := make(chan lightning.BaseMessage, 1000)
+	channel := make(chan lightning.BaseMessage, 1000)
 
-	p.revolt.AddHandler(func(s *revoltgo.Session, m *revoltgo.EventMessageDelete) {
-		ch <- lightning.BaseMessage{
+	p.socket.OnMessageDeleted(func(m *revoltEventMessageDelete) {
+		channel <- lightning.BaseMessage{
 			EventID:   m.ID,
 			ChannelID: m.Channel,
 			Plugin:    p.Name(),
@@ -177,9 +171,9 @@ func (p *revoltPlugin) ListenDeletes() <-chan lightning.BaseMessage {
 		}
 	})
 
-	return ch
+	return channel
 }
 
-func (p *revoltPlugin) ListenCommands() <-chan lightning.CommandEvent {
-	return make(chan lightning.CommandEvent)
+func (*revoltPlugin) ListenCommands() <-chan lightning.CommandEvent {
+	return nil
 }

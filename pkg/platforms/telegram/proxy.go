@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"io"
+	"log/slog"
 	"maps"
 	"net/http"
 	"strconv"
@@ -11,37 +12,45 @@ import (
 )
 
 func (p *telegramPlugin) startProxy() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/telegram")
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		path := strings.TrimPrefix(request.URL.Path, "/telegram")
 		url := p.telegram.FileURL(p.telegram.Token, path, nil)
-		req, err := http.NewRequestWithContext(r.Context(), r.Method, url, nil)
+
+		req, err := http.NewRequestWithContext(request.Context(), request.Method, url, nil)
 		if err != nil {
-			http.Error(w, "Failed to create request", http.StatusInternalServerError)
-			lightning.LogError(err, "Failed to create request for Telegram file proxy", nil, nil)
+			http.Error(writer, "Failed to create request", http.StatusInternalServerError)
+			slog.Warn("telegram: failed to create request", "err", err)
+
 			return
 		}
 
-		req.Header = r.Header.Clone()
+		req.Header = request.Header.Clone()
+
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			http.Error(w, "Failed to fetch file from Telegram", http.StatusInternalServerError)
-			lightning.LogError(err, "Failed to fetch file from Telegram", nil, nil)
+			http.Error(writer, "Failed to fetch file from Telegram", http.StatusInternalServerError)
+			slog.Warn("telegram: failed to fetch file", "err", err)
+
 			return
 		}
 
-		defer resp.Body.Close()
-		maps.Copy(w.Header(), resp.Header)
-		w.WriteHeader(resp.StatusCode)
-		if _, err := io.CopyBuffer(w, resp.Body, make([]byte, 64*1024)); err != nil {
-			http.Error(w, "Failed to write response", http.StatusInternalServerError)
-			lightning.LogError(err, "Failed to write response from Telegram file proxy", nil, nil)
-			return
+		maps.Copy(writer.Header(), resp.Header)
+		writer.WriteHeader(resp.StatusCode)
+
+		if _, err = io.CopyBuffer(writer, resp.Body, make([]byte, 64*1024)); err != nil {
+			http.Error(writer, "Failed to write response", http.StatusInternalServerError)
+			slog.Warn("telegram: failed to write resp", "err", err)
+		}
+
+		if err = resp.Body.Close(); err != nil {
+			slog.Warn("telegram: failed to close body", "err", err)
 		}
 	})
 
-	if err := http.ListenAndServe("0.0.0.0:"+strconv.FormatInt(p.proxyPort, 10), nil); err != nil {
+	//nolint:gosec // this doesn't really matter right now
+	if err := http.ListenAndServe("0.0.0.0:"+strconv.FormatInt(p.cfg.proxyPort, 10), nil); err != nil {
 		panic(lightning.LogError(err, "Failed to start Telegram file proxy", nil, nil))
 	}
 
-	lightning.Log.With("plugin", "telegram").Info("file proxy available", "url", p.proxyURL, "port", p.proxyPort)
+	slog.Info("telegram: file proxy available", "url", p.cfg.proxyURL, "port", p.cfg.proxyPort)
 }
