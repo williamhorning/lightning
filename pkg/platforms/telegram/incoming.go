@@ -164,7 +164,12 @@ func getLightningAuthor(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) li
 		Color:          "#24A1DE",
 	}
 
-	if pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil); err == nil && pics.TotalCount > 0 {
+	if ctx.EffectiveUser == nil {
+		return author
+	}
+
+	pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
+	if err == nil && pics.TotalCount > 0 {
 		var bestPhoto *gotgbot.PhotoSize
 
 		for i := range pics.Photos[0] {
