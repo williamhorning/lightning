@@ -23,3 +23,5 @@ require (
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )
+
+retract v0.0.0 // this tag was an attempt to retract other commits that didn't work
