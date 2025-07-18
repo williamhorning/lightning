@@ -51,7 +51,6 @@ type guildedChatMessage struct {
 	IsPinned              *bool               `json:"isPinned,omitempty"`
 	IsPrivate             *bool               `json:"isPrivate,omitempty"`
 	IsSilent              *bool               `json:"isSilent,omitempty"`
-	Mentions              *guildedMentions    `json:"mentions,omitempty"`
 	ReplyMessageIDs       *[]string           `json:"replyMessageIds,omitempty"`
 	ServerID              *string             `json:"serverId,omitempty"`
 	UpdatedAt             *time.Time          `json:"updatedAt,omitempty"`
@@ -79,22 +78,6 @@ type guildedChatMessageDeleted struct {
 type guildedChatMessageUpdated struct {
 	Message  guildedChatMessage `json:"message"`
 	ServerID string             `json:"serverId"`
-}
-
-type guildedMentionsIDField struct {
-	ID string `json:"id"`
-}
-
-type guildedMentions struct {
-	Channels *[]guildedMentionsIDField `json:"channels,omitempty"`
-
-	Everyone *bool `json:"everyone,omitempty"`
-
-	Here *bool `json:"here,omitempty"`
-
-	Roles *guildedMentionsIDField `json:"roles,omitempty"`
-
-	Users *[]guildedMentionsIDField `json:"users,omitempty"`
 }
 
 type guildedPayload struct {
