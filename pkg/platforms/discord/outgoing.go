@@ -174,7 +174,7 @@ func getOutgoingComponents(
 			continue
 		}
 
-		replyMsg, err := session.State.Message(message.ChannelID, replyID)
+		replyMsg, err := session.ChannelMessage(message.ChannelID, replyID)
 		if err != nil {
 			continue
 		}
@@ -196,6 +196,10 @@ func getOutgoingComponents(
 				replyMsg.ChannelID + "/" + replyMsg.ID,
 		}
 		buttons = append(buttons, btn)
+	}
+
+	if len(buttons) < 1 {
+		return nil
 	}
 
 	return []discordgo.MessageComponent{
