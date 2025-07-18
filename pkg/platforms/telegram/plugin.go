@@ -124,6 +124,9 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 
 	sendOpts := &gotgbot.SendMessageOpts{
 		ParseMode: gotgbot.ParseModeMarkdownV2,
+		RequestOpts: &gotgbot.RequestOpts{
+			Timeout: time.Second * 10,
+		},
 	}
 
 	if len(message.RepliedTo) > 0 {
