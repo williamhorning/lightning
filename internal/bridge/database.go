@@ -1,10 +1,5 @@
 package bridge
 
-import "errors"
-
-// ErrUnsupportedDatabaseType is returned when an unsupported database type is given in configuration.
-var ErrUnsupportedDatabaseType = errors.New("unsupported database type, must be 'postgres'")
-
 // The Database implementation used by the bridge system.
 type Database interface {
 	createBridge(bridge bridge) error
@@ -24,9 +19,18 @@ type DatabaseConfig struct {
 // GetDatabase returns a Database based on the configuration.
 func (config DatabaseConfig) GetDatabase() (Database, error) {
 	switch config.Type {
-	case "postgres":
-		return newPostgresDatabase(config.Connection)
+	case "postgres", "pgx":
+		return newSQLDatabase("pgx", config.Connection)
+	case "sqlite":
+		return newSQLDatabase("sqlite", config.Connection)
 	default:
-		return nil, ErrUnsupportedDatabaseType
+		return nil, UnsupportedDatabaseTypeError{}
 	}
+}
+
+// UnsupportedDatabaseTypeError is returned when an unsupported database type is given in configuration.
+type UnsupportedDatabaseTypeError struct{}
+
+func (UnsupportedDatabaseTypeError) Error() string {
+	return "unsupported database type, must be 'postgres', 'pgx' (postgres), or 'sqlite'"
 }
