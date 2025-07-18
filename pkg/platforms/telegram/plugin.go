@@ -178,6 +178,10 @@ func (p *telegramPlugin) EditMessage(message lightning.Message, ids []string, op
 		return nil
 	}
 
+	if err == nil {
+		return nil
+	}
+
 	return lightning.LogError(err, "Failed to edit message on Telegram",
 		map[string]any{"channel_id": message.ChannelID, "content": content}, nil)
 }
@@ -202,6 +206,9 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 	}
 
 	_, err = p.telegram.DeleteMessages(channel, messageIDs, nil)
+	if err == nil {
+		return nil
+	}
 
 	return lightning.LogError(err, "Failed to delete message on Telegram", map[string]any{"channel_id": channelID}, nil)
 }
