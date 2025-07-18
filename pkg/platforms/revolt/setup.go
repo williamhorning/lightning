@@ -25,12 +25,7 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	case revoltChannelTypeText, revoltChannelTypeVoice:
 		return p.handleTextOrVoiceChannel(channelData)
 	default:
-		return nil, lightning.LogError(
-			revoltPermissionsError{},
-			"Unknown channel type",
-			nil,
-			nil,
-		)
+		return nil, lightning.LogError(revoltPermissionsError{}, "Unknown channel type", nil, nil)
 	}
 }
 

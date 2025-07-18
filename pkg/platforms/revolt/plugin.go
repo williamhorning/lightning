@@ -49,7 +49,7 @@ func New(config any) (lightning.Plugin, error) {
 	socket.OnReady(func(ready *revoltEventReady) {
 		plugin.setCache(ready)
 		slog.Info("revolt: ready!", "username", plugin.self.Username, "servers", len(ready.Servers))
-		slog.Info("revolt: invite me at https://revolt.chat/invite/" + plugin.self.ID)
+		slog.Info("revolt: invite me at https://app.revolt.chat/invite/" + plugin.self.ID)
 	})
 
 	if err := socket.Connect(); err != nil {
