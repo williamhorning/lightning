@@ -90,6 +90,8 @@ func newSQLDatabase(driver, connection string) (*sqlDatabase, error) {
 		return nil, lightning.LogError(err, "failed to open db", nil, nil)
 	}
 
+	conn.SetMaxIdleConns(0)
+
 	instance := &sqlDatabase{db: conn, driver: driver}
 
 	_, err = conn.ExecContext(context.Background(), instance.prepareQuery(sqlCreateTables))
