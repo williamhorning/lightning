@@ -37,6 +37,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
+
       - name: build image
         id: build-image
         uses: docker/build-push-action@v3
@@ -45,7 +46,7 @@ jobs:
           tags: ghcr.io/williamhorning/lightning:latest, ghcr.io/williamhorning/lightning:${{ github.ref_name }}
           platforms: linux/amd64,linux/arm64
           context: .
-          file: ./Dockerfile
+          file: ./containerfile
           build-args: |
             TARGETARCH=amd64
             TARGETARCH=arm64
