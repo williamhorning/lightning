@@ -11,7 +11,7 @@ LABEL org.opencontainers.image.source="https://github.com/williamhorning/lightni
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Use build arg to determine architecture
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 
 # copy pre-built binaries and certificates
 USER 1001:1001

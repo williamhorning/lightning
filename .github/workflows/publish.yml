@@ -24,8 +24,8 @@ jobs:
       - name: Build binaries
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o lightning-amd64 ./cmd/lightning/main.go
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o lightning-arm64 ./cmd/lightning/main.go          
-      - name: Set up QEMU
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o lightning-arm64 ./cmd/lightning/main.go
+      - name: set up qemu
         uses: docker/setup-qemu-action@v3
       - name: login to ghcr
         uses: redhat-actions/podman-login@v1
@@ -33,22 +33,15 @@ jobs:
           registry: ghcr.io
           username: ${{github.actor}}
           password: ${{secrets.GITHUB_TOKEN}}
-      - name: build image with podman
+      - name: build image
         id: build-image
-        uses: redhat-actions/buildah-build@v2
+        uses: docker/build-push-action@v3
         with:
-          image: ghcr.io/williamhorning/lightning
-          archs: amd64, arm64
-          tags: latest ${{github.ref_name}}
-          containerfiles: ./containerfile
+          push: true
+          tags: ghcr.io/williamhorning/lightning:latest, ghcr.io/williamhorning/lightning:${{ github.ref_name }}
+          platforms: linux/amd64,linux/arm64
+          context: .
+          file: ./Dockerfile
           build-args: |
             TARGETARCH=amd64
             TARGETARCH=arm64
-      - name: push to ghcr.io
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ steps.build-image.outputs.tags }}
-          registry: ghcr.io
-          username: ${{github.actor}}
-          password: ${{ secrets.GITHUB_TOKEN }}
