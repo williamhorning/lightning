@@ -33,7 +33,7 @@ func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightni
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.ChannelID,
-			Plugin:    "bolt-discord",
+			Plugin:    "discord",
 			Time:      message.Timestamp,
 		},
 		Attachments: getLightningAttachments(message.Attachments, message.StickerItems),

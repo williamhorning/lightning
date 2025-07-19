@@ -106,7 +106,7 @@ type telegramPlugin struct {
 }
 
 func (*telegramPlugin) Name() string {
-	return "bolt-telegram"
+	return "telegram"
 }
 
 func (*telegramPlugin) SetupChannel(channel string) (any, error) {

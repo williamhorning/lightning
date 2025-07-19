@@ -89,7 +89,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 			BaseMessage: lightning.BaseMessage{
 				EventID:   interaction.ID,
 				ChannelID: interaction.ChannelID,
-				Plugin:    "bolt-discord",
+				Plugin:    "discord",
 				Time:      timestamp,
 			},
 			Prefix: "/",

@@ -68,7 +68,7 @@ type guildedPlugin struct {
 }
 
 func (*guildedPlugin) Name() string {
-	return "bolt-guilded"
+	return "guilded"
 }
 
 func (*guildedPlugin) EditMessage(_ lightning.Message, _ []string, _ *lightning.SendOptions) error {
@@ -136,7 +136,7 @@ func (p *guildedPlugin) ListenDeletes() <-chan lightning.BaseMessage {
 		channel <- lightning.BaseMessage{
 			EventID:   msg.Message.ID,
 			ChannelID: msg.Message.ChannelID,
-			Plugin:    "bolt-guilded",
+			Plugin:    "guilded",
 			Time:      msg.DeletedAt,
 		}
 	})

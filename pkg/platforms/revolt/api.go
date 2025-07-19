@@ -152,7 +152,7 @@ func revoltMakeRequest(token, method, endpoint string, body io.Reader) (*http.Re
 
 	req.Header.Set("X-Bot-Token", token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "rvapi/0.0.5")
+	req.Header.Set("User-Agent", "lightning/0.8.0-beta.1")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err == nil {

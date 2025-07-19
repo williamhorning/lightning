@@ -180,7 +180,7 @@ func (p *guildedPlugin) getIncomingMessage(msg *guildedChatMessage) *lightning.M
 		BaseMessage: lightning.BaseMessage{
 			EventID:   msg.ID,
 			ChannelID: msg.ChannelID,
-			Plugin:    "bolt-guilded",
+			Plugin:    "guilded",
 			Time:      msg.CreatedAt,
 		},
 		Attachments: p.getIncomingAttachments(urls),

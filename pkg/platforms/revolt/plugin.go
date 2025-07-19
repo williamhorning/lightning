@@ -69,7 +69,7 @@ type revoltPlugin struct {
 }
 
 func (*revoltPlugin) Name() string {
-	return "bolt-revolt"
+	return "revolt"
 }
 
 func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {

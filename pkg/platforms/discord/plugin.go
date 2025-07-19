@@ -82,7 +82,7 @@ type discordPlugin struct {
 }
 
 func (*discordPlugin) Name() string {
-	return "bolt-discord"
+	return "discord"
 }
 
 func (p *discordPlugin) SetupChannel(channel string) (any, error) {

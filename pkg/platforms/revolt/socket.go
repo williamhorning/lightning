@@ -82,7 +82,7 @@ func (s *revoltSocketManager) Connect() error {
 
 func (s *revoltSocketManager) connectWebsocket() error {
 	header := http.Header{}
-	header.Set("User-Agent", "rvapi/0.0.5")
+	header.Set("User-Agent", "lightning/0.8.0-beta.1")
 
 	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
 

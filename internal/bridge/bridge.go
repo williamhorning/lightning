@@ -64,10 +64,16 @@ func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType,
 func getBase(data any) (lightning.BaseMessage, error) {
 	switch msg := data.(type) {
 	case lightning.EditedMessage:
+		msg.Message.Plugin = "bolt-" + msg.Message.Plugin
+
 		return msg.Message.BaseMessage, nil
 	case lightning.Message:
+		msg.Plugin = "bolt-" + msg.Plugin
+
 		return msg.BaseMessage, nil
 	case lightning.BaseMessage:
+		msg.Plugin = "bolt-" + msg.Plugin
+
 		return msg, nil
 	default:
 		return lightning.BaseMessage{}, unsupportedTypeError{data}
@@ -186,10 +192,7 @@ func handleChannel(
 		}
 	}(channel)
 
-	opts := &lightning.SendOptions{
-		AllowEveryonePings: bridgeData.Settings.AllowEveryone,
-		ChannelData:        channel.Data,
-	}
+	opts := &lightning.SendOptions{AllowEveryonePings: bridgeData.Settings.AllowEveryone, ChannelData: channel.Data}
 
 	var resultIDs []string
 
@@ -207,7 +210,7 @@ func handleChannel(
 		}
 
 		newMessage.ChannelID = channel.ID
-		newMessage.Plugin = channel.Plugin
+		newMessage.Plugin = channel.Plugin[5:]
 		newMessage.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID, channel.Plugin)
 
 		if event == typeCreate {
@@ -221,7 +224,7 @@ func handleChannel(
 		}
 	case typeDelete:
 		resultIDs = priorMessageIDs
-		err = bot.DeleteMessages(channel.Plugin, channel.ID, priorMessageIDs)
+		err = bot.DeleteMessages(channel.Plugin[5:], channel.ID, priorMessageIDs)
 	}
 
 	if err != nil {

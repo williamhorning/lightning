@@ -208,7 +208,7 @@ func handleBridgeRow(row *sql.Row) (bridge, error) {
 func handleMessageRow(row *sql.Row) (bridgeMessageCollection, error) {
 	var messages bridgeMessageCollection
 
-	var channelsData, messagesData, settingsData *[]byte
+	var channelsData, messagesData, settingsData []byte
 
 	err := row.Scan(&messages.ID, &messages.Name, &messages.BridgeID, &channelsData, &messagesData, &settingsData)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -218,9 +218,9 @@ func handleMessageRow(row *sql.Row) (bridgeMessageCollection, error) {
 	}
 
 	if err := cmp.Or(
-		json.Unmarshal(*channelsData, &messages.Channels),
-		json.Unmarshal(*messagesData, &messages.Messages),
-		json.Unmarshal(*settingsData, &messages.Settings),
+		json.Unmarshal(channelsData, &messages.Channels),
+		json.Unmarshal(messagesData, &messages.Messages),
+		json.Unmarshal(settingsData, &messages.Settings),
 	); err != nil {
 		return bridgeMessageCollection{}, lightning.LogError(err, "failed to unmarshal message json", nil, nil)
 	}
