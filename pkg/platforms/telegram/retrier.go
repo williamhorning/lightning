@@ -32,13 +32,11 @@ func (r *retrier) RequestWithContext(
 	opts *gotgbot.RequestOpts,
 ) (json.RawMessage, error) {
 	resp, err := r.baseClient.RequestWithContext(ctx, token, method, params, data, opts)
-
 	if err == nil {
 		return resp, nil
 	}
 
 	telegramError := &gotgbot.TelegramError{}
-
 	if !errors.As(err, &telegramError) {
 		return resp, err //nolint:wrapcheck // this might be used by gotgbot
 	}

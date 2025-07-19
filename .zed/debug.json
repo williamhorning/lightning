@@ -1,0 +1,10 @@
+[
+  {
+    "adapter": "Delve",
+    "label": "run bot",
+    "request": "launch",
+    "mode": "debug",
+    "program": "./cmd/lightning/main.go",
+    "cwd": "${ZED_WORKTREE_ROOT}"
+  }
+]
