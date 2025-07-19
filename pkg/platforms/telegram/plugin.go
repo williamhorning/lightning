@@ -46,7 +46,7 @@ func New(config any) (lightning.Plugin, error) {
 		return nil, err
 	}
 
-	telegram, err := gotgbot.NewBot(cfg.token, nil)
+	telegram, err := gotgbot.NewBot(cfg.token, &gotgbot.BotOpts{BotClient: newRetrier()})
 	if err != nil {
 		return nil, lightning.LogError(err, "Failed to setup Telegram bot", nil, nil)
 	}
