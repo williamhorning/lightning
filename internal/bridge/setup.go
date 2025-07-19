@@ -16,7 +16,7 @@ func Setup(bot *lightning.Bot, database Database) {
 		Name:        "help",
 		Description: "get help with the bot",
 		Executor: func(_ lightning.CommandOptions) (string, error) {
-			return "hi, i'm lightning v0.8.0-beta.1! [docs](https://williamhorning.eu.org/lightning/)", nil
+			return "hi, i'm lightning" + lightning.VERSION + "! [docs](https://williamhorning.eu.org/lightning/)", nil
 		},
 	})
 

@@ -23,7 +23,7 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "lightning/0.8.0-beta.1")
+	req.Header.Set("User-Agent", "lightning/"+lightning.VERSION)
 	req.Header["x-guilded-bot-api-use-official-markdown"] = []string{"true"}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -106,7 +106,7 @@ func (s *guildedSocketManager) Connect() error {
 func (s *guildedSocketManager) connectWebsocket() error {
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+s.Token)
-	header.Set("User-Agent", "lightning/0.8.0-beta.1")
+	header.Set("User-Agent", "lightning/"+lightning.VERSION)
 	header["x-guilded-bot-api-use-official-markdown"] = []string{"true"}
 
 	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}

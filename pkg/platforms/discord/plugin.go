@@ -53,6 +53,7 @@ func New(config any) (lightning.Plugin, error) {
 	discord.StateEnabled = true
 	discord.ShouldReconnectOnError = true
 	discord.LogLevel = 1
+	discord.UserAgent = "lightning/" + lightning.VERSION + " DiscordGo/" + discordgo.VERSION
 	discordgo.Logger = func(msgL, _ int, format string, args ...any) {
 		slog.Log(context.Background(), slog.Level(msgL), "discordgo: "+format, "args", args)
 	}
