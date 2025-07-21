@@ -11,10 +11,10 @@ import (
 func (b *Bot) AddCommand(command Command) {
 	b.commands[command.Name] = command
 
-	for _, plugin := range b.plugins {
+	for pluginName, plugin := range b.plugins {
 		if err := plugin.SetupCommands(b.commands); err != nil {
 			err := LogError(err, "Failed to setup commands for plugin",
-				map[string]any{"plugin": plugin.Name()}, nil)
+				map[string]any{"plugin": pluginName}, nil)
 			slog.Warn("lightning: commands for plugin might not be available", "err", err)
 		}
 	}
@@ -51,7 +51,6 @@ func handleMessageCommand(prefix string) func(bot *Bot, event *Message) {
 					BaseMessage: BaseMessage{
 						ChannelID: event.ChannelID,
 						Time:      time.Now(),
-						Plugin:    event.Plugin,
 					},
 				}, nil)
 

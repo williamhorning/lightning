@@ -1,22 +1,25 @@
+FROM golang:1.24.5-alpine AS builder
+
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 go build -o /out/lightning ./cmd/lightning/main.go
+
 FROM scratch
 
 # metadata
 LABEL maintainer="William Horning"
-LABEL version="0.8.0-beta.2"
+LABEL version="0.8.0-beta.3"
 LABEL description="Lightning"
 LABEL org.opencontainers.image.title="Lightning"
 LABEL org.opencontainers.image.description="extensible chatbot connecting communities"
-LABEL org.opencontainers.image.version="0.8.0-beta.2"
+LABEL org.opencontainers.image.version="0.8.0-beta.3"
 LABEL org.opencontainers.image.source="https://github.com/williamhorning/lightning"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Use build arg to determine architecture
-ARG TARGETARCH
-
 # copy pre-built binaries and certificates
 USER 1001:1001
-COPY ./lightning-${TARGETARCH} /lightning
-COPY --from=gcr.io/distroless/static:nonroot /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /out/lightning /lightning
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 VOLUME [ "/data" ]
 WORKDIR /data
 

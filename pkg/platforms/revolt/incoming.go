@@ -28,7 +28,6 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.Channel,
-			Plugin:    "revolt",
 			Time:      timestamp,
 		},
 		Attachments: getLightningAttachment(message.Attachments),

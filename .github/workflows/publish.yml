@@ -16,37 +16,23 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: true
-      - name: Build binaries
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o lightning-amd64 ./cmd/lightning/main.go
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o lightning-arm64 ./cmd/lightning/main.go
       - name: set up qemu
         uses: docker/setup-qemu-action@v3
+      - name: setup buildx
+        uses: docker/setup-buildx-action@v3
       - name: login to ghcr
-        uses: redhat-actions/podman-login@v1
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{github.actor}}
-          password: ${{secrets.GITHUB_TOKEN}}
-      - name: set up buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: build image
-        id: build-image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           push: true
-          tags: ghcr.io/williamhorning/lightning:latest, ghcr.io/williamhorning/lightning:${{ github.ref_name }}
           platforms: linux/amd64,linux/arm64
           context: .
           file: ./containerfile
-          build-args: |
-            TARGETARCH=amd64
-            TARGETARCH=arm64
+          tags: |
+            ghcr.io/williamhorning/lightning:latest
+            ghcr.io/williamhorning/lightning:${{ github.ref_name }}

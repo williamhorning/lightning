@@ -6,7 +6,6 @@ type PluginConstructor func(config any) (Plugin, error)
 // A Plugin provides methods used by [Bot] to allow bots to not worry
 // about platform specifics, as each Plugin handles that.
 type Plugin interface {
-	Name() string
 	SetupChannel(channel string) (any, error)
 	SendMessage(message Message, opts *SendOptions) ([]string, error)
 	EditMessage(message Message, ids []string, opts *SendOptions) error
@@ -36,19 +35,23 @@ func (b *Bot) AddPluginType(name string, constructor PluginConstructor) error {
 // UsePluginType takes in a plugin name and config to use a plugin with your bot.
 // It only returns an error if a plugin already exists *or* if the plugin type is
 // not found.
-func (b *Bot) UsePluginType(name string, config any) error {
+func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
 	b.typesMutex.RLock()
 	defer b.typesMutex.RUnlock()
 
 	b.pluginMutex.Lock()
 	defer b.pluginMutex.Unlock()
 
-	if _, exists := b.plugins[name]; exists {
+	if instanceName == "" {
+		instanceName = typeName
+	}
+
+	if _, exists := b.plugins[instanceName]; exists {
 		return PluginRegisteredError{}
 	}
 
-	constructor, exists := b.types[name]
-	if !exists {
+	constructor, ok := b.types[typeName]
+	if !ok {
 		return MissingPluginError{}
 	}
 
@@ -57,37 +60,39 @@ func (b *Bot) UsePluginType(name string, config any) error {
 		return err
 	}
 
-	b.plugins[instance.Name()] = instance
-
+	b.plugins[instanceName] = instance
 	ensureHandlers(b)
 
+	b.startPluginListeners(instanceName, instance)
+
+	return nil
+}
+
+// startPluginListeners listens for events from a plugin and forwards them.
+// do NOT rely on the ChannelID format, treat it as an opaque string.
+func (b *Bot) startPluginListeners(name string, instance Plugin) {
 	go func() {
-		msgChan := instance.ListenMessages()
-		for msg := range msgChan {
+		for msg := range instance.ListenMessages() {
+			msg.ChannelID = name + "::" + msg.ChannelID
 			b.messageChannel <- msg
 		}
 	}()
-
 	go func() {
-		editChan := instance.ListenEdits()
-		for msg := range editChan {
-			b.editChannel <- msg
+		for edit := range instance.ListenEdits() {
+			edit.Message.ChannelID = name + "::" + edit.Message.ChannelID
+			b.editChannel <- edit
 		}
 	}()
-
 	go func() {
-		delChan := instance.ListenDeletes()
-		for msg := range delChan {
-			b.delChannel <- msg
+		for del := range instance.ListenDeletes() {
+			del.ChannelID = name + "::" + del.ChannelID
+			b.delChannel <- del
 		}
 	}()
-
 	go func() {
-		cmdChan := instance.ListenCommands()
-		for cmd := range cmdChan {
+		for cmd := range instance.ListenCommands() {
+			cmd.ChannelID = name + "::" + cmd.ChannelID
 			b.commandChannel <- cmd
 		}
 	}()
-
-	return nil
 }

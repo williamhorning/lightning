@@ -67,7 +67,7 @@ func main() {
 	bridge.Setup(bot, database)
 
 	for plugin, cfg := range cfg.Plugins {
-		if err := bot.UsePluginType(plugin, cfg); err != nil {
+		if err := bot.UsePluginType(plugin, "", cfg); err != nil {
 			slog.Error("failed to setup a plugin", "err", err)
 			os.Exit(1)
 		}

@@ -20,7 +20,7 @@ func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType,
 	var priorMessage *bridgeMessageCollection
 
 	if event == typeCreate {
-		bridgeData, err = database.getBridgeByChannel(base.ChannelID)
+		bridgeData, err = getBridgeByChannel(database, base.ChannelID)
 	} else {
 		var prior bridgeMessageCollection
 
@@ -49,8 +49,8 @@ func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType,
 		return nil
 	}
 
-	if bridgeData.getChannelDisabled(base.ChannelID, base.Plugin).Read {
-		slog.Debug("bridge: channel is subscribed, skipping", "channel", base.ChannelID, "plugin", base.Plugin)
+	if bridgeData.getChannelDisabled(base.ChannelID).Read {
+		slog.Debug("bridge: channel is subscribed, skipping", "channel", base.ChannelID)
 
 		return nil
 	}
@@ -64,20 +64,34 @@ func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType,
 func getBase(data any) (lightning.BaseMessage, error) {
 	switch msg := data.(type) {
 	case lightning.EditedMessage:
-		msg.Message.Plugin = "bolt-" + msg.Message.Plugin
-
 		return msg.Message.BaseMessage, nil
 	case lightning.Message:
-		msg.Plugin = "bolt-" + msg.Plugin
-
 		return msg.BaseMessage, nil
 	case lightning.BaseMessage:
-		msg.Plugin = "bolt-" + msg.Plugin
-
 		return msg, nil
 	default:
 		return lightning.BaseMessage{}, unsupportedTypeError{data}
 	}
+}
+
+func getBridgeByChannel(database Database, channel string) (bridge, error) {
+	bridgeData, err := database.getBridgeByChannel(channel)
+	if err != nil {
+		return bridge{}, lightning.LogError(err, "failed to get bridge", map[string]any{"channel": channel}, nil)
+	}
+
+	if bridgeData.ID != "" {
+		return bridgeData, nil
+	}
+
+	_, channelID := parseChannelID(channel)
+
+	bridgeData, err = database.getBridgeByChannel(channelID)
+	if err != nil {
+		return bridge{}, lightning.LogError(err, "failed to get bridge", map[string]any{"channel": channel}, nil)
+	}
+
+	return bridgeData, nil
 }
 
 func getMessage(data any) (lightning.Message, error) {
@@ -132,24 +146,17 @@ func processMessage(
 	waitGroup := sync.WaitGroup{}
 
 	for _, channel := range bridgeData.Channels {
-		if channel.ID == base.ChannelID && channel.Plugin == base.Plugin {
-			continue
-		}
-
-		if channel.isDisabled().Write {
+		if compareChannelIDs(channel, base.ChannelID) || channel.isDisabled().Write {
 			continue
 		}
 
 		waitGroup.Add(1)
 
 		go func(channelCopy *bridgeChannel) {
-			var priorMessageIDs []string
-			if event != typeCreate {
-				priorMessageIDs = priorMessage.getChannelMessageIDs(channelCopy.ID, channelCopy.Plugin)
+			priorMessageIDs := priorMessage.getChannelMessageIDs(channelCopy.ID)
 
-				if len(priorMessageIDs) == 0 {
-					return
-				}
+			if event != typeCreate && len(priorMessageIDs) == 0 {
+				return
 			}
 
 			defer waitGroup.Done()
@@ -171,7 +178,6 @@ func processMessage(
 	return append(messages, bridgeMessage{
 		ID:      []string{base.EventID},
 		Channel: base.ChannelID,
-		Plugin:  base.Plugin,
 	})
 }
 
@@ -188,15 +194,16 @@ func handleChannel(
 	defer func(channel *bridgeChannel) {
 		if r := recover(); r != nil {
 			slog.Error("bridge: panic in handling", "err", lightning.LogError(fmt.Errorf("%v", r), //nolint:err113
-				"panic in bridge handling", map[string]any{"channel": channel.ID, "plugin": channel.Plugin}, nil))
+				"panic in bridge handling", map[string]any{"channel": channel.ID}, nil))
 		}
 	}(channel)
 
 	opts := &lightning.SendOptions{AllowEveryonePings: bridgeData.Settings.AllowEveryone, ChannelData: channel.Data}
 
-	var resultIDs []string
-
 	var err error
+
+	resultIDs := priorMessageIDs
+	channelID := normalizeChannelID(*channel)
 
 	switch event {
 	case typeCreate, typeEdit:
@@ -204,27 +211,21 @@ func handleChannel(
 		if msgErr != nil {
 			slog.Warn("unsupported message type for bridge channel", "err", lightning.LogError(
 				err, "unsupported message type for bridge channel",
-				map[string]any{"channel": channel.ID, "plugin": channel.Plugin, "event": event}, nil))
+				map[string]any{"channel": channel.ID, "event": event}, nil))
 
 			return nil
 		}
 
-		newMessage.ChannelID = channel.ID
-		newMessage.Plugin = channel.Plugin[5:]
-		newMessage.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID, channel.Plugin)
+		newMessage.ChannelID = channelID
+		newMessage.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID)
 
 		if event == typeCreate {
 			resultIDs, err = bot.SendMessage(newMessage, opts)
-		} else {
-			resultIDs = priorMessageIDs
-
-			if len(priorMessageIDs) != 0 {
-				err = bot.EditMessage(newMessage, priorMessageIDs, opts)
-			}
+		} else if len(priorMessageIDs) != 0 {
+			err = bot.EditMessage(newMessage, priorMessageIDs, opts)
 		}
 	case typeDelete:
-		resultIDs = priorMessageIDs
-		err = bot.DeleteMessages(channel.Plugin[5:], channel.ID, priorMessageIDs)
+		err = bot.DeleteMessages(channelID, priorMessageIDs)
 	}
 
 	if err != nil {
@@ -233,7 +234,7 @@ func handleChannel(
 		return nil
 	}
 
-	return &bridgeMessage{channel.ID, channel.Plugin, resultIDs}
+	return &bridgeMessage{channelID, resultIDs}
 }
 
 func getRepliedToMessage(database Database, data any) *bridgeMessageCollection {
@@ -254,38 +255,30 @@ func getRepliedToMessage(database Database, data any) *bridgeMessageCollection {
 }
 
 func handleError(database Database, err error, channel *bridgeChannel, bridgeData *bridge, event eventType) {
-	lightningErr := lightning.LogError(err, "error handling bridge message", map[string]any{
-		"channel": channel.ID,
-		"plugin":  channel.Plugin,
-		"bridge":  bridgeData.ID,
-		"event":   event,
-	}, nil)
+	lightningErr := lightning.LogError(err, "error handling bridge message",
+		map[string]any{"channel": channel.ID, "bridge": bridgeData.ID, "event": event}, nil)
 	if !lightningErr.Disable.Read && !lightningErr.Disable.Write {
 		return
 	}
 
-	updatedChannels := make([]bridgeChannel, 0, len(bridgeData.Channels))
+	for idx, channelData := range bridgeData.Channels {
+		if compareChannelIDs(channelData, channel.ID) {
+			bridgeData.Channels[idx].Disabled = lightningErr.Disable
 
-	for _, ch := range bridgeData.Channels {
-		if ch.ID == channel.ID && ch.Plugin == channel.Plugin {
-			ch.Disabled = lightningErr.Disable
+			break
 		}
-
-		updatedChannels = append(updatedChannels, ch)
 	}
 
-	bridgeData.Channels = updatedChannels
-
-	msg := disableChannelError{bridgeData.ID, channel.ID, channel.Plugin}
+	msg := disableChannelError{bridgeData.ID, channel.ID}
 
 	slog.Warn("bridge: disabling channel due to error", "channel", channel.ID,
-		"plugin", channel.Plugin, "bridge", bridgeData.ID, "event", event, "err",
+		"bridge", bridgeData.ID, "event", event, "err",
 		lightning.LogError(msg, msg.Error(), map[string]any{"disable": lightningErr.Disable}, lightningErr.Disable))
 
 	if err := database.createBridge(*bridgeData); err != nil {
 		slog.Warn("bridge: failed to disable channel", "err", lightning.LogError(
 			err, "Failed to update bridge with disabled channel", map[string]any{
-				"bridge": bridgeData.ID, "channel": channel.ID, "plugin": channel.Plugin,
+				"bridge": bridgeData.ID, "channel": channel.ID,
 			}, nil))
 	}
 }

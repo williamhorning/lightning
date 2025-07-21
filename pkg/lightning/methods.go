@@ -1,10 +1,12 @@
 package lightning
 
+import "strings"
+
 // SetupChannel allows you to create the platform-specific equivalent of
 // a webhook and allows you to send messages with a different author, when
 // then return value is passed as ChannelData in [*SendOptions].
-func (b *Bot) SetupChannel(pluginName, channel string) (any, error) {
-	plugin, ok := b.plugins[pluginName]
+func (b *Bot) SetupChannel(channel string) (any, error) {
+	plugin, channel, ok := b.getPluginFromChannel(channel)
 	if !ok {
 		return nil, MissingPluginError{}
 	}
@@ -20,10 +22,12 @@ func (b *Bot) SetupChannel(pluginName, channel string) (any, error) {
 // SendMessage allows you to send a message to the channel and plugin specified
 // on the provided [Message]. You may additionally provide [*SendOptions].
 func (b *Bot) SendMessage(message Message, opts *SendOptions) ([]string, error) {
-	plugin, ok := b.plugins[message.Plugin]
+	plugin, channel, ok := b.getPluginFromChannel(message.ChannelID)
 	if !ok {
 		return nil, MissingPluginError{}
 	}
+
+	message.ChannelID = channel
 
 	result, err := plugin.SendMessage(message, opts)
 	if err == nil {
@@ -35,10 +39,12 @@ func (b *Bot) SendMessage(message Message, opts *SendOptions) ([]string, error) 
 
 // EditMessage allows you to edit a message in the channel and plugin specified.
 func (b *Bot) EditMessage(message Message, ids []string, opts *SendOptions) error {
-	plugin, ok := b.plugins[message.Plugin]
+	plugin, channel, ok := b.getPluginFromChannel(message.ChannelID)
 	if !ok {
 		return MissingPluginError{}
 	}
+
+	message.ChannelID = channel
 
 	if err := plugin.EditMessage(message, ids, opts); err != nil {
 		return LogError(err, "failed to edit message", map[string]any{"message": message, "opts": opts}, nil)
@@ -48,8 +54,8 @@ func (b *Bot) EditMessage(message Message, ids []string, opts *SendOptions) erro
 }
 
 // DeleteMessages allows you to delete messages in the channel and plugin specified.
-func (b *Bot) DeleteMessages(pluginName, channel string, ids []string) error {
-	plugin, ok := b.plugins[pluginName]
+func (b *Bot) DeleteMessages(channel string, ids []string) error {
+	plugin, channel, ok := b.getPluginFromChannel(channel)
 	if !ok {
 		return MissingPluginError{}
 	}
@@ -59,4 +65,12 @@ func (b *Bot) DeleteMessages(pluginName, channel string, ids []string) error {
 	}
 
 	return nil
+}
+
+func (b *Bot) getPluginFromChannel(channel string) (Plugin, string, bool) {
+	pluginName, channelName, _ := strings.Cut(channel, "::")
+
+	plugin, ok := b.plugins[pluginName]
+
+	return plugin, channelName, ok
 }

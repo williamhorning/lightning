@@ -14,7 +14,6 @@ type BaseMessage struct {
 	Time      time.Time
 	EventID   string
 	ChannelID string
-	Plugin    string
 }
 
 // ChannelDisabled represents whether to disable a channel due to possible errors.

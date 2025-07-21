@@ -80,21 +80,20 @@ func arguments(to string) []lightning.CommandArgument {
 }
 
 func prepareChannelForBridge(db Database, opts lightning.CommandOptions) (bridgeChannel, string) {
-	if br, err := db.getBridgeByChannel(opts.ChannelID); br.ID != "" || err != nil {
+	if br, err := getBridgeByChannel(db, opts.ChannelID); br.ID != "" || err != nil {
 		return bridgeChannel{}, "This channel is already part of a bridge. Please leave the bridge first."
 	}
 
-	data, err := opts.Bot.SetupChannel(opts.Plugin, opts.ChannelID)
+	data, err := opts.Bot.SetupChannel(opts.ChannelID)
 	if err != nil {
 		return bridgeChannel{}, lightning.LogError(err, "Failed to setup channel for bridge",
-			map[string]any{"plugin": opts.Plugin, "channel": opts.ChannelID}, nil).Error()
+			map[string]any{"channel": opts.ChannelID}, nil).Error()
 	}
 
 	return bridgeChannel{
 		ID:       opts.ChannelID,
 		Data:     data,
-		Plugin:   opts.Plugin,
-		Disabled: lightning.ChannelDisabled{Read: false, Write: false},
+		Disabled: lightning.ChannelDisabled{},
 	}, ""
 }
 
@@ -147,7 +146,7 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 }
 
 func leaveCommand(database Database, opts lightning.CommandOptions) (string, error) {
-	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
+	bridgeData, err := getBridgeByChannel(database, opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
@@ -159,9 +158,9 @@ func leaveCommand(database Database, opts lightning.CommandOptions) (string, err
 		return "This channel is not part of the specified bridge.", nil
 	}
 
-	for i, channel := range bridgeData.Channels {
-		if channel.ID == opts.ChannelID {
-			bridgeData.Channels = slices.Delete(bridgeData.Channels, i, i+1)
+	for idx, channel := range bridgeData.Channels {
+		if compareChannelIDs(channel, opts.ChannelID) {
+			bridgeData.Channels = slices.Delete(bridgeData.Channels, idx, idx+1)
 
 			break
 		}
@@ -178,7 +177,7 @@ func leaveCommand(database Database, opts lightning.CommandOptions) (string, err
 func toggleCommand(database Database, opts lightning.CommandOptions) (string, error) {
 	setting := opts.Arguments["setting"]
 
-	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
+	bridgeData, err := getBridgeByChannel(database, opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
@@ -201,7 +200,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) (string, er
 }
 
 func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
-	bridgeData, err := db.getBridgeByChannel(opts.ChannelID)
+	bridgeData, err := getBridgeByChannel(db, opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
@@ -212,7 +211,14 @@ func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
 	status := "Name: `" + bridgeData.Name + "`\n\nChannels:\n"
 
 	for i, channel := range bridgeData.Channels {
-		status += strconv.Itoa(i+1) + ". `" + channel.ID + "` on `" + channel.Plugin + "`"
+		status += strconv.Itoa(i+1) + ". `"
+
+		if channel.DeprecatedPlugin == "" {
+			status += channel.ID + "`"
+		} else {
+			status += channel.DeprecatedPlugin + "::" + channel.ID + "`"
+		}
+
 		if channel.isDisabled().Read {
 			status += " (subscribed)"
 		}

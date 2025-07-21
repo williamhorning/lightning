@@ -16,7 +16,6 @@ func getBase(ctx *ext.Context) lightning.BaseMessage {
 	return lightning.BaseMessage{
 		EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
 		ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-		Plugin:    "telegram",
 		Time:      time.UnixMilli(ctx.EffectiveMessage.GetDate() * 1000),
 	}
 }

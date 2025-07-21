@@ -68,10 +68,6 @@ type revoltPlugin struct {
 	token string
 }
 
-func (*revoltPlugin) Name() string {
-	return "revolt"
-}
-
 func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	allowEveryone := false
 
@@ -166,7 +162,6 @@ func (p *revoltPlugin) ListenDeletes() <-chan lightning.BaseMessage {
 		channel <- lightning.BaseMessage{
 			EventID:   m.ID,
 			ChannelID: m.Channel,
-			Plugin:    p.Name(),
 			Time:      time.Now(),
 		}
 	})

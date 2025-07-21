@@ -1,6 +1,8 @@
 package bridge
 
-import "github.com/williamhorning/lightning/pkg/lightning"
+import (
+	"github.com/williamhorning/lightning/pkg/lightning"
+)
 
 type bridgeSettings struct {
 	AllowEveryone bool `json:"allow_everyone"`
@@ -10,12 +12,12 @@ type bridgeChannel struct {
 	ID       string `json:"id"`
 	Data     any    `json:"data"`
 	Disabled any    `json:"disabled"`
-	Plugin   string `json:"plugin"`
+	// Deprecated: this is for backwards compatibility only
+	DeprecatedPlugin string `json:"plugin"`
 }
 
 type bridgeMessage struct {
 	Channel string   `json:"channel"`
-	Plugin  string   `json:"plugin"`
 	ID      []string `json:"id"`
 }
 
@@ -33,14 +35,18 @@ type bridgeMessageCollection struct {
 	bridge //nolint:embeddedstructfieldcheck // memory alignment is better this way
 }
 
-func (b *bridgeMessageCollection) getChannelMessageIDs(channelID, plugin string) []string {
+func (b *bridgeMessageCollection) getChannelMessageIDs(channelID string) []string {
 	if b == nil {
 		return nil
 	}
 
-	for _, message := range b.Messages {
-		if message.Channel == channelID && message.Plugin == plugin {
-			return message.ID
+	_, channelID = parseChannelID(channelID)
+
+	for _, msg := range b.Messages {
+		_, messageID := parseChannelID(msg.Channel)
+
+		if channelID == messageID {
+			return msg.ID
 		}
 	}
 
@@ -70,9 +76,9 @@ func (b *bridgeChannel) isDisabled() lightning.ChannelDisabled {
 	}
 }
 
-func (b *bridge) getChannelDisabled(channelID, plugin string) lightning.ChannelDisabled {
+func (b *bridge) getChannelDisabled(channelID string) lightning.ChannelDisabled {
 	for _, channel := range b.Channels {
-		if channel.ID == channelID && channel.Plugin == plugin {
+		if compareChannelIDs(channel, channelID) {
 			return channel.isDisabled()
 		}
 	}

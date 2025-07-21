@@ -7,11 +7,10 @@ import (
 type disableChannelError struct {
 	BridgeID  string
 	ChannelID string
-	Plugin    string
 }
 
 func (e disableChannelError) Error() string {
-	return "disabling channel " + e.ChannelID + " in bridge " + e.BridgeID + " for plugin " + e.Plugin
+	return "disabling channel " + e.ChannelID + " in bridge " + e.BridgeID
 }
 
 type unsupportedTypeError struct {

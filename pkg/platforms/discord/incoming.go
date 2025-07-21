@@ -33,7 +33,6 @@ func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightni
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.ChannelID,
-			Plugin:    "discord",
 			Time:      message.Timestamp,
 		},
 		Attachments: getLightningAttachments(message.Attachments, message.StickerItems),
@@ -165,7 +164,7 @@ func getLightningContent(session *discordgo.Session, message *discordgo.Message)
 	})
 
 	return emojiMention.ReplaceAllStringFunc(content, func(match string) string {
-		return emojiMention.FindStringSubmatch(match)[0]
+		return ":" + strings.Split(match, ":")[1] + ":"
 	})
 }
 

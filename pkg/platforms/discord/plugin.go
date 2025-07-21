@@ -82,10 +82,6 @@ type discordPlugin struct {
 	webhookCache *cache.Expiring[string, bool]
 }
 
-func (*discordPlugin) Name() string {
-	return "discord"
-}
-
 func (p *discordPlugin) SetupChannel(channel string) (any, error) {
 	wh, err := p.discord.WebhookCreate(channel, "Lightning Bridge", "")
 	if err != nil {
@@ -207,7 +203,6 @@ func (p *discordPlugin) ListenDeletes() <-chan lightning.BaseMessage {
 		channel <- lightning.BaseMessage{
 			EventID:   m.ID,
 			ChannelID: m.ChannelID,
-			Plugin:    p.Name(),
 			Time:      m.Timestamp,
 		}
 	})

@@ -105,10 +105,6 @@ type telegramPlugin struct {
 	updater        *ext.Updater
 }
 
-func (*telegramPlugin) Name() string {
-	return "telegram"
-}
-
 func (*telegramPlugin) SetupChannel(channel string) (any, error) {
 	return channel, nil
 }
