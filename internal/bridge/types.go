@@ -40,12 +40,8 @@ func (b *bridgeMessageCollection) getChannelMessageIDs(channelID string) []strin
 		return nil
 	}
 
-	_, channelID = parseChannelID(channelID)
-
 	for _, msg := range b.Messages {
-		_, messageID := parseChannelID(msg.Channel)
-
-		if channelID == messageID {
+		if compareChannelIDs(bridgeChannel{ID: msg.Channel}, channelID) {
 			return msg.ID
 		}
 	}

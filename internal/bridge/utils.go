@@ -3,19 +3,26 @@ package bridge
 import "strings"
 
 func parseChannelID(channelID string) (string, string) {
-	plugin, id, _ := strings.Cut(channelID, "::")
+	plugin, chID, found := strings.Cut(channelID, "::")
 
-	return plugin, id
+	if !found {
+		return "", channelID
+	}
+
+	return plugin, chID
 }
 
 func normalizeChannelID(channel bridgeChannel) string {
+	plugin := channel.DeprecatedPlugin
+	if plugin != "" {
+		plugin = strings.Replace(plugin, "bolt-", "", 1)
+	}
+
 	if strings.Contains(channel.ID, "::") {
 		return channel.ID
 	}
 
-	if channel.DeprecatedPlugin != "" {
-		plugin := strings.Replace(channel.DeprecatedPlugin, "bolt-", "", 1)
-
+	if plugin != "" {
 		return plugin + "::" + channel.ID
 	}
 
@@ -24,8 +31,12 @@ func normalizeChannelID(channel bridgeChannel) string {
 
 func compareChannelIDs(channel bridgeChannel, targetID string) bool {
 	normalizedID := normalizeChannelID(channel)
-	plugin1, id1, _ := strings.Cut(normalizedID, "::")
-	plugin2, id2, _ := strings.Cut(targetID, "::")
+	plugin1, id1 := parseChannelID(normalizedID)
+	plugin2, id2 := parseChannelID(targetID)
 
-	return id1 == id2 && (plugin1 == plugin2 || plugin1 == "" || plugin2 == "")
+	if id1 != id2 {
+		return false
+	}
+
+	return plugin1 == plugin2 || plugin1 == "" || plugin2 == ""
 }
