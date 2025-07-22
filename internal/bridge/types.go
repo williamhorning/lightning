@@ -10,10 +10,10 @@ type bridgeSettings struct {
 
 type bridgeChannel struct {
 	ID       string `json:"id"`
-	Data     any    `json:"data"`
-	Disabled any    `json:"disabled"`
+	Data     any    `json:"data,omitempty"`
+	Disabled any    `json:"disabled,omitempty"`
 	// Deprecated: this is for backwards compatibility only
-	DeprecatedPlugin string `json:"plugin"`
+	DeprecatedPlugin string `json:"plugin,omitempty"`
 }
 
 type bridgeMessage struct {

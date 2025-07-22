@@ -105,8 +105,8 @@ type telegramPlugin struct {
 	updater        *ext.Updater
 }
 
-func (*telegramPlugin) SetupChannel(channel string) (any, error) {
-	return channel, nil
+func (*telegramPlugin) SetupChannel(_ string) (any, error) {
+	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
 func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {

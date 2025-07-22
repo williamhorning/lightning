@@ -16,12 +16,10 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	channelData := p.getChannel(channel)
 
 	switch channelData.ChannelType {
-	case revoltChannelTypeSavedMessages:
-		return channel, nil
+	case revoltChannelTypeSavedMessages, revoltChannelTypeGroup:
+		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 	case revoltChannelTypeDM:
 		return handleDMChannel(channelData)
-	case revoltChannelTypeGroup:
-		return p.handleGroupChannel(channelData)
 	case revoltChannelTypeText, revoltChannelTypeVoice:
 		return p.handleTextOrVoiceChannel(channelData)
 	default:
@@ -39,24 +37,7 @@ func handleDMChannel(channel *revoltChannel) (any, error) {
 		)
 	}
 
-	return channel.ID, nil
-}
-
-func (p *revoltPlugin) handleGroupChannel(channel *revoltChannel) (any, error) {
-	if channel.Owner == p.self.ID {
-		return channel.ID, nil
-	}
-
-	if channel.Permissions == nil {
-		return nil, lightning.LogError(
-			revoltPermissionsError{},
-			"Group permissions on Revolt are nil",
-			nil,
-			nil,
-		)
-	}
-
-	return channel.ID, nil
+	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
 func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, error) {
@@ -71,7 +52,7 @@ func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, er
 	}
 
 	if server.Owner == p.self.ID {
-		return channel.ID, nil
+		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 	}
 
 	member := p.getMember(channel.Server, p.self.ID)
@@ -110,7 +91,7 @@ func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, er
 		)
 	}
 
-	return channel.ID, nil
+	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
 func calculatePermissions(
