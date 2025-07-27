@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"time"
 )
 
@@ -31,6 +32,8 @@ func LogError(err error, message string, extra map[string]any, disable *ChannelD
 
 	slog.Error("lightning error: "+message,
 		"id", errorID, "read", disable.Read, "write", disable.Write, "error", err, "extra", extra)
+
+	debug.PrintStack()
 
 	lightningError := BotError{
 		disable,

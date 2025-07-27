@@ -138,7 +138,9 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 	}
 
 	msg, err := p.telegram.SendMessage(channel, content, sendOpts)
-	if err != nil {
+	if err != nil && strings.Contains(err.Error(), "context deadline exceeded") {
+		return []string{}, nil
+	} else if err != nil {
 		return []string{}, lightning.LogError(err, "failed to send telegram message",
 			map[string]any{"channel": message.ChannelID, "content": content, "reply": sendOpts.ReplyParameters}, nil)
 	}
