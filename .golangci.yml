@@ -7,6 +7,7 @@ linters:
     - exhaustruct
     - mnd
     - noinlineerr
+    - nolintlint
     - tagliatelle
     - wsl
 

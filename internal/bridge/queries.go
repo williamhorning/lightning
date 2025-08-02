@@ -66,8 +66,9 @@ const (
 	selectMessageIDQuery = `
 		SELECT id FROM bridge_messages
 		WHERE EXISTS (
-			SELECT 1 FROM jsonb_array_elements(messages) AS m
-			WHERE $1 = ANY((m->>'message_ids')::TEXT[])
+			SELECT 1 FROM jsonb_array_elements(messages) AS m,
+				jsonb_array_elements_text(m -> 'message_ids') AS message_id
+			WHERE $1 = message_id
 		)
 		LIMIT 1;`
 

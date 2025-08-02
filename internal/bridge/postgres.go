@@ -203,7 +203,7 @@ func (p *postgresDatabase) createMessage(message bridgeMessageCollection) error 
 func (p *postgresDatabase) getMessage(msgID string) (bridgeMessageCollection, error) {
 	var (
 		message bridgeMessageCollection
-		data    json.RawMessage
+		data    sql.NullString
 	)
 
 	err := p.db.QueryRowContext(context.Background(),
@@ -211,9 +211,11 @@ func (p *postgresDatabase) getMessage(msgID string) (bridgeMessageCollection, er
 		Scan(&message.ID, &message.BridgeID, &data)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return message, wrapErr(err, "query message")
+	} else if errors.Is(err, sql.ErrNoRows) {
+		return bridgeMessageCollection{}, nil
 	}
 
-	if err := json.Unmarshal(data, &message.Messages); err != nil {
+	if err := json.Unmarshal([]byte(data.String), &message.Messages); err != nil {
 		return message, wrapErr(err, "unmarshal messages")
 	}
 
