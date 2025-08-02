@@ -40,7 +40,7 @@ func wrapErr(err error, msg string) error {
 	return lightning.LogError(err, msg, nil, nil)
 }
 
-func (p *postgresDatabase) exec(query string, args ...interface{}) error {
+func (p *postgresDatabase) exec(query string, args ...any) error {
 	if _, err := p.db.ExecContext(context.Background(), query, args...); err != nil {
 		return wrapErr(err, "exec failed")
 	}
