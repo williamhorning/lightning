@@ -1,67 +1,81 @@
 package bridge
 
 const (
-	sqlCreateTables = `
+	createTables = `
+		CREATE TABLE IF NOT EXISTS bridges (
+			id TEXT PRIMARY KEY,
+			settings JSONB NOT NULL DEFAULT '{"allow_everyone": false}'::jsonb
+		);
+
+		CREATE TABLE IF NOT EXISTS bridge_channels (
+			bridge_id TEXT NOT NULL REFERENCES bridges(id) ON DELETE CASCADE,
+			channel_id TEXT NOT NULL,
+			data JSONB DEFAULT '{}'::jsonb,
+			disabled JSONB NOT NULL DEFAULT '{"read": false, "write": false}'::jsonb,
+			PRIMARY KEY (bridge_id, channel_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS bridge_messages (
+			id TEXT PRIMARY KEY,
+			bridge_id TEXT NOT NULL REFERENCES bridges(id) ON DELETE CASCADE,
+			messages JSONB NOT NULL DEFAULT '[]'::jsonb
+		);
+
 		CREATE TABLE IF NOT EXISTS lightning (
 			prop  TEXT PRIMARY KEY,
 			value TEXT NOT NULL
-		);
-
-		INSERT INTO lightning (prop, value)
-		VALUES ('db_data_version', '0.8.0')
-		ON CONFLICT DO NOTHING;
-
-		CREATE TABLE IF NOT EXISTS bridges (
-			id       TEXT PRIMARY KEY,
-			name     TEXT NOT NULL,
-			channels JSONB NOT NULL,
-			settings JSONB NOT NULL
-		);
-
-		:create_index:
-
-		CREATE TABLE IF NOT EXISTS bridge_messages (
-			id        TEXT PRIMARY KEY,
-			name      TEXT NOT NULL,
-			bridge_id TEXT NOT NULL,
-			channels  JSONB NOT NULL,
-			messages  JSONB NOT NULL,
-			settings  JSONB NOT NULL
 		);`
 
-	sqlInsertBridge = `
-		INSERT INTO bridges (id, name, channels, settings)
-		VALUES (?1, ?2, ?3, ?4)
-		ON CONFLICT(id) DO UPDATE SET
-			name = excluded.name,
-			channels = excluded.channels,
-			settings = excluded.settings`
+	insertBridge = `
+		INSERT INTO bridges (id, settings)
+		VALUES ($1, $2)
+		ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings;`
 
-	sqlInsertMessage = `
-		INSERT INTO bridge_messages (id, name, bridge_id, channels, messages, settings)
-		VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-		ON CONFLICT(id) DO UPDATE SET
-			name = excluded.name,
-			channels = excluded.channels,
-			messages = excluded.messages,
-			settings = excluded.settings`
+	insertChannel = `
+		INSERT INTO bridge_channels (bridge_id, channel_id, data, disabled)
+		VALUES ($1, $2, $3, $4);`
 
-	sqlSelectBridgeByID = `SELECT id, name, channels, settings FROM bridges WHERE id = ?1`
+	insertMessage = `
+		INSERT INTO bridge_messages (id, bridge_id, messages)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (id) DO UPDATE SET
+			bridge_id = EXCLUDED.bridge_id,
+			messages = EXCLUDED.messages;`
 
-	sqlSelectBridgeByChannel = `
-		SELECT id, name, channels, settings FROM bridges
+	selectBridgeSettingsByID = `SELECT settings FROM bridges WHERE id = $1;`
+
+	selectBridgeByChannelQuery = `
+		SELECT bridge_id FROM bridge_channels 
+		WHERE channel_id = $1;`
+
+	selectBridgeChannelsQuery = `
+		SELECT channel_id, data, disabled FROM bridge_channels 
+		WHERE bridge_id = $1;`
+
+	selectMessageCollectionQuery = `
+		SELECT id, bridge_id, messages
+		FROM bridge_messages
 		WHERE EXISTS (
-			SELECT 1 FROM jsonb_array_elements(channels) AS ch
-			WHERE ch.value->>'id' = ?1
-		);`
+			SELECT 1
+			FROM jsonb_array_elements(messages) AS m,
+				jsonb_array_elements_text(m -> 'message_ids') AS message_id
+			WHERE $1 = message_id
+		)
+		LIMIT 1;`
 
-	sqlSelectMessage = `
-		SELECT id, name, bridge_id, channels, messages, settings FROM bridge_messages
-		WHERE id = $1 OR EXISTS (
-			SELECT 1 FROM jsonb_array_elements(messages) AS msg
-			CROSS JOIN jsonb_array_elements_text(msg->'id') AS id_element
-			WHERE id_element.value = $1
-		)`
+	selectMessageIDQuery = `
+		SELECT id FROM bridge_messages
+		WHERE EXISTS (
+			SELECT 1 FROM jsonb_array_elements(messages) AS m
+			WHERE $1 = ANY((m->>'message_ids')::TEXT[])
+		)
+		LIMIT 1;`
 
-	sqlDeleteMessage = `DELETE FROM bridge_messages WHERE id = ?1`
+	deleteBridgeChannelsQuery = `DELETE FROM bridge_channels WHERE bridge_id = $1;`
+
+	deleteMessageCollectionQuery = `DELETE FROM bridge_messages WHERE id = $1;`
+
+	selectDatabaseVersionQuery = `SELECT value FROM lightning WHERE prop = 'db_data_version';`
+
+	insertDatabaseVersionQuery = `INSERT INTO lightning (prop, value) VALUES ('db_data_version', '0.8.1');`
 )

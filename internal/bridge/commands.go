@@ -21,9 +21,6 @@ func bridgeCommand(database Database) lightning.Command {
 			{
 				Name:        "create",
 				Description: "create a new bridge",
-				Arguments: []lightning.CommandArgument{
-					{Name: "name", Description: "the name to use for the bridge", Required: true},
-				},
 				Executor: func(options lightning.CommandOptions) (string, error) {
 					return createCommand(database, options)
 				},
@@ -80,7 +77,7 @@ func arguments(to string) []lightning.CommandArgument {
 }
 
 func prepareChannelForBridge(db Database, opts lightning.CommandOptions) (bridgeChannel, string) {
-	if br, err := getBridgeByChannel(db, opts.ChannelID); br.ID != "" || err != nil {
+	if br, err := db.getBridgeByChannel(opts.ChannelID); br.ID != "" || err != nil {
 		return bridgeChannel{}, "This channel is already part of a bridge. Please leave the bridge first."
 	}
 
@@ -90,11 +87,7 @@ func prepareChannelForBridge(db Database, opts lightning.CommandOptions) (bridge
 			map[string]any{"channel": opts.ChannelID}, nil).Error()
 	}
 
-	return bridgeChannel{
-		ID:       opts.ChannelID,
-		Data:     data,
-		Disabled: lightning.ChannelDisabled{},
-	}, ""
+	return bridgeChannel{data, opts.ChannelID, lightning.ChannelDisabled{}}, ""
 }
 
 func createCommand(database Database, opts lightning.CommandOptions) (string, error) {
@@ -105,9 +98,8 @@ func createCommand(database Database, opts lightning.CommandOptions) (string, er
 
 	bridgeData := bridge{
 		ID:       ulid.Make().String(),
-		Name:     opts.Arguments["name"],
 		Channels: []bridgeChannel{channel},
-		Settings: bridgeSettings{false},
+		Settings: bridgeSettings{AllowEveryone: false},
 	}
 
 	if err := database.createBridge(bridgeData); err != nil {
@@ -146,7 +138,7 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 }
 
 func leaveCommand(database Database, opts lightning.CommandOptions) (string, error) {
-	bridgeData, err := getBridgeByChannel(database, opts.ChannelID)
+	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
@@ -159,7 +151,7 @@ func leaveCommand(database Database, opts lightning.CommandOptions) (string, err
 	}
 
 	for idx, channel := range bridgeData.Channels {
-		if compareChannelIDs(channel, opts.ChannelID) {
+		if channel.ID == opts.ChannelID {
 			bridgeData.Channels = slices.Delete(bridgeData.Channels, idx, idx+1)
 
 			break
@@ -177,7 +169,7 @@ func leaveCommand(database Database, opts lightning.CommandOptions) (string, err
 func toggleCommand(database Database, opts lightning.CommandOptions) (string, error) {
 	setting := opts.Arguments["setting"]
 
-	bridgeData, err := getBridgeByChannel(database, opts.ChannelID)
+	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
@@ -200,7 +192,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) (string, er
 }
 
 func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
-	bridgeData, err := getBridgeByChannel(db, opts.ChannelID)
+	bridgeData, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return lightning.LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
@@ -208,22 +200,16 @@ func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
 		return notInBridge, nil
 	}
 
-	status := "Name: `" + bridgeData.Name + "`\n\nChannels:\n"
+	status := "Channels:\n"
 
 	for i, channel := range bridgeData.Channels {
-		status += strconv.Itoa(i+1) + ". `"
+		status += strconv.Itoa(i+1) + ". `" + channel.ID + "`"
 
-		if channel.DeprecatedPlugin == "" {
-			status += channel.ID + "`"
-		} else {
-			status += channel.DeprecatedPlugin + "::" + channel.ID + "`"
-		}
-
-		if channel.isDisabled().Read {
+		if channel.Disabled.Read {
 			status += " (subscribed)"
 		}
 
-		if channel.isDisabled().Write {
+		if channel.Disabled.Write {
 			status += " (write disabled)"
 		}
 

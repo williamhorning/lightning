@@ -21,8 +21,6 @@ func (config DatabaseConfig) GetDatabase() (Database, error) {
 	switch config.Type {
 	case "postgres":
 		return newPostgresDatabase(config.Connection)
-	case "sqlite":
-		return newSQLiteDatabase(config.Connection)
 	default:
 		return nil, UnsupportedDatabaseTypeError{}
 	}
@@ -32,5 +30,5 @@ func (config DatabaseConfig) GetDatabase() (Database, error) {
 type UnsupportedDatabaseTypeError struct{}
 
 func (UnsupportedDatabaseTypeError) Error() string {
-	return "unsupported database type, must be 'postgres' or 'sqlite'"
+	return "unsupported database type, must be 'postgres'"
 }

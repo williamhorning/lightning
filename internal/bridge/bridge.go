@@ -20,7 +20,7 @@ func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType,
 	var priorMessage *bridgeMessageCollection
 
 	if event == typeCreate {
-		bridgeData, err = getBridgeByChannel(database, base.ChannelID)
+		bridgeData, err = database.getBridgeByChannel(base.ChannelID)
 	} else {
 		var prior bridgeMessageCollection
 
@@ -28,16 +28,11 @@ func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType,
 		if err == nil {
 			priorMessage = &prior
 
-			bridgeData = bridge{
-				ID:       priorMessage.BridgeID,
-				Name:     priorMessage.Name,
-				Channels: priorMessage.Channels,
-				Settings: priorMessage.Settings,
-			}
-
 			if priorMessage.ID != base.EventID && event == typeEdit {
 				return nil
 			}
+
+			bridgeData, err = database.getBridge(prior.BridgeID)
 		}
 	}
 
@@ -74,26 +69,6 @@ func getBase(data any) (lightning.BaseMessage, error) {
 	}
 }
 
-func getBridgeByChannel(database Database, channel string) (bridge, error) {
-	bridgeData, err := database.getBridgeByChannel(channel)
-	if err != nil {
-		return bridge{}, lightning.LogError(err, "failed to get bridge", map[string]any{"channel": channel}, nil)
-	}
-
-	if bridgeData.ID != "" {
-		return bridgeData, nil
-	}
-
-	_, channelID := parseChannelID(channel)
-
-	bridgeData, err = database.getBridgeByChannel(channelID)
-	if err != nil {
-		return bridge{}, lightning.LogError(err, "failed to get bridge", map[string]any{"channel": channel}, nil)
-	}
-
-	return bridgeData, nil
-}
-
 func getMessage(data any) (lightning.Message, error) {
 	switch msg := data.(type) {
 	case lightning.EditedMessage:
@@ -110,20 +85,11 @@ func setDatabase(
 	event eventType,
 	base lightning.BaseMessage,
 	bridgeData *bridge,
-	messages []bridgeMessage,
+	messages channelMessageArray,
 ) error {
 	switch event {
 	case typeCreate, typeEdit:
-		return database.createMessage(bridgeMessageCollection{
-			bridge: bridge{
-				ID:       base.EventID,
-				Name:     bridgeData.Name,
-				Channels: bridgeData.Channels,
-				Settings: bridgeData.Settings,
-			},
-			BridgeID: bridgeData.ID,
-			Messages: messages,
-		})
+		return database.createMessage(bridgeMessageCollection{base.EventID, bridgeData.ID, messages})
 	case typeDelete:
 		return database.deleteMessage(base.EventID)
 	default:
@@ -140,13 +106,13 @@ func processMessage(
 	data any,
 	repliedTo *bridgeMessageCollection,
 	priorMessage *bridgeMessageCollection,
-) []bridgeMessage {
-	messages := make([]bridgeMessage, 0, len(bridgeData.Channels)+1)
+) channelMessageArray {
+	messages := make(channelMessageArray, 0, len(bridgeData.Channels)+1)
 	messageMutex := sync.Mutex{}
 	waitGroup := sync.WaitGroup{}
 
 	for _, channel := range bridgeData.Channels {
-		if compareChannelIDs(channel, base.ChannelID) || channel.isDisabled().Write {
+		if channel.ID == base.ChannelID || channel.Disabled.Write {
 			continue
 		}
 
@@ -175,10 +141,7 @@ func processMessage(
 
 	waitGroup.Wait()
 
-	return append(messages, bridgeMessage{
-		ID:      []string{base.EventID},
-		Channel: base.ChannelID,
-	})
+	return append(messages, channelMessage{base.ChannelID, []string{base.EventID}})
 }
 
 func handleChannel(
@@ -190,7 +153,7 @@ func handleChannel(
 	data any,
 	repliedTo *bridgeMessageCollection,
 	priorMessageIDs []string,
-) *bridgeMessage {
+) *channelMessage {
 	defer func(channel *bridgeChannel) {
 		if r := recover(); r != nil {
 			slog.Error("bridge: panic in handling", "err", lightning.LogError(fmt.Errorf("%v", r), //nolint:err113
@@ -203,7 +166,6 @@ func handleChannel(
 	var err error
 
 	resultIDs := priorMessageIDs
-	channelID := normalizeChannelID(*channel)
 
 	switch event {
 	case typeCreate, typeEdit:
@@ -216,7 +178,7 @@ func handleChannel(
 			return nil
 		}
 
-		newMessage.ChannelID = channelID
+		newMessage.ChannelID = channel.ID
 		newMessage.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID)
 
 		if event == typeCreate {
@@ -225,7 +187,7 @@ func handleChannel(
 			err = bot.EditMessage(newMessage, priorMessageIDs, opts)
 		}
 	case typeDelete:
-		err = bot.DeleteMessages(channelID, priorMessageIDs)
+		err = bot.DeleteMessages(channel.ID, priorMessageIDs)
 	}
 
 	if err != nil {
@@ -234,7 +196,7 @@ func handleChannel(
 		return nil
 	}
 
-	return &bridgeMessage{channelID, resultIDs}
+	return &channelMessage{channel.ID, resultIDs}
 }
 
 func getRepliedToMessage(database Database, data any) *bridgeMessageCollection {
@@ -262,8 +224,8 @@ func handleError(database Database, err error, channel *bridgeChannel, bridgeDat
 	}
 
 	for idx, channelData := range bridgeData.Channels {
-		if compareChannelIDs(channelData, channel.ID) {
-			bridgeData.Channels[idx].Disabled = lightningErr.Disable
+		if channelData.ID == channel.ID {
+			bridgeData.Channels[idx].Disabled = *lightningErr.Disable
 
 			break
 		}
