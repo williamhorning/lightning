@@ -49,7 +49,7 @@ const (
 		WHERE channel_id = $1;`
 
 	selectBridgeChannelsQuery = `
-		SELECT channel_id, data, disabled FROM bridge_channels 
+		SELECT channel_id, COALESCE(data, '{}'), disabled FROM bridge_channels 
 		WHERE bridge_id = $1;`
 
 	selectMessageCollectionQuery = `

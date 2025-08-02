@@ -7,7 +7,7 @@ import (
 )
 
 // VERSION is the version of the lightning bot framework.
-const VERSION = "0.8.0-beta.6"
+const VERSION = "0.8.0-beta.7"
 
 // BotOptions allows you to configure the default author used by commands
 // and the prefix used by the bot for registered commands, in addition to

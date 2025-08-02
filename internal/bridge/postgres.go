@@ -209,7 +209,7 @@ func (p *postgresDatabase) getMessage(msgID string) (bridgeMessageCollection, er
 	err := p.db.QueryRowContext(context.Background(),
 		selectMessageCollectionQuery, msgID).
 		Scan(&message.ID, &message.BridgeID, &data)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return message, wrapErr(err, "query message")
 	}
 
