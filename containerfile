@@ -2,7 +2,7 @@ FROM golang:1.25.0-alpine AS builder
 
 WORKDIR /src
 COPY . .
-RUN CGO_ENABLED=0 go build -o /out/lightning ./cmd/lightning/main.go
+RUN CGO_ENABLED=0 go build -tags goolm -o /out/lightning ./cmd/lightning/main.go
 
 FROM scratch
 
