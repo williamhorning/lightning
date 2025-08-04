@@ -53,7 +53,12 @@ func uploadFile(token, tag, name string, reader io.Reader) (string, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", lightning.LogError(err, "revolt: unexpected status code "+strconv.Itoa(resp.StatusCode), nil, nil)
+		return "", lightning.LogError(
+			revoltStatusError{"failed to upload file", resp.StatusCode},
+			"revolt: unexpected status code "+strconv.Itoa(resp.StatusCode),
+			nil,
+			nil,
+		)
 	}
 
 	body, err := io.ReadAll(resp.Body)
