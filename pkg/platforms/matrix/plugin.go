@@ -85,6 +85,10 @@ func (*matrixPlugin) SetupChannel(_ string) (any, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
+func (*matrixPlugin) SendCommandResponse(_ lightning.Message, _ *lightning.SendOptions, _ string) ([]string, error) {
+	return nil, nil //nolint:nilnil // placeholder
+}
+
 func (p *matrixPlugin) SendMessage(message lightning.Message, _ *lightning.SendOptions) ([]string, error) {
 	msg := format.RenderMarkdown(message.Content, true, false)
 
