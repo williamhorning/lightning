@@ -37,6 +37,32 @@ func (p *revoltPlugin) getChannel(channelID string) *revoltChannel {
 	return &channel
 }
 
+func (p *revoltPlugin) getDMChannel(user string) *revoltChannel {
+	if channel, ok := p.dmChannelCache.Get(user); ok {
+		return &channel
+	}
+
+	resp, err := revoltMakeRequest(p.token, "GET", "/users/"+user+"/dm", nil)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("revolt: failed to close body", "err", err)
+		}
+	}()
+
+	var channel revoltChannel
+	if err := json.NewDecoder(resp.Body).Decode(&channel); err != nil {
+		return nil
+	}
+
+	p.dmChannelCache.Set(user, channel)
+
+	return &channel
+}
+
 func (p *revoltPlugin) getEmoji(emojiID string) *revoltEmoji {
 	if emoji, ok := p.emojiCache.Get(emojiID); ok {
 		return &emoji

@@ -7,6 +7,7 @@ type PluginConstructor func(config any) (Plugin, error)
 // about platform specifics, as each Plugin handles that.
 type Plugin interface {
 	SetupChannel(channel string) (any, error)
+	SendCommandResponse(message Message, opts *SendOptions, user string) ([]string, error)
 	SendMessage(message Message, opts *SendOptions) ([]string, error)
 	EditMessage(message Message, ids []string, opts *SendOptions) error
 	DeleteMessage(channel string, ids []string) error

@@ -7,15 +7,17 @@ import (
 )
 
 type revoltCache struct {
-	channelCache *cache.Expiring[string, revoltChannel]
-	emojiCache   *cache.Expiring[string, revoltEmoji]
-	memberCache  *cache.Expiring[string, revoltServerMember]
-	serverCache  *cache.Expiring[string, revoltServer]
-	userCache    *cache.Expiring[string, revoltUser]
+	channelCache   *cache.Expiring[string, revoltChannel]
+	dmChannelCache *cache.Expiring[string, revoltChannel]
+	emojiCache     *cache.Expiring[string, revoltEmoji]
+	memberCache    *cache.Expiring[string, revoltServerMember]
+	serverCache    *cache.Expiring[string, revoltServer]
+	userCache      *cache.Expiring[string, revoltUser]
 }
 
 func newRevoltCache() revoltCache {
 	return revoltCache{
+		cache.New[string, revoltChannel](30 * time.Second),
 		cache.New[string, revoltChannel](30 * time.Second),
 		cache.New[string, revoltEmoji](30 * time.Second),
 		cache.New[string, revoltServerMember](30 * time.Second),

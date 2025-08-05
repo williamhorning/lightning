@@ -109,6 +109,16 @@ func (*telegramPlugin) SetupChannel(_ string) (any, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
+func (p *telegramPlugin) SendCommandResponse(
+	message lightning.Message,
+	opts *lightning.SendOptions,
+	user string,
+) ([]string, error) {
+	message.ChannelID = user
+
+	return p.SendMessage(message, opts)
+}
+
 func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {

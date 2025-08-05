@@ -12,6 +12,14 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
+func (p *guildedPlugin) SendCommandResponse(
+	message lightning.Message,
+	opts *lightning.SendOptions,
+	_ string,
+) ([]string, error) {
+	return p.SendMessage(message, opts)
+}
+
 func (p *guildedPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := p.getOutgoingMessage(message, opts)
 

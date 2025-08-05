@@ -91,6 +91,21 @@ func (p *discordPlugin) SetupChannel(channel string) (any, error) {
 	return map[string]string{"id": wh.ID, "token": wh.Token}, nil
 }
 
+func (p *discordPlugin) SendCommandResponse(
+	message lightning.Message,
+	opts *lightning.SendOptions,
+	user string,
+) ([]string, error) {
+	channel, err := p.discord.UserChannelCreate(user)
+	if err != nil {
+		return nil, getError(err, map[string]any{"user": user}, "Failed to create DM channel for command response")
+	}
+
+	message.ChannelID = channel.ID
+
+	return p.SendMessage(message, opts)
+}
+
 func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := getOutgoingMessage(p.discord, message, opts, opts != nil)
 

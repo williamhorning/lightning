@@ -68,6 +68,26 @@ type revoltPlugin struct {
 	token string
 }
 
+func (p *revoltPlugin) SendCommandResponse(
+	message lightning.Message,
+	opts *lightning.SendOptions,
+	user string,
+) ([]string, error) {
+	channel := p.getDMChannel(user)
+	if channel == nil {
+		return nil, lightning.LogError(
+			revoltStatusError{},
+			"Failed to get DM channel for user",
+			map[string]any{"user": user},
+			nil,
+		)
+	}
+
+	message.ChannelID = channel.ID
+
+	return p.SendMessage(message, opts)
+}
+
 func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	allowEveryone := false
 

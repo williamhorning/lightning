@@ -45,16 +45,27 @@ func handleMessageCommand(prefix string) func(bot *Bot, event *Message) {
 			Command: commandName,
 			Options: options,
 			Reply: func(message string) error {
-				_, err := bot.SendMessage(Message{
+				plugin, _, ok := bot.getPluginFromChannel(event.ChannelID)
+				if !ok {
+					return MissingPluginError{}
+				}
+
+				_, err := plugin.SendCommandResponse(Message{
 					Content: message,
 					Author:  bot.author,
 					BaseMessage: BaseMessage{
 						ChannelID: event.ChannelID,
 						Time:      time.Now(),
 					},
-				}, nil)
+				}, nil, event.Author.ID)
 
-				return err
+				if err == nil {
+					return nil
+				}
+
+				return LogError(err, "failed to send command response", map[string]any{
+					"command": commandName, "event": event, "response": message,
+				}, nil)
 			},
 		})
 	}

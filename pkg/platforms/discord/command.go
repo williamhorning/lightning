@@ -100,6 +100,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: message,
+					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
 		},
