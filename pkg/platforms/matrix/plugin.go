@@ -14,8 +14,6 @@ package matrix
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -67,78 +65,10 @@ func New(config any) (lightning.Plugin, error) {
 		return nil, lightning.LogError(lightning.PluginConfigError{}, "Client does not use DefaultSyncer", nil, nil)
 	}
 
-	syncer.OnSync(func(ctx context.Context, resp *mautrix.RespSync, since string) bool {
-		if since != "" {
-			return true
-		}
-
-		return client.DontProcessOldEvents(ctx, resp, since)
-	})
-
-	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
-		if evt.Content.AsMember().Membership == event.MembershipInvite {
-			_, err := client.JoinRoomByID(ctx, evt.RoomID)
-			if err != nil {
-				slog.Warn("failed to join room", "err", err)
-			}
-		}
-	})
-
 	msgChannel := make(chan lightning.Message, 1000)
 	editChannel := make(chan lightning.EditedMessage, 1000)
 
-	syncer.OnEventType(event.EventMessage, func(_ context.Context, evt *event.Event) {
-		msg := evt.Content.AsMessage()
-
-		if evt.Sender.String() == client.UserID.String() && msg.BeeperPerMessageProfile != nil {
-			return
-		}
-
-		replyIDs := []string{}
-
-		if msg.RelatesTo != nil && msg.RelatesTo.InReplyTo != nil {
-			replyIDs = append(replyIDs, msg.RelatesTo.InReplyTo.EventID.String())
-		}
-
-		if msg.FormattedBody == "" {
-			msg.FormattedBody = msg.Body // fallback to plain text body if no formatted body
-		}
-
-		content, _ := format.HTMLToMarkdownFull(nil, msg.FormattedBody)
-
-		newMessage := lightning.Message{
-			BaseMessage: lightning.BaseMessage{
-				Time:      time.UnixMilli(evt.Timestamp),
-				EventID:   evt.ID.String(),
-				ChannelID: evt.RoomID.String(),
-			},
-			Attachments: nil, // TODO: how on earth
-			Author:      lightning.MessageAuthor{},
-			Content:     content,
-			RepliedTo:   replyIDs,
-		}
-
-		if msg.NewContent != nil {
-			if msg.NewContent.FormattedBody == "" {
-				msg.NewContent.FormattedBody = msg.NewContent.Body
-			}
-
-			newContent, _ := format.HTMLToMarkdownFull(nil, msg.NewContent.FormattedBody)
-			newMessage.Content = newContent
-
-			editChannel <- lightning.EditedMessage{Edited: evt.Mautrix.EditedAt, Message: newMessage}
-		} else {
-			msgChannel <- newMessage
-		}
-	})
-
-	go func() {
-		if err := client.Sync(); err != nil {
-			slog.Error("Failed to sync Matrix client", "err", err)
-
-			return
-		}
-	}()
+	setupEvents(syncer, client, msgChannel, editChannel)
 
 	return &matrixPlugin{client, syncer, msgChannel, editChannel}, nil
 }
@@ -152,19 +82,20 @@ type matrixPlugin struct {
 }
 
 func (*matrixPlugin) SetupChannel(_ string) (any, error) {
-	// TODO: permission check?
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
-func (p *matrixPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+func (p *matrixPlugin) SendMessage(message lightning.Message, _ *lightning.SendOptions) ([]string, error) {
 	msg := format.RenderMarkdown(message.Content, true, false)
 
 	msg.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{
 		ID:          message.Author.ID,
 		Displayname: message.Author.Nickname,
-		// TODO: avatar URL and cache
+		// TODO: avatar URL, cache, sendoptions
 		HasFallback: false,
 	}
+
+	msg.AddPerMessageProfileFallback()
 
 	resp, err := p.client.SendMessageEvent(
 		context.Background(),
@@ -174,19 +105,14 @@ func (p *matrixPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 		mautrix.ReqSendEvent{},
 	)
 	if err != nil {
-		// TODO: look at permissions with HTTPError
-		return nil, lightning.LogError(err, "Failed to send Matrix message",
-			map[string]any{"channel": message.ChannelID, "content": message.Content}, nil)
+		return nil, handleError(err, "failed to send matrix message",
+			map[string]any{"channel": message.ChannelID, "content": message.Content})
 	}
 
 	return []string{resp.EventID.String()}, nil
 }
 
-func (p *matrixPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
-	fmt.Printf("%+v\n%+v\n", message, opts)
-	for _, msgID := range ids {
-		println(msgID)
-	}
+func (*matrixPlugin) EditMessage(_ lightning.Message, _ []string, _ *lightning.SendOptions) error {
 	return nil
 }
 
@@ -195,9 +121,8 @@ func (p *matrixPlugin) DeleteMessage(channel string, ids []string) error {
 		if _, err := p.client.RedactEvent(
 			context.Background(), id.RoomID(channel), id.EventID(msgID), mautrix.ReqRedact{Reason: "deleted in bridge"},
 		); err != nil {
-			// TODO: look at permissions with HTTPError
-			return lightning.LogError(err, "Failed to redact Matrix message",
-				map[string]any{"channel": channel, "message_id": msgID}, nil)
+			return handleError(err, "Failed to redact Matrix message",
+				map[string]any{"channel": channel, "message_id": msgID})
 		}
 	}
 
