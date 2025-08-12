@@ -25,10 +25,13 @@ func getValidUsername(author lightning.MessageAuthor) string {
 func (p *guildedPlugin) getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions) *guildedPayload {
 	base := &guildedPayload{
 		Content:         message.Content,
-		AvatarURL:       *message.Author.ProfilePicture,
 		Username:        getValidUsername(message.Author),
 		ReplyMessageIDs: message.RepliedTo,
-		Embeds:          p.getOutgoingEmbeds(message, opts != nil),
+		Embeds:          p.getOutgoingEmbeds(message, opts),
+	}
+
+	if message.Author.ProfilePicture != nil {
+		base.AvatarURL = *message.Author.ProfilePicture
 	}
 
 	if len(base.Content) == 0 && len(base.Embeds) == 0 {
@@ -43,7 +46,7 @@ func (p *guildedPlugin) getOutgoingMessage(message lightning.Message, opts *ligh
 	return base
 }
 
-func (p *guildedPlugin) getOutgoingEmbeds(message lightning.Message, incl bool) []guildedChatEmbed {
+func (p *guildedPlugin) getOutgoingEmbeds(message lightning.Message, opts *lightning.SendOptions) []guildedChatEmbed {
 	guildedEmbeds := make([]guildedChatEmbed, 0)
 
 	for _, embed := range message.Embeds {
@@ -75,7 +78,7 @@ func (p *guildedPlugin) getOutgoingEmbeds(message lightning.Message, incl bool) 
 		})
 	}
 
-	if incl && len(message.RepliedTo) > 0 {
+	if opts != nil && len(message.RepliedTo) > 0 {
 		guildedEmbeds = p.appendReplyEmbed(guildedEmbeds, message)
 	}
 

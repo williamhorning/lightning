@@ -1,8 +1,8 @@
 package bridge
 
 import (
-	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -24,7 +24,7 @@ func Setup(bot *lightning.Bot, database Database) {
 		Name:        "ping",
 		Description: "check if the bot is alive",
 		Executor: func(options lightning.CommandOptions) (string, error) {
-			return fmt.Sprintf("Pong! 🏓 %dms", (time.Since(options.Time)).Milliseconds()), nil
+			return "Pong! 🏓 " + strconv.FormatInt(time.Since(options.Time).Milliseconds(), 10), nil
 		},
 	})
 

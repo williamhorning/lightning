@@ -14,6 +14,7 @@ package discord
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -34,20 +35,18 @@ import (
 func New(config any) (lightning.Plugin, error) {
 	cfg, ok := config.(map[string]any)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid config for Discord plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "discord", Message: "invalid config"}
 	}
 
 	token, ok := cfg["token"].(string)
 	if !ok || token == "" {
-		return nil, lightning.LogError(
-			lightning.PluginConfigError{},
-			"Missing or invalid token in Discord plugin config",
-			nil,
-			nil,
-		)
+		return nil, lightning.PluginConfigError{Plugin: "discord", Message: "invalid token"}
 	}
 
 	discord, err := discordgo.New("Bot " + token)
+	if err != nil {
+		return nil, fmt.Errorf("discord: failed to create session: %w", err)
+	}
 
 	discord.Identify.Intents = 16813601
 	discord.StateEnabled = true
@@ -58,22 +57,22 @@ func New(config any) (lightning.Plugin, error) {
 		slog.Log(context.Background(), slog.Level(msgL), "discordgo: "+format, "args", args)
 	}
 
-	if err != nil {
-		return nil, lightning.LogError(err, "Failed to create Discord session", nil, nil)
-	}
-
 	if err = discord.Open(); err != nil {
-		return nil, lightning.LogError(err, "Failed to open Discord session", nil, nil)
+		return nil, fmt.Errorf("discord: failed to open session: %w", err)
 	}
 
-	app, _ := discord.Application("@me")
+	app, err := discord.Application("@me")
+	if err != nil {
+		return nil, fmt.Errorf("discord: failed to get application info: %w", err)
+	}
+
 	slog.Info("discord: ready!",
 		"username", app.Name,
 		"servers", len(discord.State.Guilds),
 		"invite", "https://discord.com/oauth2/authorize?client_id="+app.ID+"&scope=bot&permissions=8",
 	)
 
-	return &discordPlugin{cfg, discord, cache.New[string, bool](30 * time.Second)}, nil
+	return &discordPlugin{cfg, discord, cache.New[string, bool](cache.DefaultTTL)}, nil
 }
 
 type discordPlugin struct {
@@ -107,15 +106,15 @@ func (p *discordPlugin) SendCommandResponse(
 }
 
 func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
-	msg := getOutgoingMessage(p.discord, message, opts, opts != nil)
+	msg := getOutgoingMessage(p.discord, message, opts)
 
 	if opts != nil {
-		id, token, err := p.getWebhookFromChannel(message.ChannelID, opts)
+		webhook, err := p.getWebhookFromChannel(message.ChannelID, opts)
 		if err != nil {
 			return nil, err
 		}
 
-		res, err := p.discord.WebhookExecute(id, token, true, msg.Webhook())
+		res, err := p.discord.WebhookExecute(webhook.ID, webhook.Token, true, msg.Webhook())
 		if err != nil {
 			return nil, getError(err, map[string]any{"msg": msg}, "Failed to send message to Discord via webhook")
 		}
@@ -132,16 +131,20 @@ func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.S
 }
 
 func (p *discordPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
-	webhookID, webhookToken, err := p.getWebhookFromChannel(message.ChannelID, opts)
+	webhook, err := p.getWebhookFromChannel(message.ChannelID, opts)
 	if err != nil {
 		return err
 	}
 
+	if len(ids) == 0 {
+		return nil
+	}
+
 	_, err = p.discord.WebhookMessageEdit(
-		webhookID,
-		webhookToken,
+		webhook.ID,
+		webhook.Token,
 		ids[0],
-		getOutgoingMessage(p.discord, message, opts, true).WebhookEdit(),
+		getOutgoingMessage(p.discord, message, opts).WebhookEdit(),
 	)
 	if err == nil {
 		return nil
@@ -168,12 +171,12 @@ func (p *discordPlugin) DeleteMessage(channel string, ids []string) error {
 func (p *discordPlugin) SetupCommands(command map[string]lightning.Command) error {
 	app, err := p.discord.Application("@me")
 	if err != nil {
-		return lightning.LogError(err, "Failed to get application info for Discord commands", nil, nil)
+		return getError(err, nil, "failed to get application info for Discord commands")
 	}
 
 	_, err = p.discord.ApplicationCommandBulkOverwrite(app.ID, "", getDiscordCommand(command))
 	if err != nil {
-		return lightning.LogError(err, "Failed to setup commands in Discord", map[string]any{"commands": command}, nil)
+		return getError(err, nil, "failed to setup Discord commands")
 	}
 
 	return nil

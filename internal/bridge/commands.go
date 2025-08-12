@@ -83,7 +83,7 @@ func prepareChannelForBridge(db Database, opts lightning.CommandOptions) (bridge
 
 	data, err := opts.Bot.SetupChannel(opts.ChannelID)
 	if err != nil {
-		return bridgeChannel{}, lightning.LogError(err, "Failed to setup channel for bridge",
+		return bridgeChannel{}, LogError(err, "Failed to setup channel for bridge",
 			map[string]any{"channel": opts.ChannelID}, nil).Error()
 	}
 
@@ -103,7 +103,7 @@ func createCommand(database Database, opts lightning.CommandOptions) (string, er
 	}
 
 	if err := database.createBridge(bridgeData); err != nil {
-		return lightning.LogError(err, "Failed to create bridge in database",
+		return LogError(err, "Failed to create bridge in database",
 			map[string]any{"bridge": bridgeData}, nil).Error(), nil
 	}
 
@@ -120,7 +120,7 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 
 	bridgeData, err := database.getBridge(opts.Arguments["id"])
 	if err != nil {
-		return lightning.LogError(err, "Failed to get bridge from database",
+		return LogError(err, "Failed to get bridge from database",
 			map[string]any{"bridge_id": opts.Arguments["id"]}, nil).Error(), nil
 	} else if bridgeData.ID == "" {
 		return "No bridge found with the provided ID.", nil
@@ -130,7 +130,7 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 	bridgeData.Channels = append(bridgeData.Channels, channel)
 
 	if err := database.createBridge(bridgeData); err != nil {
-		return lightning.LogError(err, "Failed to update bridge in database",
+		return LogError(err, "Failed to update bridge in database",
 			map[string]any{"bridge": bridgeData}, nil).Error(), nil
 	}
 
@@ -140,7 +140,7 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 func leaveCommand(database Database, opts lightning.CommandOptions) (string, error) {
 	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
-		return lightning.LogError(err, "Failed to get bridge from database",
+		return LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
 	} else if bridgeData.ID == "" {
 		return notInBridge, nil
@@ -159,7 +159,7 @@ func leaveCommand(database Database, opts lightning.CommandOptions) (string, err
 	}
 
 	if err := database.createBridge(bridgeData); err != nil {
-		return lightning.LogError(err, "Failed to update bridge in database",
+		return LogError(err, "Failed to update bridge in database",
 			map[string]any{"bridge": bridgeData}, nil).Error(), nil
 	}
 
@@ -171,7 +171,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) (string, er
 
 	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
-		return lightning.LogError(err, "Failed to get bridge from database",
+		return LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
 	} else if bridgeData.ID == "" {
 		return notInBridge, nil
@@ -184,7 +184,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) (string, er
 	bridgeData.Settings.AllowEveryone = !bridgeData.Settings.AllowEveryone
 
 	if err := database.createBridge(bridgeData); err != nil {
-		return lightning.LogError(err, "Failed to update bridge in database",
+		return LogError(err, "Failed to update bridge in database",
 			map[string]any{"bridge": bridgeData}, nil).Error(), nil
 	}
 
@@ -194,7 +194,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) (string, er
 func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
 	bridgeData, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
-		return lightning.LogError(err, "Failed to get bridge from database",
+		return LogError(err, "Failed to get bridge from database",
 			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
 	} else if bridgeData.ID == "" {
 		return notInBridge, nil

@@ -3,11 +3,10 @@ package guilded
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
@@ -18,14 +17,18 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 
 	body, err := json.Marshal(map[string]string{"channelId": channel, "name": "Lightning Bridges"})
 	if err != nil {
-		return nil, lightning.LogError(err, "Failed to marshal webhook creation body", nil, nil)
+		slog.Error("guilded: failed to marshal webhook creation body", "error", err, "channel", channel)
+
+		return nil, fmt.Errorf("guilded: failed to marshal webhook creation body: %w", err)
 	}
 
 	var reader io.Reader = bytes.NewReader(body)
 
 	resp, err := guildedMakeRequest(p.token, "POST", "/servers/"+channelData.ServerID+"/webhooks", reader)
 	if err != nil {
-		return nil, lightning.LogError(err, "Failed to create webhook for channel", nil, nil)
+		slog.Error("guilded: failed to create webhook for channel", "error", err, "channel", channel)
+
+		return nil, fmt.Errorf("guilded: failed to create webhook for channel %s: %w", channel, err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -40,27 +43,21 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 			slog.Warn("guilded: failed to close request body when making webhook")
 		}
 
-		return nil, lightning.LogError(
-			guildedStatusError{"failed to create webhook", resp.StatusCode},
-			"Failed to create webhook for channel",
-			extra,
-			nil,
-		)
+		return nil, guildedStatusError{"failed to create webhook", resp.StatusCode, false}
 	}
 
 	var webhookData guildedWebhookResponse
 
 	if err := json.NewDecoder(resp.Body).Decode(&webhookData); err != nil {
-		return nil, lightning.LogError(err, "Failed to decode webhook data", nil, nil)
+		slog.Error("guilded: failed to decode webhook data", "error", err, "channel", channel)
+
+		return nil, fmt.Errorf("guilded: failed to decode webhook data: %w", err)
 	}
 
 	if webhookData.Webhook.Token == nil {
-		return nil, lightning.LogError(
-			guildedWebhookTokenNilError{},
-			"Failed to create webhook for channel",
-			map[string]any{"channelID": channel, "webhook": webhookData},
-			nil,
-		)
+		slog.Error("guilded: webhook token is nil", "channel", channel, "data", webhookData)
+
+		return nil, guildedWebhookTokenNilError{channel}
 	}
 
 	return map[string]string{"id": webhookData.Webhook.ID, "token": *webhookData.Webhook.Token}, nil
@@ -69,12 +66,16 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 func getChannel(token, channel string) (*guildedServerChannel, error) {
 	resp, err := guildedMakeRequest(token, "GET", "/channels/"+channel, nil)
 	if err != nil {
-		return nil, lightning.LogError(err, "Failed to get channel for setup", nil, nil)
+		slog.Error("guilded: failed to get channel for setup", "error", err, "channel", channel)
+
+		return nil, fmt.Errorf("guilded: failed to get channel %s for setup: %w", channel, err)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, lightning.LogError(err, "Failed to read response body", nil, nil)
+		slog.Error("guilded: failed to read response body when getting channel", "error", err, "channel", channel)
+
+		return nil, fmt.Errorf("guilded: failed to read response body when getting channel %s: %w", channel, err)
 	}
 
 	if resp.Body.Close() != nil {
@@ -82,17 +83,17 @@ func getChannel(token, channel string) (*guildedServerChannel, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return nil, lightning.LogError(
-			guildedStatusError{"failed to get channel", resp.StatusCode},
-			"Failed to get channel for setup",
-			map[string]any{"status": resp.StatusCode, "body": string(bodyBytes)},
-			nil,
-		)
+		slog.Error("guilded: unexpected status code when getting channel",
+			"status", resp.StatusCode, "body", string(bodyBytes))
+
+		return nil, guildedStatusError{"failed to get channel", resp.StatusCode, false}
 	}
 
 	var channelData guildedServerChannelResponse
 	if err := json.Unmarshal(bodyBytes, &channelData); err != nil {
-		return nil, lightning.LogError(err, "Failed to unmarshal channel data", nil, nil)
+		slog.Error("guilded: failed to unmarshal channel data", "error", err, "body", string(bodyBytes))
+
+		return nil, fmt.Errorf("guilded: failed to unmarshal channel data: %w", err)
 	}
 
 	return &channelData.Channel, nil

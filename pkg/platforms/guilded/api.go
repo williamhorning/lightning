@@ -3,6 +3,7 @@ package guilded
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,7 +19,9 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 
 	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
-		return nil, lightning.LogError(err, "guilded: failed to create request", nil, nil)
+		slog.Error("guilded: failed to create request", "error", err, "method", method, "endpoint", endpoint)
+
+		return nil, fmt.Errorf("guilded: failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -31,7 +34,9 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 		return resp, nil
 	}
 
-	return nil, lightning.LogError(err, "guilded: failed to make api request", nil, nil)
+	slog.Error("guilded: failed to make API request", "error", err, "method", method, "endpoint", endpoint)
+
+	return nil, fmt.Errorf("guilded: failed to make API request: %w", err)
 }
 
 type guildedSocketManager struct {
@@ -117,7 +122,9 @@ func (s *guildedSocketManager) connectWebsocket() error {
 
 	s.conn, resp, err = dialer.Dial("wss://www.guilded.gg/websocket/v1", header)
 	if err != nil {
-		return lightning.LogError(err, "failed to dial Guilded websocket", nil, nil)
+		slog.Error("guilded: failed to dial WebSocket", "error", err, "response", resp)
+
+		return fmt.Errorf("guilded: failed to dial WebSocket: %w", err)
 	}
 
 	err = resp.Body.Close()
@@ -142,7 +149,7 @@ func (s *guildedSocketManager) readMessages() {
 		s.Alive = false
 		if s.conn != nil {
 			if err := s.conn.Close(); err != nil {
-				slog.Warn("guilded: failed to close request body when reading messages")
+				slog.Warn("guilded: failed to close WebSocket connection when reading messages")
 			}
 
 			s.conn = nil

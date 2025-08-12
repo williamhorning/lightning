@@ -48,13 +48,12 @@ func getDiscordCommand(command map[string]lightning.Command) []*discordgo.Applic
 }
 
 func getLightningCommand(session *discordgo.Session, interaction *discordgo.InteractionCreate) *lightning.CommandEvent {
-	if interaction.Type != discordgo.InteractionApplicationCommand ||
-		interaction.Data.Type() != discordgo.InteractionApplicationCommand {
+	if interaction.Type != discordgo.InteractionApplicationCommand {
 		return nil
 	}
 
 	args := make(map[string]string)
-	data := interaction.ApplicationCommandData() // see check above
+	data := interaction.ApplicationCommandData()
 
 	var subcommand *string
 
@@ -70,15 +69,13 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 			}
 		case discordgo.ApplicationCommandOptionString:
 			args[option.Name] = option.StringValue()
-		default:
 		}
 	}
 
 	timestamp, err := discordgo.SnowflakeTimestamp(interaction.ID)
 	if err != nil {
-		slog.Warn("discord: failed to parse interaction timestamp", "err",
-			lightning.LogError(err, "failed to parse interaction timestamp",
-				map[string]any{"interaction_id": interaction.ID}, nil))
+		slog.Warn("discord: failed to parse interaction timestamp", "err", err, "interaction_id", interaction.ID)
+		slog.Warn("discord: using current time as fallback for interaction timestamp")
 
 		timestamp = time.Now()
 	}

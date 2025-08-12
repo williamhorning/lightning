@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// DefaultTTL is the default time-to-live for cache items.
+const DefaultTTL = time.Second * 30
+
 type cacheItem[T any] struct {
 	Value     T
 	ExpiresAt time.Time

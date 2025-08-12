@@ -112,6 +112,7 @@ func getLightningAuthor(session *discordgo.Session, message *discordgo.Message) 
 	message.Member.User = message.Author
 	author.Nickname = message.Member.DisplayName()
 	profilePicture = message.Member.AvatarURL("")
+	author.ProfilePicture = &profilePicture
 
 	return author
 }

@@ -16,7 +16,7 @@ func getBase(ctx *ext.Context) lightning.BaseMessage {
 	return lightning.BaseMessage{
 		EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
 		ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-		Time:      time.UnixMilli(ctx.EffectiveMessage.GetDate() * 1000),
+		Time:      time.UnixMilli(ctx.EffectiveMessage.Date * 1000),
 	}
 }
 
@@ -44,7 +44,7 @@ func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) lightning.Co
 				ParseMode: gotgbot.ParseModeMarkdownV2,
 			})
 
-			return lightning.LogError(err, "Failed to reply to Telegram command", nil, nil)
+			return fmt.Errorf("telegram: failed to reply to command %s: %w", cmdName, err)
 		},
 	}
 }
@@ -71,7 +71,9 @@ func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.
 	}
 
 	if location := ctx.EffectiveMessage.Location; location != nil {
-		msg.Content = fmt.Sprintf("https://www.openstreetmap.org/#map=18/%f/%f", location.Latitude, location.Longitude)
+		msg.Content = "https://www.openstreetmap.org/#map=18/" +
+			strconv.FormatFloat(location.Latitude, 'f', 6, 64) + "/" +
+			strconv.FormatFloat(location.Longitude, 'f', 6, 64)
 
 		return msg
 	}
@@ -84,6 +86,11 @@ func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.
 }
 
 func addAttachment(bot *gotgbot.Bot, ctx *ext.Context, msg *lightning.Message, proxyPath string) {
+	if newChatPhoto := ctx.EffectiveMessage.NewChatPhoto; len(newChatPhoto) > 0 {
+		handleAttachment(bot, newChatPhoto[0].FileId, "chat_photo.jpg",
+			newChatPhoto[0].FileSize, "image/jpeg", msg, proxyPath)
+	}
+
 	if doc := ctx.EffectiveMessage.Document; doc != nil {
 		handleAttachment(bot, doc.FileId, doc.FileName, doc.FileSize, doc.MimeType, msg, proxyPath)
 	}

@@ -10,6 +10,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
+const defaultTimeout = gotgbot.DefaultTimeout * 2
+
 type retrier struct {
 	baseClient *gotgbot.BaseBotClient
 }
@@ -18,7 +20,7 @@ func newRetrier() *retrier {
 	return &retrier{&gotgbot.BaseBotClient{
 		Client: http.Client{},
 		DefaultRequestOpts: &gotgbot.RequestOpts{
-			Timeout: time.Second * 10,
+			Timeout: defaultTimeout,
 		},
 	}}
 }

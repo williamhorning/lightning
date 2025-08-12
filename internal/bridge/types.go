@@ -1,8 +1,6 @@
 package bridge
 
-import (
-	"github.com/williamhorning/lightning/pkg/lightning"
-)
+import "github.com/williamhorning/lightning/pkg/lightning"
 
 type eventType string
 

@@ -1,10 +1,6 @@
 package revolt
 
-import (
-	"time"
-
-	"github.com/williamhorning/lightning/internal/cache"
-)
+import "github.com/williamhorning/lightning/internal/cache"
 
 type revoltCache struct {
 	channelCache   *cache.Expiring[string, revoltChannel]
@@ -17,12 +13,12 @@ type revoltCache struct {
 
 func newRevoltCache() revoltCache {
 	return revoltCache{
-		cache.New[string, revoltChannel](30 * time.Second),
-		cache.New[string, revoltChannel](30 * time.Second),
-		cache.New[string, revoltEmoji](30 * time.Second),
-		cache.New[string, revoltServerMember](30 * time.Second),
-		cache.New[string, revoltServer](30 * time.Second),
-		cache.New[string, revoltUser](30 * time.Second),
+		cache.New[string, revoltChannel](cache.DefaultTTL),
+		cache.New[string, revoltChannel](cache.DefaultTTL),
+		cache.New[string, revoltEmoji](cache.DefaultTTL),
+		cache.New[string, revoltServerMember](cache.DefaultTTL),
+		cache.New[string, revoltServer](cache.DefaultTTL),
+		cache.New[string, revoltUser](cache.DefaultTTL),
 	}
 }
 

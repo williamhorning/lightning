@@ -1,14 +1,10 @@
 name: Build
-
 on:
   workflow_dispatch:
-  release:
-    types: [published]
-
+  release: { types: [published] }
 permissions:
   contents: read
   packages: write
-
 jobs:
   publish:
     name: publish to ghcr

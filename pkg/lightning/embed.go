@@ -1,8 +1,6 @@
 package lightning
 
-import (
-	"time"
-)
+import "time"
 
 // ToMarkdown converts a lightning Embed to a Markdown string
 // and it handles every field except for the color, which can't

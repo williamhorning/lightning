@@ -13,6 +13,7 @@
 package guilded
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/williamhorning/lightning/internal/cache"
@@ -30,13 +31,13 @@ func New(config any) (lightning.Plugin, error) {
 	cfg, ok := config.(map[string]any)
 
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid config for Guilded plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "guilded", Message: "invalid config"}
 	}
 
 	token, ok := cfg["token"].(string)
 
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid token for Guilded plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "guilded", Message: "invalid token"}
 	}
 
 	socket := guildedNewSocketManager(token)
@@ -52,7 +53,7 @@ func New(config any) (lightning.Plugin, error) {
 	})
 
 	if err := socket.Connect(); err != nil {
-		return nil, lightning.LogError(err, "Failed to connect to Guilded socket", nil, nil)
+		return nil, fmt.Errorf("guilded: failed to connect to socket: %w", err)
 	}
 
 	return plugin, nil
@@ -80,12 +81,9 @@ func (p *guildedPlugin) DeleteMessage(channel string, ids []string) error {
 		}
 
 		if err != nil {
-			return lightning.LogError(
-				err,
-				"Failed to delete message",
-				map[string]any{"messageID": msgID, "channelID": channel},
-				nil,
-			)
+			slog.Error("guilded: failed to delete message", "error", err, "messageID", msgID, "channelID", channel)
+
+			return fmt.Errorf("guilded: failed to delete message %s in channel %s: %w", msgID, channel, err)
 		}
 	}
 

@@ -6,6 +6,19 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
+type channelIDError struct {
+	channelID string
+}
+
+// Disable implements the lightning.ChannelDisabler interface for channelIDError.
+func (channelIDError) Disable() *lightning.ChannelDisabled {
+	return &lightning.ChannelDisabled{Read: false, Write: true}
+}
+
+func (e channelIDError) Error() string {
+	return "telegram: invalid channel ID: " + e.channelID
+}
+
 func parseContent(message lightning.Message, opts *lightning.SendOptions) string {
 	content := ""
 

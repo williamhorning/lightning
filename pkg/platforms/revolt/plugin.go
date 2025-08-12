@@ -13,6 +13,7 @@
 package revolt
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -29,12 +30,12 @@ import (
 func New(config any) (lightning.Plugin, error) {
 	cfg, ok := config.(map[string]any)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid config for Revolt plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "revolt", Message: "invalid config"}
 	}
 
 	token, ok := cfg["token"].(string)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid token for Revolt plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "revolt", Message: "invalid token"}
 	}
 
 	cache := newRevoltCache()
@@ -43,7 +44,7 @@ func New(config any) (lightning.Plugin, error) {
 	plugin.self = plugin.getUser("@me")
 
 	if plugin.self == nil {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "failed to get self for Revolt plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "revolt", Message: "failed to get self user"}
 	}
 
 	socket.OnReady(func(ready *revoltEventReady) {
@@ -53,7 +54,9 @@ func New(config any) (lightning.Plugin, error) {
 	})
 
 	if err := socket.Connect(); err != nil {
-		return nil, lightning.LogError(err, "Failed to connect to Revolt socket", nil, nil)
+		slog.Error("revolt: failed to connect to socket", "error", err)
+
+		return nil, fmt.Errorf("revolt: failed to connect to socket: %w", err)
 	}
 
 	return plugin, nil
@@ -75,12 +78,7 @@ func (p *revoltPlugin) SendCommandResponse(
 ) ([]string, error) {
 	channel := p.getDMChannel(user)
 	if channel == nil {
-		return nil, lightning.LogError(
-			revoltStatusError{},
-			"Failed to get DM channel for user",
-			map[string]any{"user": user},
-			nil,
-		)
+		return nil, revoltStatusError{"failed to get DM channel for user", 0, false}
 	}
 
 	message.ChannelID = channel.ID
@@ -89,13 +87,7 @@ func (p *revoltPlugin) SendCommandResponse(
 }
 
 func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
-	allowEveryone := false
-
-	if opts != nil {
-		allowEveryone = opts.AllowEveryonePings
-	}
-
-	msg := getOutgoing(p.token, message, false, opts != nil, allowEveryone)
+	msg := getOutgoing(p.token, message, opts)
 	leftoverAttachments := make([]string, 0)
 
 	if len(msg.Attachments) > 5 {
@@ -105,7 +97,7 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 
 	res, err := sendRevoltMessage(p.token, message.ChannelID, msg)
 	if err != nil {
-		return nil, getRevoltError(err, map[string]any{"msg": msg}, "Failed to send message to Revolt", false)
+		return nil, getRevoltError(err, map[string]any{"msg": msg}, "Failed to send message to Revolt")
 	}
 
 	ids := []string{res}
@@ -127,10 +119,12 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 }
 
 func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
+	message.Attachments = nil
+
 	err := editRevoltMessage(p.token, message.ChannelID, ids[0],
-		getOutgoing(p.token, message, true, true, opts.AllowEveryonePings).toEdit())
+		getOutgoing(p.token, message, opts).toEdit())
 	if err != nil {
-		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to edit message on Revolt", true)
+		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to edit message on Revolt")
 	}
 
 	return nil
@@ -138,7 +132,7 @@ func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts
 
 func (p *revoltPlugin) DeleteMessage(channel string, ids []string) error {
 	if err := bulkDeleteRevoltMessages(p.token, channel, revoltChannelMessageBulkDeleteData{IDs: ids}); err != nil {
-		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to delete messages on Revolt", true)
+		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to delete messages on Revolt")
 	}
 
 	return nil

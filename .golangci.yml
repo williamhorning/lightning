@@ -1,69 +1,38 @@
 version: "2"
-
-linters:
-  default: all
-  disable:
-    - depguard
-    - exhaustruct
-    - mnd
-    - noinlineerr
-    - nolintlint
-    - tagliatelle
-    - wsl
-
-  settings:
-    govet:
-      enable-all: true
-    ireturn:
-      allow:
-        - anon
-        - error
-        - empty
-        - stdlib
-        - Plugin
-        - Database
-    lll:
-      tab-width: 2
-    revive:
-      enable-all-rules: true
-      rules:
-        - name: add-constant
-          disabled: true
-        - name: cognitive-complexity
-          disabled: true
-        - name: confusing-results
-          disabled: true
-        - name: cyclomatic
-          disabled: true
-        - name: flag-parameter
-          disabled: true
-        - name: line-length-limit
-          arguments:
-            - 120
-        - name: max-public-structs
-          disabled: true
-    varnamelen:
-      ignore-type-assert-ok: true
-      ignore-map-index-ok: true
-      ignore-chan-recv-ok: true
-      ignore-names:
-        - err
-        - ok
-
-formatters:
-  enable:
-    - gci
-    - gofmt
-    - gofumpt
-    - goimports
-    - golines
-    - swaggo
-
-  settings:
-    golines:
-      max-len: 120
-      tab-len: 2
-
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
+linters: {
+  default: all,
+  disable: [
+    depguard,
+    exhaustruct,
+    mnd,
+    noinlineerr,
+    nolintlint,
+    tagliatelle,
+    wsl,
+  ],
+  settings: {
+    govet: { enable-all: true },
+    ireturn: { allow: [anon, error, empty, stdlib, Plugin, Database] },
+    lll: { tab-width: 2 },
+    revive: {
+      enable-all-rules: true,
+      rules: [
+        { name: add-constant, disabled: true },
+        { name: cognitive-complexity, disabled: true },
+        { name: cyclomatic, disabled: true },
+        { name: line-length-limit, arguments: [120] },
+        { name: max-public-structs, disabled: true },
+      ],
+    },
+    varnamelen: {
+      ignore-type-assert-ok: true,
+      ignore-map-index-ok: true,
+      ignore-chan-recv-ok: true,
+      ignore-names: [err, ok],
+    },
+  },
+}
+formatters: {
+  enable: [gci, gofmt, gofumpt, goimports, golines, swaggo],
+  settings: { golines: { max-len: 120, tab-len: 2 } },
+}

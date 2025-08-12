@@ -77,5 +77,5 @@ func main() {
 	signal.Notify(quitChannel, os.Interrupt, syscall.SIGTERM)
 	<-quitChannel
 
-	slog.Error("bot stopped", "err", lightning.LogError(nil, "bot stopped", nil, nil))
+	slog.Error("bot stopped", "err", bridge.LogError(nil, "bot stopped", nil, nil))
 }

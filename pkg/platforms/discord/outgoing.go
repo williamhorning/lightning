@@ -2,7 +2,9 @@ package discord
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -64,49 +66,33 @@ func (o *discordOutgoingMessage) Message() *discordgo.MessageSend {
 	}
 }
 
-func (p *discordPlugin) getWebhookFromChannel(channel string, options *lightning.SendOptions) (string, string, error) {
+type discordWebhook struct {
+	ID    string `json:"id"`
+	Token string `json:"token"`
+}
+
+func (p *discordPlugin) getWebhookFromChannel(channel string, options *lightning.SendOptions) (discordWebhook, error) {
 	webhookData, ok := options.ChannelData.(map[string]any)
 	if !ok {
-		return "", "", lightning.LogError(
-			discordInvalidWebhookError{},
-			"Failed to use webhook for Discord",
-			map[string]any{"channel": channel},
-			&lightning.ChannelDisabled{Read: false, Write: true},
-		)
+		return discordWebhook{}, discordInvalidWebhookError{channel}
 	}
 
-	webhookID, ok := webhookData["id"].(string)
+	webhookID, okID := webhookData["id"].(string)
+	webhookToken, okToken := webhookData["token"].(string)
 
-	if !ok || webhookID == "" {
-		return "", "", lightning.LogError(
-			discordInvalidWebhookError{},
-			"Failed to use webhook for Discord",
-			map[string]any{"channel": channel},
-			&lightning.ChannelDisabled{Read: false, Write: true},
-		)
-	}
-
-	webhookToken, ok := webhookData["token"].(string)
-
-	if !ok || webhookID == "" {
-		return "", "", lightning.LogError(
-			discordInvalidWebhookError{},
-			"Failed to use webhook for Discord",
-			map[string]any{"channel": channel},
-			&lightning.ChannelDisabled{Read: false, Write: true},
-		)
+	if !okID || !okToken || webhookID == "" || webhookToken == "" {
+		return discordWebhook{}, discordInvalidWebhookError{channel}
 	}
 
 	p.webhookCache.Set(webhookID, true)
 
-	return webhookID, webhookToken, nil
+	return discordWebhook{webhookID, webhookToken}, nil
 }
 
 func getOutgoingMessage(
 	session *discordgo.Session,
 	message lightning.Message,
 	opts *lightning.SendOptions,
-	button bool,
 ) *discordOutgoingMessage {
 	msg := discordOutgoingMessage{
 		AllowedMentions: getOutgoingMention(opts),
@@ -117,7 +103,7 @@ func getOutgoingMessage(
 		Username:        message.Author.Nickname,
 	}
 
-	if button {
+	if opts != nil {
 		msg.Components = getOutgoingComponents(session, message)
 	} else {
 		msg.Reference = getOutgoingReference(message)
@@ -360,7 +346,13 @@ func (c *cancelableReadCloser) Close() error {
 	err := c.ReadCloser.Close()
 	c.cancel()
 
-	return lightning.LogError(err, "discord failed to close reader", nil, nil)
+	if err != nil {
+		slog.Error("discord: failed closing cancelable read closer", "error", err)
+
+		return fmt.Errorf("discord: failed closing cancelable read closer: %w", err)
+	}
+
+	return nil
 }
 
 func getOutgoingReference(message lightning.Message) *discordgo.MessageReference {

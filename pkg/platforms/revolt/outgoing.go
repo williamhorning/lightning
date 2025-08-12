@@ -2,9 +2,9 @@ package revolt
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,9 +14,7 @@ import (
 func getOutgoing(
 	token string,
 	message lightning.Message,
-	skipFiles,
-	useMasquerade,
-	allowEveryone bool,
+	opts *lightning.SendOptions,
 ) revoltMessageSend {
 	content := message.Content
 
@@ -24,7 +22,7 @@ func getOutgoing(
 		content = "*empty message*"
 	}
 
-	if !allowEveryone {
+	if opts != nil && !opts.AllowEveryonePings {
 		content = strings.ReplaceAll(content, "@everyone", "@\u2800everyone")
 		content = strings.ReplaceAll(content, "@online", "@\u2800online")
 	}
@@ -34,16 +32,13 @@ func getOutgoing(
 	}
 
 	msg := revoltMessageSend{
-		Content: content,
-		Embeds:  getOutgoingEmbeds(message.Embeds),
-		Replies: getOutgoingReplies(message.RepliedTo),
+		Attachments: getOutgoingAttachments(token, message.Attachments),
+		Content:     content,
+		Embeds:      getOutgoingEmbeds(message.Embeds),
+		Replies:     getOutgoingReplies(message.RepliedTo),
 	}
 
-	if !skipFiles {
-		msg.Attachments = getOutgoingAttachments(token, message.Attachments)
-	}
-
-	if useMasquerade {
+	if opts != nil {
 		msg.Masquerade = getOutgoingMasquerade(message.Author)
 	}
 
@@ -114,7 +109,7 @@ func convertOutgoingEmbed(embed lightning.Embed) *revoltMessageEmbed {
 	}
 
 	if embed.Color != nil {
-		revoltEmbed.Color = fmt.Sprintf("#%06x", *embed.Color)
+		revoltEmbed.Color = "#" + strconv.FormatInt(int64(*embed.Color), 16)
 	}
 
 	setEmbedMedia(revoltEmbed, embed)

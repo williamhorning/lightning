@@ -1,14 +1,13 @@
 package telegram
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"maps"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func (p *telegramPlugin) startProxy() {
@@ -37,7 +36,7 @@ func (p *telegramPlugin) startProxy() {
 		maps.Copy(writer.Header(), resp.Header)
 		writer.WriteHeader(resp.StatusCode)
 
-		if _, err = io.CopyBuffer(writer, resp.Body, make([]byte, 64*1024)); err != nil {
+		if _, err = io.CopyBuffer(writer, resp.Body, nil); err != nil {
 			http.Error(writer, "Failed to write response", http.StatusInternalServerError)
 			slog.Warn("telegram: failed to write resp", "err", err)
 		}
@@ -49,7 +48,7 @@ func (p *telegramPlugin) startProxy() {
 
 	//nolint:gosec // this doesn't really matter right now
 	if err := http.ListenAndServe("0.0.0.0:"+strconv.FormatInt(p.cfg.proxyPort, 10), nil); err != nil {
-		panic(lightning.LogError(err, "Failed to start Telegram file proxy", nil, nil))
+		panic(fmt.Errorf("telegram: failed to start file proxy: %w", err))
 	}
 
 	slog.Info("telegram: file proxy available", "url", p.cfg.proxyURL, "port", p.cfg.proxyPort)

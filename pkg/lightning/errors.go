@@ -1,19 +1,8 @@
 package lightning
 
-// BotError is the wrapper for any error encountered by a [Bot].
-type BotError struct {
-	Disable *ChannelDisabled
-
-	underlying error
-	message    string
-}
-
-func (botErr BotError) Error() string {
-	return botErr.message
-}
-
-func (botErr BotError) Unwrap() error {
-	return botErr.underlying
+// ChannelDisabler is an interface that allows a channel to be disabled in an external system.
+type ChannelDisabler interface {
+	Disable() *ChannelDisabled
 }
 
 // PluginRegisteredError only occurs when a plugin/type is already registered and
@@ -33,14 +22,27 @@ func (MissingPluginError) Error() string {
 }
 
 // PluginConfigError only occurs when a plugin is passed an invalid config on registration.
-type PluginConfigError struct{}
-
-func (PluginConfigError) Error() string {
-	return "plugin config is invalid"
+type PluginConfigError struct {
+	Plugin  string
+	Message string
 }
 
-type nilLogError struct{}
+func (p PluginConfigError) Error() string {
+	return "plugin configuration error: " + p.Plugin + ": " + p.Message
+}
 
-func (nilLogError) Error() string {
-	return "LogError called with nil error. Please provide a valid error"
+// PluginMethodError is a wrapped error that occurs when a plugin method fails.
+type PluginMethodError struct {
+	err     error
+	ID      string
+	Method  string
+	Message string
+}
+
+func (p PluginMethodError) Error() string {
+	return "plugin " + p.ID + " method " + p.Method + " failed: " + p.Message + ": " + p.err.Error()
+}
+
+func (p PluginMethodError) Unwrap() error {
+	return p.err
 }

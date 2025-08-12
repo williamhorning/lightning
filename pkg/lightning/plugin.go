@@ -25,7 +25,7 @@ func (b *Bot) AddPluginType(name string, constructor PluginConstructor) error {
 	defer b.typesMutex.Unlock()
 
 	if _, exists := b.types[name]; exists {
-		return LogError(PluginRegisteredError{}, "Plugin type already registered", map[string]any{"name": name}, nil)
+		return PluginRegisteredError{}
 	}
 
 	b.types[name] = constructor
@@ -37,12 +37,6 @@ func (b *Bot) AddPluginType(name string, constructor PluginConstructor) error {
 // It only returns an error if a plugin already exists *or* if the plugin type is
 // not found.
 func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
-	b.typesMutex.RLock()
-	defer b.typesMutex.RUnlock()
-
-	b.pluginMutex.Lock()
-	defer b.pluginMutex.Unlock()
-
 	if instanceName == "" {
 		instanceName = typeName
 	}
@@ -51,7 +45,12 @@ func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
 		return PluginRegisteredError{}
 	}
 
+	b.typesMutex.RLock()
+
 	constructor, ok := b.types[typeName]
+
+	b.typesMutex.RUnlock()
+
 	if !ok {
 		return MissingPluginError{}
 	}
@@ -61,7 +60,12 @@ func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
 		return err
 	}
 
+	b.pluginMutex.Lock()
+
 	b.plugins[instanceName] = instance
+
+	b.pluginMutex.Unlock()
+
 	ensureHandlers(b)
 
 	b.startPluginListeners(instanceName, instance)

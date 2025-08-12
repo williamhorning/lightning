@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -173,7 +174,9 @@ func revoltMakeRequest(token, method, endpoint string, body io.Reader) (*http.Re
 
 	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
-		return nil, lightning.LogError(err, "revolt: failed to create request", nil, nil)
+		slog.Error("revolt: failed to create request", "error", err, "method", method, "endpoint", endpoint)
+
+		return nil, fmt.Errorf("revolt: failed to create request: %w", err)
 	}
 
 	req.Header.Set("X-Bot-Token", token)
@@ -185,13 +188,17 @@ func revoltMakeRequest(token, method, endpoint string, body io.Reader) (*http.Re
 		return resp, nil
 	}
 
-	return nil, lightning.LogError(err, "revolt: failed to make api request", nil, nil)
+	slog.Error("revolt: failed to make API request", "error", err, "method", method, "endpoint", endpoint)
+
+	return nil, fmt.Errorf("revolt: failed to make API request: %w", err)
 }
 
 func sendRevoltMessage(token, channel string, message revoltMessageSend) (string, error) {
 	payload, err := json.Marshal(message)
 	if err != nil {
-		return "", lightning.LogError(err, "revolt: failed to marshal message", nil, nil)
+		slog.Error("revolt: failed to marshal message", "error", err, "message", message)
+
+		return "", fmt.Errorf("revolt: failed to marshal message: %w", err)
 	}
 
 	resp, err := revoltMakeRequest(
@@ -211,12 +218,14 @@ func sendRevoltMessage(token, channel string, message revoltMessageSend) (string
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", revoltStatusError{"failed to send revolt message", resp.StatusCode}
+		return "", revoltStatusError{"failed to send revolt message", resp.StatusCode, false}
 	}
 
 	var response revoltMessage
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return "", lightning.LogError(err, "revolt: failed to decode response", nil, nil)
+		slog.Error("revolt: failed to decode response", "error", err, "status", resp.StatusCode)
+
+		return "", fmt.Errorf("revolt: failed to decode response: %w", err)
 	}
 
 	return response.ID, nil
@@ -225,7 +234,9 @@ func sendRevoltMessage(token, channel string, message revoltMessageSend) (string
 func editRevoltMessage(token, channel, messageID string, message revoltMessageEditData) error {
 	payload, err := json.Marshal(message)
 	if err != nil {
-		return lightning.LogError(err, "revolt: failed to marshal message", nil, nil)
+		slog.Error("revolt: failed to marshal message", "error", err, "message", message)
+
+		return fmt.Errorf("revolt: failed to marshal message: %w", err)
 	}
 
 	resp, err := revoltMakeRequest(
@@ -245,7 +256,7 @@ func editRevoltMessage(token, channel, messageID string, message revoltMessageEd
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return revoltStatusError{"failed to edit revolt message", resp.StatusCode}
+		return revoltStatusError{"failed to edit revolt message", resp.StatusCode, true}
 	}
 
 	return nil
@@ -254,7 +265,9 @@ func editRevoltMessage(token, channel, messageID string, message revoltMessageEd
 func bulkDeleteRevoltMessages(token, channel string, body revoltChannelMessageBulkDeleteData) error {
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return lightning.LogError(err, "revolt: failed to marshal deletion", nil, nil)
+		slog.Error("revolt: failed to marshal deletion", "error", err, "body", body)
+
+		return fmt.Errorf("revolt: failed to marshal deletion: %w", err)
 	}
 
 	resp, err := revoltMakeRequest(
@@ -274,7 +287,7 @@ func bulkDeleteRevoltMessages(token, channel string, body revoltChannelMessageBu
 	}()
 
 	if resp.StatusCode != http.StatusNoContent {
-		return revoltStatusError{"failed to delete revolt message", resp.StatusCode}
+		return revoltStatusError{"failed to delete revolt message", resp.StatusCode, true}
 	}
 
 	return nil

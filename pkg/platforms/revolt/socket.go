@@ -2,6 +2,7 @@ package revolt
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -92,7 +93,7 @@ func (s *revoltSocketManager) connectWebsocket() error {
 
 	s.conn, resp, err = dialer.Dial("wss://app.revolt.chat/events?version=1&format=json&token="+s.Token, header)
 	if err != nil {
-		return lightning.LogError(err, "failed to dial Revolt websocket", nil, nil)
+		return fmt.Errorf("revolt: failed to dial WebSocket: %w", err)
 	}
 
 	err = resp.Body.Close()

@@ -172,15 +172,10 @@ type guildedUserStatus struct {
 }
 
 type guildedWebhook struct {
-	CreatedAt time.Time  `json:"createdAt"`
-	Avatar    *string    `json:"avatar,omitempty"`
-	DeletedAt *time.Time `json:"deletedAt,omitempty"`
-	Token     *string    `json:"token,omitempty"`
-	ChannelID string     `json:"channelId"`
-	CreatedBy string     `json:"createdBy"`
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	ServerID  string     `json:"serverId"`
+	Avatar *string `json:"avatar,omitempty"`
+	Token  *string `json:"token,omitempty"`
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
 }
 
 func (wh *guildedWebhook) toAuthor() lightning.MessageAuthor {

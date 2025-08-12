@@ -2,52 +2,55 @@ package revolt
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 	"strconv"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type revoltPermissionsError struct{}
+type revoltPermissionsError struct {
+	msg string
+}
 
-func (revoltPermissionsError) Error() string {
-	return "insufficient permissions in Revolt channel, please check them"
+// Disable implements the lightning.ChannelDisabler interface for revoltPermissionsError.
+func (revoltPermissionsError) Disable() *lightning.ChannelDisabled {
+	return &lightning.ChannelDisabled{Read: false, Write: true}
+}
+
+func (e revoltPermissionsError) Error() string {
+	return "insufficient permissions in Revolt " + e.msg + " channel, please check them"
 }
 
 type revoltStatusError struct {
-	msg  string
-	code int
+	msg            string
+	code           int
+	disableDisable bool
+}
+
+// Disable implements the lightning.ChannelDisabler interface for revoltStatusError.
+func (e revoltStatusError) Disable() *lightning.ChannelDisabled {
+	return &lightning.ChannelDisabled{Read: false, Write: e.code == 403 || (e.code == 404 && !e.disableDisable)}
 }
 
 func (e revoltStatusError) Error() string {
 	return strconv.Itoa(e.code) + ": " + e.msg
 }
 
-func getRevoltError(err error, extra map[string]any, message string, edit bool) error {
+func getRevoltError(err error, extra map[string]any, message string) error {
 	if errors.Is(err, revoltPermissionsError{}) {
-		return lightning.LogError(err, err.Error(), nil, &lightning.ChannelDisabled{Read: false, Write: true})
+		slog.Error("revolt: insufficient permissions", "error", err, "extra", extra)
+
+		return err
 	}
 
-	var revoltErr revoltStatusError
-	if errors.As(err, &revoltErr) {
-		switch revoltErr.code {
-		case 403:
-			return lightning.LogError(
-				err,
-				"insufficient permissions, please check them",
-				extra,
-				&lightning.ChannelDisabled{Read: false, Write: true},
-			)
-		case 404:
-			if edit {
-				return nil
-			}
+	if errors.Is(err, revoltStatusError{}) {
+		slog.Error("revolt: status error", "error", err, "extra", extra)
 
-			return lightning.LogError(err, "revolt: resource not found",
-				extra, &lightning.ChannelDisabled{Read: false, Write: true})
-		default:
-			return lightning.LogError(err, message, extra, nil)
-		}
+		return err
 	}
 
-	return lightning.LogError(err, message, extra, nil)
+	slog.Error("revolt: error", "error", err, "message", message, "extra", extra)
+
+	return fmt.Errorf("revolt: %s: %w", message, err)
 }

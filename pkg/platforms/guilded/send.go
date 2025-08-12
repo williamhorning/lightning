@@ -25,7 +25,9 @@ func (p *guildedPlugin) SendMessage(message lightning.Message, opts *lightning.S
 
 	jsonMsg, err := json.Marshal(msg)
 	if err != nil {
-		return nil, lightning.LogError(err, "failed to marshal message", map[string]any{"message": message}, nil)
+		slog.Error("guilded: failed to marshal message", "error", err, "message", message)
+
+		return nil, fmt.Errorf("guilded: failed to marshal message: %w", err)
 	}
 
 	reader := bytes.NewReader(jsonMsg)
@@ -40,12 +42,9 @@ func (p *guildedPlugin) SendMessage(message lightning.Message, opts *lightning.S
 func (p *guildedPlugin) apiSendMessage(message lightning.Message, reader io.Reader) ([]string, error) {
 	resp, err := guildedMakeRequest(p.token, "POST", "/channels/"+message.ChannelID+"/messages", reader)
 	if err != nil {
-		return nil, lightning.LogError(
-			err,
-			"Failed to send message",
-			map[string]any{"message": message, "channelID": message.ChannelID},
-			nil,
-		)
+		slog.Error("guilded: failed to send message", "error", err, "message", message)
+
+		return nil, fmt.Errorf("guilded: failed to send message: %w", err)
 	}
 
 	if err := checkStatusCode(resp, message.ChannelID); err != nil {
@@ -64,28 +63,20 @@ func (p *guildedPlugin) apiSendMessage(message lightning.Message, reader io.Read
 	return []string{msg.Message.ID}, nil
 }
 
-func getWebhookInfo(data any) (string, string, error) {
+func getWebhookInfo(data any) (guildedWebhook, error) {
 	webhookData, ok := data.(map[string]any)
 	if !ok {
-		return "", "", lightning.LogError(
-			guildedWebhookDataError{},
-			"Failed to use webhook for Guilded",
-			nil, &lightning.ChannelDisabled{Read: false, Write: true},
-		)
+		return guildedWebhook{}, guildedWebhookDataError{}
 	}
 
 	whID, idOk := webhookData["id"].(string)
 	token, tokenOk := webhookData["token"].(string)
 
 	if !idOk || !tokenOk {
-		return "", "", lightning.LogError(
-			guildedWebhookDataError{},
-			"Failed to use webhook for Guilded",
-			nil, &lightning.ChannelDisabled{Read: false, Write: true},
-		)
+		return guildedWebhook{}, guildedWebhookDataError{}
 	}
 
-	return whID, token, nil
+	return guildedWebhook{ID: whID, Token: &token}, nil
 }
 
 func (p *guildedPlugin) sendWebhookMessage(
@@ -93,35 +84,29 @@ func (p *guildedPlugin) sendWebhookMessage(
 	opts *lightning.SendOptions,
 	reader io.Reader,
 ) ([]string, error) {
-	whID, token, err := getWebhookInfo(opts.ChannelData)
+	webhook, err := getWebhookInfo(opts.ChannelData)
 	if err != nil {
 		return nil, err
 	}
 
-	url := fmt.Sprintf("https://media.guilded.gg/webhooks/%s/%s", whID, token)
+	url := "https://media.guilded.gg/webhooks/" + webhook.ID + "/" + *webhook.Token
 
-	p.webhookIDsCache.Set(whID, true)
+	p.webhookIDsCache.Set(webhook.ID, true)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, reader)
 	if err != nil {
-		return nil, lightning.LogError(
-			err,
-			"Failed to send message request",
-			map[string]any{"message": message, "channelID": message.ChannelID},
-			nil,
-		)
+		return nil, fmt.Errorf("guilded: failed to create webhook message in channel ID %s (message %+v): %w",
+			message.ChannelID, message, err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, lightning.LogError(
-			err,
-			"Failed to send message",
-			map[string]any{"message": message, "channelID": message.ChannelID},
-			nil,
-		)
+		slog.Error("guilded: failed to send webhook message", "error", err, "message", message)
+
+		return nil, fmt.Errorf("guilded: failed to send webhook message in channel ID %s (message %+v): %w",
+			message.ChannelID, message, err)
 	}
 
 	if err := checkStatusCode(resp, message.ChannelID); err != nil {
@@ -162,22 +147,25 @@ func checkStatusCode(resp *http.Response, channelID string) error {
 		disable = false
 	}
 
-	return lightning.LogError(
-		guildedStatusError{errMsg, resp.StatusCode},
-		"Failed to send message",
-		map[string]any{"channelID": channelID},
-		&lightning.ChannelDisabled{Read: false, Write: disable},
-	)
+	slog.Error("guilded: failed to send message: ", "status", resp.StatusCode, "channelID", channelID)
+
+	return guildedStatusError{"failed to send message: " + errMsg, resp.StatusCode, disable}
 }
 
 func readResponse(resp *http.Response, target any, channelID string) error {
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return lightning.LogError(err, "Failed to read response body", map[string]any{"channelID": channelID}, nil)
+		slog.Error("guilded: failed to read response body", "error", err, "status", resp.StatusCode,
+			"channelID", channelID)
+
+		return fmt.Errorf("guilded: failed to read response body: %w", err)
 	}
 
 	if err := json.Unmarshal(bodyBytes, target); err != nil {
-		return lightning.LogError(err, "Failed to unmarshal response", map[string]any{"channelID": channelID}, nil)
+		slog.Error("guilded: failed to unmarshal response body", "error", err, "body", string(bodyBytes),
+			"channelID", channelID)
+
+		return fmt.Errorf("guilded: failed to unmarshal response body: %w", err)
 	}
 
 	return nil

@@ -1,6 +1,6 @@
-![lightning logo](./logo.svg)
-
 # lightning
+
+![lightning logo](./logo.svg)
 
 - **Connecting Communities**: bridges many popular messaging apps
 - **Extensible**: support for messaging apps provided by plugins which can be

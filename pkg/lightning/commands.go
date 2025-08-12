@@ -13,9 +13,8 @@ func (b *Bot) AddCommand(command Command) {
 
 	for pluginName, plugin := range b.plugins {
 		if err := plugin.SetupCommands(b.commands); err != nil {
-			err := LogError(err, "Failed to setup commands for plugin",
-				map[string]any{"plugin": pluginName}, nil)
-			slog.Warn("lightning: commands for plugin might not be available", "err", err)
+			methodErr := PluginMethodError{err, pluginName, "SetupCommands", "failed to setup commands"}
+			slog.Warn("lightning: commands for plugin might not be available", "err", methodErr)
 		}
 	}
 }
@@ -63,9 +62,7 @@ func handleMessageCommand(prefix string) func(bot *Bot, event *Message) {
 					return nil
 				}
 
-				return LogError(err, "failed to send command response", map[string]any{
-					"command": commandName, "event": event, "response": message,
-				}, nil)
+				return PluginMethodError{err, event.ChannelID, "SendCommandResponse", "failed to send command response"}
 			},
 		})
 	}
@@ -80,8 +77,8 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 	}
 
 	if len(event.Options) != 0 {
-		event.Subcommand = &(event.Options)[0]
-		event.Options = (event.Options)[1:]
+		event.Subcommand = &event.Options[0]
+		event.Options = event.Options[1:]
 	}
 
 	for _, subcommand := range command.Subcommands {
@@ -98,17 +95,11 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 
 	response, err := command.Executor(event.CommandOptions)
 	if err != nil {
-		response = LogError(err, "Error executing command", map[string]any{
-			"command": command.Name,
-			"event":   event.EventID,
-		}, nil).Error()
+		response = "Something went wrong when running that command!\nPlease try again later."
 	}
 
 	if err = event.Reply(response); err != nil {
-		err := LogError(err, "Error sending command response", map[string]any{
-			"command": command.Name,
-			"event":   event.EventID,
-		}, nil)
+		err := PluginMethodError{err, event.ChannelID, "eventReply", "failed to reply to command event"}
 		slog.Warn("lightning: failed to respond to command", "err", err)
 	}
 }
@@ -120,8 +111,8 @@ func processCommandArguments(command Command, event *CommandEvent) bool {
 		}
 
 		if len(event.Options) > 0 {
-			event.Arguments[arg.Name] = (event.Options)[0]
-			event.Options = (event.Options)[1:]
+			event.Arguments[arg.Name] = event.Options[0]
+			event.Options = event.Options[1:]
 		}
 
 		if event.Arguments[arg.Name] != "" || !arg.Required {
@@ -132,8 +123,7 @@ func processCommandArguments(command Command, event *CommandEvent) bool {
 			"Please provide the " + arg.Name + " argument. Try using the `" + event.Prefix + "help` command.",
 		)
 		if err != nil {
-			err := LogError(err, "Error sending missing argument response",
-				map[string]any{"argument": arg.Name, "command": command.Name, "event": event.EventID}, nil)
+			err := PluginMethodError{err, event.ChannelID, "eventReply", "failed to reply to command event"}
 			slog.Warn("lightning: failed to respond to command", "err", err)
 		}
 

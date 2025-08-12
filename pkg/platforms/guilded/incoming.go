@@ -248,7 +248,7 @@ func (p *guildedPlugin) getWebhookAuthor(msg *guildedChatMessage) (lightning.Mes
 		return cached.toAuthor(), nil
 	}
 
-	endpoint := fmt.Sprintf("/servers/%s/webhooks/%s", *msg.ServerID, *msg.CreatedByWebhookID)
+	endpoint := "/servers/" + *msg.ServerID + "/webhooks/" + *msg.CreatedByWebhookID
 
 	resp, err := guildedMakeRequest(p.token, http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -268,7 +268,9 @@ func (p *guildedPlugin) getWebhookAuthor(msg *guildedChatMessage) (lightning.Mes
 func parseResponse(resp *http.Response, result any) error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return lightning.LogError(err, "guilded failed to read response body", nil, nil)
+		slog.Error("guilded: failed to read response body", "error", err, "status", resp.StatusCode)
+
+		return fmt.Errorf("guilded: failed to read response body: %w", err)
 	}
 
 	if resp.Body.Close() != nil {
@@ -276,7 +278,9 @@ func parseResponse(resp *http.Response, result any) error {
 	}
 
 	if err := json.Unmarshal(body, result); err != nil {
-		return lightning.LogError(err, "guilded failed to unmarshal request body", nil, nil)
+		slog.Error("guilded: failed to unmarshal response body", "error", err, "body", string(body))
+
+		return fmt.Errorf("guilded: failed to unmarshal response body: %w", err)
 	}
 
 	return nil

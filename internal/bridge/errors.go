@@ -1,8 +1,6 @@
 package bridge
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type disableChannelError struct {
 	BridgeID  string

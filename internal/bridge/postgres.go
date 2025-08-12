@@ -3,14 +3,12 @@ package bridge
 import (
 	"context"
 	"database/sql"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 type postgresDatabase struct {
@@ -26,8 +24,8 @@ func newPostgresDatabase(conn string) (Database, error) {
 	pgdb := &postgresDatabase{stdlib.OpenDBFromPool(pool)}
 
 	if err := pgdb.setupDatabase(); err != nil {
-		if err = pgdb.db.Close(); err != nil {
-			slog.Error("failed to close database connection", "err", err)
+		if closeErr := pgdb.db.Close(); closeErr != nil {
+			slog.Error("failed to close database connection", "err", closeErr)
 		}
 
 		return nil, wrapErr(err, "setup schema")
@@ -37,7 +35,7 @@ func newPostgresDatabase(conn string) (Database, error) {
 }
 
 func wrapErr(err error, msg string) error {
-	return lightning.LogError(err, msg, nil, nil)
+	return LogError(err, msg, nil, nil)
 }
 
 func (p *postgresDatabase) exec(query string, args ...any) error {
@@ -254,27 +252,12 @@ func (p *postgresDatabase) setupDatabase() error {
 	}
 
 	if version != "0.8.1" {
-		return p.migrateDatabase(version)
-	}
+		if version == "0.8.0" {
+			slog.Warn("bridge: migration from 0.8.0 to 0.8.1 isn't supported. use 0.8.0-beta.8 to migrate")
+		}
 
-	return nil
-}
-
-//go:embed migration.sql
-var zeroEightZeroMigrationQuery string
-
-func (p *postgresDatabase) migrateDatabase(version string) error {
-	if version != "0.8.0" {
 		return UnsupportedDatabaseTypeError{}
 	}
 
-	slog.Info("migrating database", "from", version)
-
-	return p.withTx(func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(context.Background(), zeroEightZeroMigrationQuery); err != nil {
-			return wrapErr(err, "exec migration")
-		}
-
-		return nil
-	})
+	return nil
 }

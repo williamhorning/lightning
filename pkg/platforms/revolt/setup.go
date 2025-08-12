@@ -3,8 +3,6 @@ package revolt
 import (
 	"log/slog"
 	"time"
-
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 const (
@@ -23,18 +21,15 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	case revoltChannelTypeText, revoltChannelTypeVoice:
 		return p.handleTextOrVoiceChannel(channelData)
 	default:
-		return nil, lightning.LogError(revoltPermissionsError{}, "Unknown channel type", nil, nil)
+		return nil, revoltPermissionsError{"unknown channel type"}
 	}
 }
 
 func handleDMChannel(channel *revoltChannel) (any, error) {
 	if channel.Permissions == nil || *channel.Permissions&messageSendPermission != messageSendPermission {
-		return nil, lightning.LogError(
-			revoltPermissionsError{},
-			"DM permissions on Revolt are incorrect",
-			map[string]any{"permissions": channel.Permissions},
-			nil,
-		)
+		slog.Error("revolt: insufficient permissions for DM channel", "permissions", channel.Permissions)
+
+		return nil, revoltPermissionsError{"DM"}
 	}
 
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
@@ -43,12 +38,7 @@ func handleDMChannel(channel *revoltChannel) (any, error) {
 func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, error) {
 	server := p.getServer(channel.Server)
 	if server == nil {
-		return nil, lightning.LogError(
-			revoltPermissionsError{},
-			"Can't get server permissions on Revolt: server is nil",
-			nil,
-			nil,
-		)
+		return nil, revoltPermissionsError{"nil server (" + channel.Server + ")"}
 	}
 
 	if server.Owner == p.self.ID {
@@ -57,21 +47,15 @@ func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, er
 
 	member := p.getMember(channel.Server, p.self.ID)
 	if member == nil {
-		return nil, lightning.LogError(
-			revoltPermissionsError{},
-			"Can't get server permissions on Revolt: bot member is nil",
-			nil,
-			nil,
-		)
+		slog.Error("revolt: bot member is nil", "server", channel.Server)
+
+		return nil, revoltPermissionsError{"server (with nil bot member)"}
 	}
 
 	if member.Timeout != nil && time.Now().Before(*member.Timeout) {
-		return nil, lightning.LogError(
-			revoltPermissionsError{},
-			"Can't setup this channel, I'm in timeout!",
-			nil,
-			nil,
-		)
+		slog.Error("revolt: bot is in timeout", "server", channel.Server, "timeout", member.Timeout)
+
+		return nil, revoltPermissionsError{"server (with bot in timeout)"}
 	}
 
 	permissions := calculatePermissions(server, member, channel)
@@ -79,16 +63,10 @@ func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, er
 	slog.Debug("revolt: permissions", "channel", channel.ID, "permissions", permissions)
 
 	if (permissions & correctPermissionValue) != correctPermissionValue {
-		return nil, lightning.LogError(
-			revoltPermissionsError{},
-			"Missing permissions. Please add permissions to a role, assign that role to the bot, and rejoin the bridge",
-			map[string]any{
-				"channel":              channel.ID,
-				"current_permissions":  permissions,
-				"expected_permissions": correctPermissionValue,
-			},
-			nil,
-		)
+		slog.Error("revolt: insufficient permissions", "channel", channel.ID, "current_permissions", permissions,
+			"expected_permissions", correctPermissionValue)
+
+		return nil, revoltPermissionsError{"server channel (with missing permissions)"}
 	}
 
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
