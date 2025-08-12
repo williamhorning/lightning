@@ -14,6 +14,7 @@ package matrix
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -35,34 +36,34 @@ import (
 func New(config any) (lightning.Plugin, error) {
 	cfg, ok := config.(map[string]any)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid config for Matrix plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid config"}
 	}
 
 	accessToken, ok := cfg["access_token"].(string)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid token for Matrix plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid token"}
 	}
 
 	homeserver, ok := cfg["homeserver"].(string)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid homeserver for Matrix plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid homeserver"}
 	}
 
 	mxid, ok := cfg["mxid"].(string)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Invalid token for Matrix plugin", nil, nil)
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid mxid"}
 	}
 
 	client, err := mautrix.NewClient(homeserver, id.UserID(mxid), accessToken)
 	if err != nil {
-		return nil, lightning.LogError(err, "Failed to create Matrix client", nil, nil)
+		return nil, fmt.Errorf("matrix: failed to create client: %w", err)
 	}
 
 	client.UserAgent = "lightning/" + lightning.VERSION
 
 	syncer, ok := client.Syncer.(*mautrix.DefaultSyncer)
 	if !ok {
-		return nil, lightning.LogError(lightning.PluginConfigError{}, "Client does not use DefaultSyncer", nil, nil)
+		client.Syncer = mautrix.NewDefaultSyncer()
 	}
 
 	msgChannel := make(chan lightning.Message, 1000)
