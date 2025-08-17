@@ -69,6 +69,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 			}
 		case discordgo.ApplicationCommandOptionString:
 			args[option.Name] = option.StringValue()
+		default:
 		}
 	}
 
@@ -92,12 +93,18 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 		},
 		Command:    data.Name,
 		Subcommand: subcommand,
-		Reply: func(message string) error {
+		Reply: func(message string, sensitive bool) error {
+			flags := discordgo.MessageFlags(0)
+
+			if sensitive {
+				flags = discordgo.MessageFlagsEphemeral
+			}
+
 			return session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: message,
-					Flags:   discordgo.MessageFlagsEphemeral,
+					Flags:   flags,
 				},
 			})
 		},

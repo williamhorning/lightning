@@ -14,30 +14,33 @@ func bridgeCommand(database Database) lightning.Command {
 	return lightning.Command{
 		Name:        "bridge",
 		Description: "manage bridges between channels",
-		Executor: func(_ lightning.CommandOptions) (string, error) {
-			return "take a look at the subcommands of this command", nil
+		Executor: func(_ lightning.CommandOptions) string {
+			return "take a look at the subcommands of this command"
 		},
 		Subcommands: []lightning.Command{
 			{
 				Name:        "create",
 				Description: "create a new bridge",
-				Executor: func(options lightning.CommandOptions) (string, error) {
+				Sensitive:   true,
+				Executor: func(options lightning.CommandOptions) string {
 					return createCommand(database, options)
 				},
 			},
 			{
 				Name:        "join",
 				Description: "join an existing bridge",
+				Sensitive:   true,
 				Arguments:   arguments("join"),
-				Executor: func(options lightning.CommandOptions) (string, error) {
+				Executor: func(options lightning.CommandOptions) string {
 					return joinCommand(database, options, false)
 				},
 			},
 			{
 				Name:        "subscribe",
 				Description: "subscribe to a bridge",
+				Sensitive:   true,
 				Arguments:   arguments("subscribe to"),
-				Executor: func(options lightning.CommandOptions) (string, error) {
+				Executor: func(options lightning.CommandOptions) string {
 					return joinCommand(database, options, true)
 				},
 			},
@@ -45,7 +48,7 @@ func bridgeCommand(database Database) lightning.Command {
 				Name:        "leave",
 				Description: "leave a bridge",
 				Arguments:   arguments("leave"),
-				Executor: func(options lightning.CommandOptions) (string, error) {
+				Executor: func(options lightning.CommandOptions) string {
 					return leaveCommand(database, options)
 				},
 			},
@@ -55,14 +58,14 @@ func bridgeCommand(database Database) lightning.Command {
 				Arguments: []lightning.CommandArgument{
 					{Name: "setting", Description: "the bridge setting to toggle", Required: true},
 				},
-				Executor: func(options lightning.CommandOptions) (string, error) {
+				Executor: func(options lightning.CommandOptions) string {
 					return toggleCommand(database, options)
 				},
 			},
 			{
 				Name:        "status",
 				Description: "get the status of the bridge in this channel",
-				Executor: func(options lightning.CommandOptions) (string, error) {
+				Executor: func(options lightning.CommandOptions) string {
 					return statusCommand(database, options)
 				},
 			},
@@ -90,10 +93,10 @@ func prepareChannelForBridge(db Database, opts lightning.CommandOptions) (bridge
 	return bridgeChannel{data, opts.ChannelID, lightning.ChannelDisabled{}}, ""
 }
 
-func createCommand(database Database, opts lightning.CommandOptions) (string, error) {
+func createCommand(database Database, opts lightning.CommandOptions) string {
 	channel, errMsg := prepareChannelForBridge(database, opts)
 	if errMsg != "" {
-		return errMsg, nil
+		return errMsg
 	}
 
 	bridgeData := bridge{
@@ -104,26 +107,30 @@ func createCommand(database Database, opts lightning.CommandOptions) (string, er
 
 	if err := database.createBridge(bridgeData); err != nil {
 		return LogError(err, "Failed to create bridge in database",
-			map[string]any{"bridge": bridgeData}, nil).Error(), nil
+			map[string]any{"bridge": bridgeData}, nil).Error()
 	}
 
 	join := opts.Prefix + "bridge join " + bridgeData.ID
 
-	return "Bridge created successfully! You can now join it using ||`" + join + "`||. Keep this command secret!", nil
+	return "Bridge created successfully! You can now join it using ||`" + join + "`||. Keep this command secret!"
 }
 
-func joinCommand(database Database, opts lightning.CommandOptions, subscribe bool) (string, error) {
+func joinCommand(database Database, opts lightning.CommandOptions, subscribe bool) string {
+	if opts.Arguments["id"] == "" {
+		return "You must provide a bridge ID to join."
+	}
+
 	channel, errMsg := prepareChannelForBridge(database, opts)
 	if errMsg != "" {
-		return errMsg, nil
+		return errMsg
 	}
 
 	bridgeData, err := database.getBridge(opts.Arguments["id"])
 	if err != nil {
 		return LogError(err, "Failed to get bridge from database",
-			map[string]any{"bridge_id": opts.Arguments["id"]}, nil).Error(), nil
+			map[string]any{"bridge_id": opts.Arguments["id"]}, nil).Error()
 	} else if bridgeData.ID == "" {
-		return "No bridge found with the provided ID.", nil
+		return "No bridge found with the provided ID."
 	}
 
 	channel.Disabled = lightning.ChannelDisabled{Read: subscribe, Write: false}
@@ -131,23 +138,27 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 
 	if err := database.createBridge(bridgeData); err != nil {
 		return LogError(err, "Failed to update bridge in database",
-			map[string]any{"bridge": bridgeData}, nil).Error(), nil
+			map[string]any{"bridge": bridgeData}, nil).Error()
 	}
 
-	return "Bridge joined successfully!", nil
+	return "Bridge joined successfully!"
 }
 
-func leaveCommand(database Database, opts lightning.CommandOptions) (string, error) {
+func leaveCommand(database Database, opts lightning.CommandOptions) string {
+	if opts.Arguments["id"] == "" {
+		return "You must provide a bridge ID to leave."
+	}
+
 	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, nil).Error()
 	} else if bridgeData.ID == "" {
-		return notInBridge, nil
+		return notInBridge
 	}
 
 	if bridgeData.ID != opts.Arguments["id"] {
-		return "This channel is not part of the specified bridge.", nil
+		return "This channel is not part of the specified bridge"
 	}
 
 	for idx, channel := range bridgeData.Channels {
@@ -160,44 +171,48 @@ func leaveCommand(database Database, opts lightning.CommandOptions) (string, err
 
 	if err := database.createBridge(bridgeData); err != nil {
 		return LogError(err, "Failed to update bridge in database",
-			map[string]any{"bridge": bridgeData}, nil).Error(), nil
+			map[string]any{"bridge": bridgeData}, nil).Error()
 	}
 
-	return "You have successfully left the bridge.", nil
+	return "You have successfully left the bridge."
 }
 
-func toggleCommand(database Database, opts lightning.CommandOptions) (string, error) {
+func toggleCommand(database Database, opts lightning.CommandOptions) string {
 	setting := opts.Arguments["setting"]
+
+	if setting == "" {
+		return "You must provide a setting to toggle."
+	}
 
 	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, nil).Error()
 	} else if bridgeData.ID == "" {
-		return notInBridge, nil
+		return notInBridge
 	}
 
 	if setting != "allow_everyone" {
-		return "That setting does not exist. Available settings are: `allow_everyone`.", nil
+		return "That setting does not exist. Available settings are: `allow_everyone`."
 	}
 
 	bridgeData.Settings.AllowEveryone = !bridgeData.Settings.AllowEveryone
 
 	if err := database.createBridge(bridgeData); err != nil {
 		return LogError(err, "Failed to update bridge in database",
-			map[string]any{"bridge": bridgeData}, nil).Error(), nil
+			map[string]any{"bridge": bridgeData}, nil).Error()
 	}
 
-	return "Bridge settings updated successfully", nil
+	return "Bridge settings updated successfully"
 }
 
-func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
+func statusCommand(db Database, opts lightning.CommandOptions) string {
 	bridgeData, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
 		return LogError(err, "Failed to get bridge from database",
-			map[string]any{"channel": opts.ChannelID}, nil).Error(), nil
+			map[string]any{"channel": opts.ChannelID}, nil).Error()
 	} else if bridgeData.ID == "" {
-		return notInBridge, nil
+		return notInBridge
 	}
 
 	status := "Channels:\n"
@@ -219,5 +234,5 @@ func statusCommand(db Database, opts lightning.CommandOptions) (string, error) {
 	status += "\nSettings:\n"
 	status += "- AllowEveryone: `" + (map[bool]string{true: "✔", false: "❌"})[bridgeData.Settings.AllowEveryone] + "`\n"
 
-	return status, nil
+	return status
 }

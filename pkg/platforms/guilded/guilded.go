@@ -36,7 +36,7 @@ type guildedChatEmbed struct {
 	Footer      *guildedChatEmbedFooter  `json:"footer,omitempty"`
 	Image       *guildedChatEmbedMedia   `json:"image,omitempty"`
 	Thumbnail   *guildedChatEmbedMedia   `json:"thumbnail,omitempty"`
-	Timestamp   *time.Time               `json:"timestamp,omitempty"`
+	Timestamp   *string                  `json:"timestamp,omitempty"`
 	Title       *string                  `json:"title,omitempty"`
 	URL         *string                  `json:"url,omitempty"`
 }

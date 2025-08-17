@@ -47,7 +47,7 @@ func (p *telegramPlugin) startProxy() {
 	})
 
 	//nolint:gosec // this doesn't really matter right now
-	if err := http.ListenAndServe("0.0.0.0:"+strconv.FormatInt(p.cfg.proxyPort, 10), nil); err != nil {
+	if err := http.ListenAndServe(":"+strconv.FormatInt(p.cfg.proxyPort, 10), nil); err != nil {
 		panic(fmt.Errorf("telegram: failed to start file proxy: %w", err))
 	}
 

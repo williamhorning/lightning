@@ -19,7 +19,7 @@ func getOutgoing(
 	content := message.Content
 
 	if content == "" && len(message.Embeds) == 0 && len(message.Attachments) == 0 {
-		content = "*empty message*"
+		content = "\u200B"
 	}
 
 	if opts != nil && !opts.AllowEveryonePings {
@@ -28,7 +28,7 @@ func getOutgoing(
 	}
 
 	if len([]rune(content)) > 2000 {
-		content = string([]rune(content)[:1997]) + "..."
+		content = string([]rune(content)[:1997]) + "..." // split the message?
 	}
 
 	msg := revoltMessageSend{

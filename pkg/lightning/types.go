@@ -40,21 +40,22 @@ type CommandOptions struct {
 
 // A Command registered with [Bot].
 type Command struct {
-	Executor    func(options CommandOptions) (string, error)
+	Executor    func(options CommandOptions) string
 	Name        string
 	Description string
 	Arguments   []CommandArgument
 	Subcommands []Command
+	Sensitive   bool
 }
 
 // CommandEvent represents an execution of a command on a platform.
 type CommandEvent struct {
-	Reply          func(message string) error
-	Subcommand     *string
-	CommandOptions //nolint:embeddedstructfieldcheck // memory alignment is better
+	CommandOptions
 
-	Command string
-	Options []string
+	Reply      func(message string, sensitive bool) error
+	Subcommand *string
+	Command    string
+	Options    []string
 }
 
 // DeletedMessage is information about a deleted message.
@@ -93,7 +94,7 @@ type Embed struct {
 	Image       *Media
 	Thumbnail   *Media
 	Video       *Media
-	Timestamp   *time.Time
+	Timestamp   *string
 	Color       *int
 	Title       *string
 	URL         *string

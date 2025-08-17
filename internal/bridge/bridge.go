@@ -188,6 +188,7 @@ func handleChannel(
 		}
 	case typeDelete:
 		err = bot.DeleteMessages(channel.ID, priorMessageIDs)
+	default:
 	}
 
 	if err != nil {

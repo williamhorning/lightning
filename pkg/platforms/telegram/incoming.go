@@ -39,7 +39,7 @@ func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) lightning.Co
 		},
 		Command: cmdName,
 		Options: args,
-		Reply: func(message string) error {
+		Reply: func(message string, _ bool) error {
 			_, err := ctx.EffectiveMessage.Reply(bot, getMarkdownV2(message), &gotgbot.SendMessageOpts{
 				ParseMode: gotgbot.ParseModeMarkdownV2,
 			})

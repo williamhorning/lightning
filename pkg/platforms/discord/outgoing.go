@@ -214,7 +214,7 @@ func setEmbedBasicProperties(discordEmbed *discordgo.MessageEmbed, embed lightni
 	}
 
 	if embed.Timestamp != nil {
-		discordEmbed.Timestamp = embed.Timestamp.Format(time.RFC3339)
+		discordEmbed.Timestamp = *embed.Timestamp
 	}
 
 	if embed.URL != nil {

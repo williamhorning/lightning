@@ -1,7 +1,5 @@
 package lightning
 
-import "time"
-
 // ToMarkdown converts a lightning Embed to a Markdown string
 // and it handles every field except for the color, which can't
 // be represented in Markdown.
@@ -10,18 +8,8 @@ func (embed *Embed) ToMarkdown() string {
 		return ""
 	}
 
-	content := "***embed***"
-	content += formatTitle(embed)
-	content += formatTimestamp(embed)
-	content += formatAuthor(embed)
-	content += formatDescription(embed)
-	content += formatImage(embed)
-	content += formatThumbnail(embed)
-	content += formatVideo(embed)
-	content += formatFields(embed)
-	content += formatFooter(embed)
-
-	return content
+	return formatTitle(embed) + formatTimestamp(embed) + formatAuthor(embed) + formatDescription(embed) +
+		formatImage(embed) + formatThumbnail(embed) + formatVideo(embed) + formatFields(embed) + formatFooter(embed)
 }
 
 func formatTitle(embed *Embed) string {
@@ -41,7 +29,7 @@ func formatTimestamp(embed *Embed) string {
 		return "\n\n"
 	}
 
-	return " (" + embed.Timestamp.Format(time.RFC3339) + ")\n\n"
+	return " (" + *embed.Timestamp + ")\n\n"
 }
 
 func formatAuthor(embed *Embed) string {
@@ -69,7 +57,7 @@ func formatImage(embed *Embed) string {
 		return ""
 	}
 
-	return "![image](" + embed.Image.URL + ")\n\n"
+	return "![](" + embed.Image.URL + ")\n\n"
 }
 
 func formatThumbnail(embed *Embed) string {
@@ -77,7 +65,7 @@ func formatThumbnail(embed *Embed) string {
 		return ""
 	}
 
-	return "![thumbnail](" + embed.Thumbnail.URL + ")\n\n"
+	return "![](" + embed.Thumbnail.URL + ")\n\n"
 }
 
 func formatVideo(embed *Embed) string {
@@ -85,7 +73,7 @@ func formatVideo(embed *Embed) string {
 		return ""
 	}
 
-	return "[video](" + embed.Video.URL + ")\n\n"
+	return embed.Video.URL + "\n\n"
 }
 
 func formatFields(embed *Embed) string {

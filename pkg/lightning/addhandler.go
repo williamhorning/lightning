@@ -1,80 +1,49 @@
 package lightning
 
-import (
-	"log/slog"
-	"sync"
-	"sync/atomic"
-)
+import "sync/atomic"
 
 // AddHandler allows you to register a listener for a given event type.
 // Each handler must take in a *Bot and a pointer to a struct that corresponds
 // with the event you want to listen to.
 func (b *Bot) AddHandler(listener any) {
-	b.handlersMutex.Lock()
-	defer b.handlersMutex.Unlock()
-
 	switch listener := listener.(type) {
 	case func(*Bot, *EditedMessage):
-		b.editHandlers = append(b.editHandlers, listener)
+		newHandlers := append(*b.editHandlers.Load(), listener)
+		b.editHandlers.Store(&newHandlers)
+
+		go processEventHandlers(b.editChannel, &b.editHandlers, &b.editProcessorActive, b)
 	case func(*Bot, *Message):
-		b.messageHandlers = append(b.messageHandlers, listener)
+		newHandlers := append(*b.messageHandlers.Load(), listener)
+		b.messageHandlers.Store(&newHandlers)
+
+		go processEventHandlers(b.messageChannel, &b.messageHandlers, &b.messageProcessorActive, b)
 	case func(*Bot, *BaseMessage):
-		b.delHandlers = append(b.delHandlers, listener)
+		newHandlers := append(*b.delHandlers.Load(), listener)
+		b.delHandlers.Store(&newHandlers)
+
+		go processEventHandlers(b.delChannel, &b.delHandlers, &b.delProcessorActive, b)
 	case func(*Bot, *CommandEvent):
-		b.commandHandlers = append(b.commandHandlers, listener)
-	default:
-		slog.Warn("invalid listener registered, this won't ever be called", "listener", listener)
-	}
+		newHandlers := append(*b.commandHandlers.Load(), listener)
+		b.commandHandlers.Store(&newHandlers)
 
-	ensureHandlers(b)
-}
-
-func ensureHandlers(bot *Bot) {
-	if !bot.editProcessorActive.Swap(true) {
-		go processEventHandlers(bot.editChannel, &bot.editHandlers, &bot.handlersMutex, &bot.editProcessorActive, bot)
-	}
-
-	if !bot.messageProcessorActive.Swap(true) {
-		go processEventHandlers(bot.messageChannel, &bot.messageHandlers, &bot.handlersMutex,
-			&bot.messageProcessorActive, bot)
-	}
-
-	if !bot.delProcessorActive.Swap(true) {
-		go processEventHandlers(bot.delChannel, &bot.delHandlers, &bot.handlersMutex, &bot.delProcessorActive, bot)
-	}
-
-	if !bot.commandProcessorActive.Swap(true) {
-		go processEventHandlers(bot.commandChannel, &bot.commandHandlers, &bot.handlersMutex,
-			&bot.commandProcessorActive, bot)
+		go processEventHandlers(b.commandChannel, &b.commandHandlers, &b.commandProcessorActive, b)
 	}
 }
 
 func processEventHandlers[C any](
-	incoming chan C,
-	handlersPtr *[]func(*Bot, *C),
-	mutex *sync.RWMutex,
+	incoming <-chan C,
+	handlers *atomic.Pointer[[]func(*Bot, *C)],
 	store *atomic.Bool,
-	lightning *Bot,
+	bot *Bot,
 ) {
+	if store.Swap(true) {
+		return
+	}
+
 	for msg := range incoming {
-		mutex.RLock()
-
-		handlersCopy := make([]func(*Bot, *C), len(*handlersPtr))
-		copy(handlersCopy, *handlersPtr)
-		mutex.RUnlock()
-
-		for _, handler := range handlersCopy {
+		for _, handler := range *handlers.Load() {
 			localMsg := msg
-
-			go func(handle func(*Bot, *C)) {
-				defer func() {
-					if r := recover(); r != nil {
-						slog.Error("lightning: handler panic", "error", r)
-					}
-				}()
-
-				handle(lightning, &localMsg)
-			}(handler)
+			go handler(bot, &localMsg)
 		}
 	}
 

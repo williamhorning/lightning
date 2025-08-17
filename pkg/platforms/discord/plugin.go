@@ -82,7 +82,7 @@ type discordPlugin struct {
 }
 
 func (p *discordPlugin) SetupChannel(channel string) (any, error) {
-	wh, err := p.discord.WebhookCreate(channel, "Lightning Bridge", "")
+	wh, err := p.discord.WebhookCreate(channel, channel, "")
 	if err != nil {
 		return nil, getError(err, map[string]any{"channel": channel}, "Failed to create webhook for channel")
 	}

@@ -83,10 +83,6 @@ func getFilename(url string) string {
 		filename = filename[:idx]
 	}
 
-	if filename == "" {
-		filename = "unknown"
-	}
-
 	return filename
 }
 

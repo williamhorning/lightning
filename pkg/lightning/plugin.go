@@ -41,9 +41,13 @@ func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
 		instanceName = typeName
 	}
 
+	b.pluginMutex.RLock()
+
 	if _, exists := b.plugins[instanceName]; exists {
 		return PluginRegisteredError{}
 	}
+
+	b.pluginMutex.RUnlock()
 
 	b.typesMutex.RLock()
 
@@ -66,7 +70,10 @@ func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
 
 	b.pluginMutex.Unlock()
 
-	ensureHandlers(b)
+	go processEventHandlers(b.editChannel, &b.editHandlers, &b.editProcessorActive, b)
+	go processEventHandlers(b.messageChannel, &b.messageHandlers, &b.messageProcessorActive, b)
+	go processEventHandlers(b.delChannel, &b.delHandlers, &b.delProcessorActive, b)
+	go processEventHandlers(b.commandChannel, &b.commandHandlers, &b.commandProcessorActive, b)
 
 	b.startPluginListeners(instanceName, instance)
 

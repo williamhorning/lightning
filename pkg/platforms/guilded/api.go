@@ -223,19 +223,22 @@ func (s *guildedSocketManager) handleReconnect() {
 }
 
 func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
+	if data.Op == 1 {
+		s.handleReadyEvent(data)
+	}
+
 	if data.T == nil {
 		return
 	}
 
 	switch *data.T {
-	case "ready":
-		s.handleReadyEvent(data)
 	case "ChatMessageCreated":
 		s.handleMessageCreatedEvent(data)
 	case "ChatMessageUpdated":
 		s.handleMessageUpdatedEvent(data)
 	case "ChatMessageDeleted":
 		s.handleMessageDeletedEvent(data)
+	default:
 	}
 }
 

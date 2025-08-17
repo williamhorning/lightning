@@ -205,6 +205,7 @@ func (s *revoltSocketManager) handleEvent(message []byte) {
 		s.handleMessageUpdatedEvent(message)
 	case "MessageDelete":
 		s.handleMessageDeletedEvent(message)
+	default:
 	}
 }
 

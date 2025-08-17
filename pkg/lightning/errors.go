@@ -13,8 +13,7 @@ func (PluginRegisteredError) Error() string {
 	return "plugin (or type) already registered: this is a bug or misconfiguration"
 }
 
-// MissingPluginError only occurs when a plugin/type is not found and the action
-// requires it to be found.
+// MissingPluginError only occurs when a plugin/type is not found.
 type MissingPluginError struct{}
 
 func (MissingPluginError) Error() string {

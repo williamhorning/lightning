@@ -65,16 +65,14 @@ func (p *guildedPlugin) getOutgoingEmbeds(message lightning.Message, opts *light
 	}
 
 	if len(message.Attachments) > 0 {
-		title := "Attachments"
-		attachmentStr := ""
+		description := ""
 
 		for _, attachment := range message.Attachments {
-			attachmentStr += "[" + attachment.Name + "](" + attachment.URL + ")\n"
+			description += "[" + attachment.Name + "](" + attachment.URL + ")\n"
 		}
 
 		guildedEmbeds = append(guildedEmbeds, guildedChatEmbed{
-			Title:       &title,
-			Description: &attachmentStr,
+			Description: &description,
 		})
 	}
 

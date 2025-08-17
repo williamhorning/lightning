@@ -2,31 +2,22 @@ package discord
 
 import (
 	"regexp"
-	"slices"
 	"strings"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightning.Message {
-	if !slices.Contains([]discordgo.MessageType{
-		discordgo.MessageTypeDefault,
-		discordgo.MessageTypeGuildMemberJoin,
-		discordgo.MessageTypeReply,
-		discordgo.MessageTypeChatInputCommand,
-		discordgo.MessageTypeContextMenuCommand,
-	}, message.Type) {
+	if message.Type != discordgo.MessageTypeDefault &&
+		message.Type != discordgo.MessageTypeReply &&
+		message.Type != discordgo.MessageTypeChatInputCommand &&
+		message.Type != discordgo.MessageTypeContextMenuCommand {
 		return nil
 	}
 
 	if exists, _ := p.webhookCache.Get(message.WebhookID); exists {
 		return nil
-	}
-
-	if message.Type == discordgo.MessageTypeGuildMemberJoin {
-		message.Content = "**joined on Discord**"
 	}
 
 	return &lightning.Message{
@@ -70,11 +61,12 @@ func getLightningAttachments(
 			stickerURL = "https://cdn.discordapp.com/stickers/" + sticker.ID + ".json"
 		case discordgo.StickerFormatTypeGIF:
 			stickerURL = "https://cdn.discordapp.com/stickers/" + sticker.ID + ".gif"
+		default:
 		}
 
 		result = append(result, lightning.Attachment{
 			URL:  stickerURL,
-			Name: sticker.Name + " (Sticker)",
+			Name: sticker.Name,
 			Size: 0, // size information isn't available for stickers?
 		})
 	}
@@ -256,11 +248,9 @@ func getLightningEmbedFields(embed *discordgo.MessageEmbed) []lightning.EmbedFie
 	return nil
 }
 
-func getLightningEmbedTime(embed *discordgo.MessageEmbed) *time.Time {
+func getLightningEmbedTime(embed *discordgo.MessageEmbed) *string {
 	if embed.Timestamp != "" {
-		if t, err := time.Parse(time.RFC3339, embed.Timestamp); err == nil {
-			return &t
-		}
+		return &embed.Timestamp
 	}
 
 	return nil
@@ -285,7 +275,7 @@ func getLightningForward(session *discordgo.Session, message *discordgo.Message)
 	snapshot := ""
 
 	for _, snap := range message.MessageSnapshots {
-		snapshot += "> *Forwarded:*\n> " + strings.ReplaceAll(getLightningContent(session, snap.Message), "\n", "\n> ")
+		snapshot += "> " + strings.ReplaceAll(getLightningContent(session, snap.Message), "\n", "\n> ")
 	}
 
 	return snapshot

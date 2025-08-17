@@ -15,7 +15,7 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 		return nil, err
 	}
 
-	body, err := json.Marshal(map[string]string{"channelId": channel, "name": "Lightning Bridges"})
+	body, err := json.Marshal(map[string]string{"channelId": channel, "name": channel})
 	if err != nil {
 		slog.Error("guilded: failed to marshal webhook creation body", "error", err, "channel", channel)
 

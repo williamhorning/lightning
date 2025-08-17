@@ -15,16 +15,16 @@ func Setup(bot *lightning.Bot, database Database) {
 	bot.AddCommand(lightning.Command{
 		Name:        "help",
 		Description: "get help with the bot",
-		Executor: func(_ lightning.CommandOptions) (string, error) {
-			return "hi, i'm lightning " + lightning.VERSION + "! [docs](https://williamhorning.eu.org/lightning/)", nil
+		Executor: func(_ lightning.CommandOptions) string {
+			return "hi, i'm lightning " + lightning.VERSION + "! [docs](https://williamhorning.eu.org/lightning/)"
 		},
 	})
 
 	bot.AddCommand(lightning.Command{
 		Name:        "ping",
 		Description: "check if the bot is alive",
-		Executor: func(options lightning.CommandOptions) (string, error) {
-			return "Pong! 🏓 " + strconv.FormatInt(time.Since(options.Time).Milliseconds(), 10), nil
+		Executor: func(options lightning.CommandOptions) string {
+			return "Pong! 🏓 " + strconv.FormatInt(time.Since(options.Time).Milliseconds(), 10) + "ms"
 		},
 	})
 

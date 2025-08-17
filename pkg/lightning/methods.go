@@ -80,7 +80,9 @@ func (b *Bot) getPluginFromChannel(channel string) (Plugin, string, bool) {
 		return nil, "", false
 	}
 
+	b.pluginMutex.RLock()
 	plugin, ok := b.plugins[pluginName]
+	b.pluginMutex.RUnlock()
 
 	return plugin, channelName, ok
 }
