@@ -110,6 +110,7 @@ func getLightningAuthor(session *discordgo.Session, message *discordgo.Message) 
 }
 
 var (
+	tenorURL       = regexp.MustCompile(`https://tenor\.com/view/[^/]+-(\d+).*`)
 	userMention    = regexp.MustCompile(`<@!?(\d+)>`)
 	channelMention = regexp.MustCompile(`<#(\d+)>`)
 	roleMention    = regexp.MustCompile(`<@&(\d+)>`)
@@ -117,7 +118,11 @@ var (
 )
 
 func getLightningContent(session *discordgo.Session, message *discordgo.Message) string {
-	content := userMention.ReplaceAllStringFunc(message.Content, func(match string) string {
+	content := tenorURL.ReplaceAllStringFunc(message.Content, func(match string) string {
+		return "https://tenor.com/view/" + tenorURL.FindStringSubmatch(match)[1] + ".gif"
+	})
+
+	content = userMention.ReplaceAllStringFunc(content, func(match string) string {
 		userID := userMention.FindStringSubmatch(match)[1]
 
 		if message.GuildID != "" {
