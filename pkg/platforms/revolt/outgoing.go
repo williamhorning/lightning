@@ -22,6 +22,8 @@ func getOutgoing(
 		content = "\u200B"
 	}
 
+	content = replaceOutgoingSpoilers(content)
+
 	if opts != nil && !opts.AllowEveryonePings {
 		content = strings.ReplaceAll(content, "@everyone", "@\u2800everyone")
 		content = strings.ReplaceAll(content, "@online", "@\u2800online")
@@ -43,6 +45,12 @@ func getOutgoing(
 	}
 
 	return msg
+}
+
+func replaceOutgoingSpoilers(content string) string {
+	return spoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
+		return "!!" + match[2:len(match)-2] + "!!"
+	})
 }
 
 func getOutgoingAttachments(token string, attachments []lightning.Attachment) []string {

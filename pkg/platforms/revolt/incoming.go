@@ -22,7 +22,8 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 		timestamp = time.Now()
 	}
 
-	content := p.replaceEmojis(message.Content)
+	content := replaceSpoilers(message.Content)
+	content = p.replaceEmojis(content)
 	content = p.replaceMentions(message.Channel, content)
 	content = p.replaceChannels(content)
 
@@ -144,10 +145,18 @@ func applyMasquerade(author lightning.MessageAuthor, masquerade *revoltMessageMa
 }
 
 var (
-	emojiRegex   = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
-	mentionRegex = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
-	channelRegex = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	revoltSpoilerRegex = regexp.MustCompile(`!!(.+?)!!`)
+	spoilerRegex       = regexp.MustCompile(`\|\|(.+?)\|\|`)
+	emojiRegex         = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
+	mentionRegex       = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	channelRegex       = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
 )
+
+func replaceSpoilers(content string) string {
+	return revoltSpoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
+		return "||" + match[2:len(match)-2] + "||"
+	})
+}
 
 func (p *revoltPlugin) replaceEmojis(content string) string {
 	return emojiRegex.ReplaceAllStringFunc(content, func(match string) string {
