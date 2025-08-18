@@ -1,15 +1,7 @@
 version: "2"
 linters: {
   default: all,
-  disable: [
-    depguard,
-    exhaustruct,
-    mnd,
-    noinlineerr,
-    nolintlint,
-    tagliatelle,
-    wsl,
-  ],
+  disable: [depguard, exhaustruct, mnd, noinlineerr, tagliatelle, wsl],
   settings: {
     govet: { enable-all: true },
     ireturn: { allow: [anon, error, empty, stdlib, Plugin, Database] },
