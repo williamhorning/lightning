@@ -15,8 +15,10 @@ package matrix
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -71,12 +73,14 @@ func New(config any) (lightning.Plugin, error) {
 
 	setupEvents(syncer, client, msgChannel, editChannel)
 
-	return &matrixPlugin{client, syncer, msgChannel, editChannel}, nil
+	return &matrixPlugin{client, syncer, cache.New[string, string](cache.DefaultTTL), msgChannel, editChannel}, nil
 }
 
 type matrixPlugin struct {
 	client *mautrix.Client
 	syncer *mautrix.DefaultSyncer
+
+	mxcCache *cache.Expiring[string, string]
 
 	msgChannel  chan lightning.Message
 	editChannel chan lightning.EditedMessage
@@ -86,18 +90,44 @@ func (*matrixPlugin) SetupChannel(_ string) (any, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
-func (*matrixPlugin) SendCommandResponse(_ lightning.Message, _ *lightning.SendOptions, _ string) ([]string, error) {
-	return nil, nil //nolint:nilnil // placeholder
+func (p *matrixPlugin) SendCommandResponse(
+	message lightning.Message,
+	opts *lightning.SendOptions,
+	_ string,
+) ([]string, error) {
+	return p.SendMessage(message, opts)
 }
 
-func (p *matrixPlugin) SendMessage(message lightning.Message, _ *lightning.SendOptions) ([]string, error) {
+func (p *matrixPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := format.RenderMarkdown(message.Content, true, false)
+
+	var url *id.ContentURIString
+
+	if message.Author.ProfilePicture != nil {
+		if cached, ok := p.mxcCache.Get(*message.Author.ProfilePicture); ok {
+			curl := id.ContentURIString(cached)
+			url = &curl
+		} else {
+			resp, err := p.client.UploadLink(context.Background(), *message.Author.ProfilePicture)
+			if err == nil {
+				curl := resp.ContentURI.CUString()
+				url = &curl
+
+				p.mxcCache.Set(*message.Author.ProfilePicture, resp.ContentURI.String())
+			}
+		}
+	}
 
 	msg.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{
 		ID:          message.Author.ID,
 		Displayname: message.Author.Nickname,
-		// TODO: avatar URL, cache, sendoptions
+		AvatarURL:   url,
 		HasFallback: false,
+	}
+
+	if opts != nil && !opts.AllowEveryonePings {
+		msg.Body = strings.ReplaceAll(msg.Body, "@room", "@\u200Broom")
+		msg.FormattedBody = strings.ReplaceAll(msg.FormattedBody, "@room", "@\u200Broom")
 	}
 
 	msg.AddPerMessageProfileFallback()

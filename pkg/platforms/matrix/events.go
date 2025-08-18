@@ -84,7 +84,18 @@ func onMessageHandler(
 			msg.FormattedBody = msg.Body // fallback to plain text body if no formatted body
 		}
 
-		content, _ := format.HTMLToMarkdownFull(nil, msg.FormattedBody)
+		attachments := make([]lightning.Attachment, 0)
+		content := ""
+
+		if msg.FileName == msg.Body {
+			attachments = append(attachments, lightning.Attachment{
+				Name: msg.FileName,
+				URL:  msg.URL.ParseOrIgnore().String(), // TODO: mxc URI -> https URL
+				Size: 0,
+			})
+		} else {
+			content, _ = format.HTMLToMarkdownFull(nil, msg.FormattedBody)
+		}
 
 		newMessage := lightning.Message{
 			BaseMessage: lightning.BaseMessage{
@@ -92,10 +103,15 @@ func onMessageHandler(
 				EventID:   evt.ID.String(),
 				ChannelID: evt.RoomID.String(),
 			},
-			Attachments: nil, // TODO: how on earth
+			Attachments: attachments,
+			// TODO: get message author information. color is also currently just white,
+			// this may be odd on revolt. there's not really a good matrix color to use here.
 			Author: lightning.MessageAuthor{
-				ID:    evt.Sender.String(),
-				Color: "",
+				ID:             evt.Sender.String(),
+				Nickname:       "",
+				Username:       "",
+				ProfilePicture: nil,
+				Color:          "#ffffff",
 			},
 			Content:   content,
 			RepliedTo: replyIDs,

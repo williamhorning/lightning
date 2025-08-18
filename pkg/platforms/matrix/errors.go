@@ -51,6 +51,7 @@ func handleError(err error, msg string, extra map[string]any) error {
 	switch httpErr.RespError.StatusCode {
 	case http.StatusForbidden, http.StatusNotFound:
 		disable = true
+	default:
 	}
 
 	return &matrixError{err, msg, disable}
