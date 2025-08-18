@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
@@ -216,6 +217,23 @@ func sendRevoltMessage(token, channel string, message revoltMessageSend) (string
 			slog.Warn("revolt: failed to close send body", "err", err)
 		}
 	}()
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := resp.Header.Get("X-Ratelimit-Retry-After")
+
+		if retryAfter == "" {
+			retryAfter = "1000"
+		}
+
+		retryAfterDuration, err := time.ParseDuration(retryAfter + "ms")
+		if err != nil {
+			retryAfterDuration = time.Second
+		}
+
+		time.Sleep(retryAfterDuration)
+
+		return sendRevoltMessage(token, channel, message)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return "", revoltStatusError{"failed to send revolt message", resp.StatusCode, false}
