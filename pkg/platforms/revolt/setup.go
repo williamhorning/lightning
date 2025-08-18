@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	correctPermissionValue = uint(485495808)
+	correctPermissionValue = uint(481301504)
 	messageSendPermission  = uint(2 << 22)
 )
 
