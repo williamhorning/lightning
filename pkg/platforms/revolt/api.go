@@ -273,7 +273,7 @@ func bulkDeleteRevoltMessages(token, channel string, body revoltChannelMessageBu
 	resp, err := revoltMakeRequest(
 		token,
 		http.MethodDelete,
-		"/channels/"+channel+"/bulk",
+		"/channels/"+channel+"/messages/bulk",
 		bytes.NewBuffer(payload),
 	)
 	if err != nil {
