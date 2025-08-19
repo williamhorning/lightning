@@ -68,7 +68,12 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 		command = bot.commands["help"]
 	}
 
-	handleCommandOptions(event, &command)
+	for _, arg := range event.Options {
+		if len(command.Subcommands) > 0 && event.Subcommand == nil {
+			event.Subcommand = &arg
+			event.Options = event.Options[1:]
+		}
+	}
 
 	for _, subcommand := range command.Subcommands {
 		if event.Subcommand != nil && subcommand.Name == *event.Subcommand {
@@ -78,32 +83,23 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 		}
 	}
 
+	handleCommandOptions(&command, event)
+
 	if err := event.Reply(command.Executor(event.CommandOptions), command.Sensitive); err != nil {
 		slog.Warn("lightning: failed to respond to command", "err",
 			PluginMethodError{err, event.ChannelID, "eventReply", "failed to reply to command event"})
 	}
 }
 
-func handleCommandOptions(event *CommandEvent, command *Command) {
-	idx := 0
-
-	if len(command.Subcommands) > 0 && idx < len(event.Options) && event.Subcommand == nil {
-		event.Subcommand = &event.Options[idx]
-		idx++
-	}
-
+func handleCommandOptions(command *Command, event *CommandEvent) {
 	for _, arg := range command.Arguments {
-		if idx >= len(event.Options) {
-			break
+		if event.Arguments[arg.Name] != "" {
+			continue
 		}
 
-		if event.Arguments[arg.Name] == "" {
-			event.Arguments[arg.Name] = event.Options[idx]
-			idx++
+		if len(event.Options) > 0 {
+			event.Arguments[arg.Name] = event.Options[0]
+			event.Options = event.Options[1:]
 		}
-	}
-
-	if idx > 0 && idx <= len(event.Options) {
-		event.Options = event.Options[idx:]
 	}
 }
