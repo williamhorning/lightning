@@ -16,13 +16,7 @@ func getOutgoing(
 	message lightning.Message,
 	opts *lightning.SendOptions,
 ) revoltMessageSend {
-	content := message.Content
-
-	if content == "" && len(message.Embeds) == 0 && len(message.Attachments) == 0 {
-		content = "\u200B"
-	}
-
-	content = replaceOutgoingSpoilers(content)
+	content := replaceOutgoingSpoilers(message.Content)
 
 	if opts != nil && !opts.AllowEveryonePings {
 		content = strings.ReplaceAll(content, "@everyone", "@\u2800everyone")
@@ -38,6 +32,10 @@ func getOutgoing(
 		Content:     content,
 		Embeds:      getOutgoingEmbeds(message.Embeds),
 		Replies:     getOutgoingReplies(message.RepliedTo),
+	}
+
+	if content == "" && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
+		msg.Content = "\u200B"
 	}
 
 	if opts != nil {
