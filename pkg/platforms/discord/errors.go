@@ -14,7 +14,6 @@ type discordInvalidWebhookError struct {
 	ChannelID string
 }
 
-// Disable implements the lightning.ChannelDisabler interface for discordInvalidWebhookError.
 func (discordInvalidWebhookError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: true}
 }
@@ -28,7 +27,6 @@ type discordAPIError struct {
 	Code    int
 }
 
-// Disable implements the lightning.ChannelDisabler interface for discordAPIError.
 func (e discordAPIError) Disable() *lightning.ChannelDisabled {
 	switch e.Code {
 	case discordgo.ErrCodeUnknownChannel:

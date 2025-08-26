@@ -10,7 +10,6 @@ type channelIDError struct {
 	channelID string
 }
 
-// Disable implements the lightning.ChannelDisabler interface for channelIDError.
 func (channelIDError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: true}
 }

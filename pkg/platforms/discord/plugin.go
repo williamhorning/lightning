@@ -7,7 +7,7 @@
 //
 //	bot.AddPluginType("discord", discord.New)
 //
-//	bot.UsePluginType("discord", map[string]any{
+//	bot.UsePluginType("discord", "", map[string]any{
 //		// ...
 //	})
 package discord

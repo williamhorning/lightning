@@ -11,7 +11,7 @@
 //
 //	bot.AddPluginType("telegram", telegram.New)
 //
-//	bot.UsePluginType("telegram", map[string]any{
+//	bot.UsePluginType("telegram", "", map[string]any{
 //		// ...
 //	})
 package telegram

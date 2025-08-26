@@ -35,7 +35,8 @@ func (b *Bot) AddPluginType(name string, constructor PluginConstructor) error {
 
 // UsePluginType takes in a plugin name and config to use a plugin with your bot.
 // It only returns an error if a plugin already exists *or* if the plugin type is
-// not found.
+// not found. If you pass an empty string to instanceName, it will default to
+// typeName, but that value must be unique.
 func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
 	if instanceName == "" {
 		instanceName = typeName

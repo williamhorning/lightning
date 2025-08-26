@@ -194,6 +194,28 @@ func revoltMakeRequest(token, method, endpoint string, body io.Reader) (*http.Re
 	return nil, fmt.Errorf("revolt: failed to make API request: %w", err)
 }
 
+func ratelimitRetry[T any](
+	resp *http.Response,
+	token, channel string,
+	data T,
+	self func(string, string, T) (string, error),
+) (string, error) {
+	retryAfter := resp.Header.Get("X-Ratelimit-Retry-After")
+
+	if retryAfter == "" {
+		retryAfter = "1000"
+	}
+
+	retryAfterDuration, err := time.ParseDuration(retryAfter + "ms")
+	if err != nil {
+		retryAfterDuration = time.Second
+	}
+
+	time.Sleep(retryAfterDuration)
+
+	return self(token, channel, data)
+}
+
 func sendRevoltMessage(token, channel string, message revoltMessageSend) (string, error) {
 	payload, err := json.Marshal(message)
 	if err != nil {
@@ -219,24 +241,11 @@ func sendRevoltMessage(token, channel string, message revoltMessageSend) (string
 	}()
 
 	if resp.StatusCode == http.StatusTooManyRequests {
-		retryAfter := resp.Header.Get("X-Ratelimit-Retry-After")
-
-		if retryAfter == "" {
-			retryAfter = "1000"
-		}
-
-		retryAfterDuration, err := time.ParseDuration(retryAfter + "ms")
-		if err != nil {
-			retryAfterDuration = time.Second
-		}
-
-		time.Sleep(retryAfterDuration)
-
-		return sendRevoltMessage(token, channel, message)
+		return ratelimitRetry(resp, token, channel, message, sendRevoltMessage)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", revoltStatusError{"failed to send revolt message", resp.StatusCode, false}
+		return "", &revoltStatusError{"failed to send revolt message", resp.StatusCode, false}
 	}
 
 	var response revoltMessage
@@ -273,8 +282,17 @@ func editRevoltMessage(token, channel, messageID string, message revoltMessageEd
 		}
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		_, err := ratelimitRetry(resp, token, channel, message,
+			func(_, _ string, _ revoltMessageEditData) (string, error) {
+				return "", editRevoltMessage(token, channel, messageID, message)
+			})
+
+		return err
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return revoltStatusError{"failed to edit revolt message", resp.StatusCode, true}
+		return &revoltStatusError{"failed to edit revolt message", resp.StatusCode, true}
 	}
 
 	return nil
@@ -304,8 +322,17 @@ func bulkDeleteRevoltMessages(token, channel string, body revoltChannelMessageBu
 		}
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		_, err := ratelimitRetry(resp, token, channel, body,
+			func(_, _ string, _ revoltChannelMessageBulkDeleteData) (string, error) {
+				return "", bulkDeleteRevoltMessages(token, channel, body)
+			})
+
+		return err
+	}
+
 	if resp.StatusCode != http.StatusNoContent {
-		return revoltStatusError{"failed to delete revolt message", resp.StatusCode, true}
+		return &revoltStatusError{"failed to delete revolt message", resp.StatusCode, true}
 	}
 
 	return nil

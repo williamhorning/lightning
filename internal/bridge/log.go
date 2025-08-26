@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -79,6 +80,10 @@ func webhookLog(errorID string, botErr BotError) {
 
 	if botErr.underlying == nil {
 		botErr.underlying = fmt.Errorf("underlying is nil: %w", errors.ErrUnsupported)
+	}
+
+	if strings.Contains(botErr.underlying.Error(), "connection reset by peer") {
+		return
 	}
 
 	body, err := json.Marshal(map[string]any{

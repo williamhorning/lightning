@@ -35,7 +35,7 @@ func New[K comparable, V any](ttl time.Duration) *Expiring[K, V] {
 
 // Get a key from the cache, returning its value and a whether it exists.
 //
-//nolint:all
+//nolint:all //nolint:nolintlint
 func (c *Expiring[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
 	item, exists := c.items[key]

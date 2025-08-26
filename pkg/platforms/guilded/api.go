@@ -30,13 +30,30 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 	req.Header["x-guilded-bot-api-use-official-markdown"] = []string{"true"}
 
 	resp, err := http.DefaultClient.Do(req)
-	if err == nil {
-		return resp, nil
+	if err != nil {
+		slog.Error("guilded: failed to make API request", "error", err, "method", method, "endpoint", endpoint)
+
+		return nil, fmt.Errorf("guilded: failed to make API request: %w", err)
 	}
 
-	slog.Error("guilded: failed to make API request", "error", err, "method", method, "endpoint", endpoint)
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := resp.Header.Get("Retry-After")
 
-	return nil, fmt.Errorf("guilded: failed to make API request: %w", err)
+		if retryAfter == "" {
+			retryAfter = "1000"
+		}
+
+		retryAfterDuration, err := time.ParseDuration(retryAfter + "ms")
+		if err != nil {
+			retryAfterDuration = time.Second
+		}
+
+		time.Sleep(retryAfterDuration)
+
+		return guildedMakeRequest(token, method, endpoint, body)
+	}
+
+	return resp, nil
 }
 
 type guildedSocketManager struct {

@@ -7,7 +7,7 @@
 //
 //	bot.AddPluginType("revolt", revolt.New)
 //
-//	bot.UsePluginType("revolt", map[string]any{
+//	bot.UsePluginType("revolt", "", map[string]any{
 //		// ...
 //	})
 package revolt
@@ -78,7 +78,7 @@ func (p *revoltPlugin) SendCommandResponse(
 ) ([]string, error) {
 	channel := p.getDMChannel(user)
 	if channel == nil {
-		return nil, revoltStatusError{"failed to get DM channel for user", 0, false}
+		return nil, &revoltStatusError{"failed to get DM channel for user", 0, false}
 	}
 
 	message.ChannelID = channel.ID

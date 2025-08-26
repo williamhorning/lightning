@@ -13,7 +13,6 @@ type revoltPermissionsError struct {
 	msg string
 }
 
-// Disable implements the lightning.ChannelDisabler interface for revoltPermissionsError.
 func (revoltPermissionsError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: true}
 }
@@ -28,7 +27,6 @@ type revoltStatusError struct {
 	disableDisable bool
 }
 
-// Disable implements the lightning.ChannelDisabler interface for revoltStatusError.
 func (e revoltStatusError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: e.code == 403 || (e.code == 404 && !e.disableDisable)}
 }

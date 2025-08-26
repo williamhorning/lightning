@@ -7,7 +7,7 @@
 //
 //	bot.AddPluginType("guilded", guilded.New)
 //
-//	bot.UsePluginType("guilded", map[string]any{
+//	bot.UsePluginType("guilded", "", map[string]any{
 //		// ...
 //	})
 package guilded

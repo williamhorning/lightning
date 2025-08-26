@@ -8,7 +8,6 @@ import (
 
 type guildedWebhookDataError struct{}
 
-// Disable implements the lightning.ChannelDisabler interface for guildedWebhookDataError.
 func (guildedWebhookDataError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: true}
 }
@@ -23,7 +22,6 @@ type guildedStatusError struct {
 	disableWrite bool
 }
 
-// Disable implements the lightning.ChannelDisabler interface for guildedStatusError.
 func (e guildedStatusError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: e.disableWrite}
 }

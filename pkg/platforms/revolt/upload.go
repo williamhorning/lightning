@@ -44,7 +44,7 @@ func uploadFile(token, tag, name string, reader io.Reader) (string, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", revoltStatusError{"failed to upload file", resp.StatusCode, true}
+		return "", &revoltStatusError{"failed to upload file", resp.StatusCode, true}
 	}
 
 	body, err := io.ReadAll(resp.Body)
