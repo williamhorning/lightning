@@ -38,7 +38,7 @@ func getLightningAttachments(
 	attachments []*discordgo.MessageAttachment,
 	stickers []*discordgo.StickerItem,
 ) []lightning.Attachment {
-	if len(attachments) == 0 {
+	if len(attachments) == 0 && len(stickers) == 0 {
 		return nil
 	}
 
@@ -52,15 +52,15 @@ func getLightningAttachments(
 	}
 
 	for _, sticker := range stickers {
-		stickerURL := ""
+		stickerURL := "https://cdn.discordapp.com/stickers/" + sticker.ID
 
 		switch sticker.FormatType {
 		case discordgo.StickerFormatTypePNG, discordgo.StickerFormatTypeAPNG:
-			stickerURL = "https://cdn.discordapp.com/stickers/" + sticker.ID + ".png"
+			stickerURL += ".png"
 		case discordgo.StickerFormatTypeLottie:
-			stickerURL = "https://cdn.discordapp.com/stickers/" + sticker.ID + ".json"
+			stickerURL += ".json"
 		case discordgo.StickerFormatTypeGIF:
-			stickerURL = "https://cdn.discordapp.com/stickers/" + sticker.ID + ".gif"
+			stickerURL += ".gif"
 		default:
 		}
 
