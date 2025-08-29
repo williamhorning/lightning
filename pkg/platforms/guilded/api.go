@@ -146,7 +146,7 @@ func (s *guildedSocketManager) connectWebsocket() error {
 
 	err = resp.Body.Close()
 	if err != nil {
-		slog.Warn("guilded: failed to close websocket request body", "err", err)
+		slog.Warn(fmt.Errorf("guilded: failed to close websocket request body: %w", err).Error())
 	}
 
 	s.mu.Lock()

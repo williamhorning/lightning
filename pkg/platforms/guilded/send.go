@@ -66,14 +66,14 @@ func (p *guildedPlugin) apiSendMessage(message *lightning.Message, reader io.Rea
 func getWebhookInfo(data any) (guildedWebhook, error) {
 	webhookData, ok := data.(map[string]any)
 	if !ok {
-		return guildedWebhook{}, guildedWebhookDataError{}
+		return guildedWebhook{}, &guildedWebhookDataError{}
 	}
 
 	whID, idOk := webhookData["id"].(string)
 	token, tokenOk := webhookData["token"].(string)
 
 	if !idOk || !tokenOk {
-		return guildedWebhook{}, guildedWebhookDataError{}
+		return guildedWebhook{}, &guildedWebhookDataError{}
 	}
 
 	return guildedWebhook{ID: whID, Token: &token}, nil
@@ -149,7 +149,7 @@ func checkStatusCode(resp *http.Response, channelID string) error {
 
 	slog.Error("guilded: failed to send message: ", "status", resp.StatusCode, "channelID", channelID)
 
-	return guildedStatusError{"failed to send message: " + errMsg, resp.StatusCode, disable}
+	return &guildedStatusError{"failed to send message: " + errMsg, resp.StatusCode, disable}
 }
 
 func readResponse(resp *http.Response, target any, channelID string) error {

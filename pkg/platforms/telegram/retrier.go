@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -40,11 +41,11 @@ func (r *retrier) RequestWithContext(
 
 	telegramError := &gotgbot.TelegramError{}
 	if !errors.As(err, &telegramError) {
-		return resp, err //nolint:wrapcheck // this might be used by gotgbot
+		return resp, errors.New(strings.ReplaceAll(err.Error(), token, "")) //nolint:err113 // token replacer is useful
 	}
 
 	if telegramError.Code != http.StatusTooManyRequests {
-		return resp, err //nolint:wrapcheck // this might be used by gotgbot
+		return resp, err //nolint:wrapcheck // might be used in the future
 	}
 
 	time.Sleep(time.Second * time.Duration(telegramError.ResponseParams.RetryAfter))

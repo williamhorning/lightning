@@ -96,9 +96,8 @@ func (s *revoltSocketManager) connectWebsocket() error {
 		return fmt.Errorf("revolt: failed to dial WebSocket: %w", err)
 	}
 
-	err = resp.Body.Close()
-	if err != nil {
-		slog.Warn("revolt: failed to close websocket request body", "err", err)
+	if err = resp.Body.Close(); err != nil {
+		slog.Warn(fmt.Errorf("revolt: failed to close websocket request body: %w", err).Error())
 	}
 
 	s.mu.Lock()
@@ -230,7 +229,7 @@ func (*revoltSocketManager) handleErrorEvent(message []byte) {
 		return
 	}
 
-	slog.Warn("revolt: socket error", "err", errorEvent)
+	slog.Warn("revolt: socket error", "event", errorEvent)
 }
 
 func (s *revoltSocketManager) handleReadyEvent(data []byte) {

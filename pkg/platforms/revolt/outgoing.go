@@ -2,6 +2,7 @@ package revolt
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -113,7 +114,7 @@ func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment
 
 		err = resp.Body.Close()
 		if err != nil {
-			slog.Warn("revolt: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 
 		cancel()

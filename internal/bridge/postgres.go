@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,29 +19,25 @@ type postgresDatabase struct {
 func newPostgresDatabase(conn string) (Database, error) {
 	pool, err := pgxpool.New(context.Background(), conn)
 	if err != nil {
-		return nil, wrapErr(err, "create connection pool")
+		return nil, fmt.Errorf("failed to make connection pool: %w", err)
 	}
 
 	pgdb := &postgresDatabase{stdlib.OpenDBFromPool(pool)}
 
 	if err := pgdb.setupDatabase(); err != nil {
 		if closeErr := pgdb.db.Close(); closeErr != nil {
-			slog.Error("failed to close database connection", "err", closeErr)
+			slog.Error(fmt.Errorf("failed to close database connection: %w", closeErr).Error())
 		}
 
-		return nil, wrapErr(err, "setup schema")
+		return nil, fmt.Errorf("failed to setup schema: %w", err)
 	}
 
 	return pgdb, nil
 }
 
-func wrapErr(err error, msg string) error {
-	return LogError(err, msg, nil, nil)
-}
-
 func (p *postgresDatabase) exec(query string, args ...any) error {
 	if _, err := p.db.ExecContext(context.Background(), query, args...); err != nil {
-		return wrapErr(err, "exec failed")
+		return fmt.Errorf("exec failed: %w", err)
 	}
 
 	return nil
@@ -49,12 +46,12 @@ func (p *postgresDatabase) exec(query string, args ...any) error {
 func (p *postgresDatabase) withTx(txnfn func(*sql.Tx) error) error {
 	txn, err := p.db.BeginTx(context.Background(), nil)
 	if err != nil {
-		return wrapErr(err, "begin tx")
+		return fmt.Errorf("failed to begin txn: %w", err)
 	}
 
 	defer func() {
 		if err := txn.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-			slog.Warn("tx rollback failed", "err", err)
+			slog.Warn(fmt.Errorf("txn rollback failed: %w", err).Error())
 		}
 	}()
 
@@ -63,7 +60,7 @@ func (p *postgresDatabase) withTx(txnfn func(*sql.Tx) error) error {
 	}
 
 	if err := txn.Commit(); err != nil {
-		return wrapErr(err, "commit tx")
+		return fmt.Errorf("failed to commit txn: %w", err)
 	}
 
 	return nil
@@ -73,31 +70,31 @@ func (p *postgresDatabase) createBridge(bridgeData bridge) error {
 	return p.withTx(func(txn *sql.Tx) error {
 		settings, err := json.Marshal(bridgeData.Settings)
 		if err != nil {
-			return wrapErr(err, "marshal settings")
+			return fmt.Errorf("failed to marshal settings: %w", err)
 		}
 
 		if _, err := txn.ExecContext(context.Background(), insertBridge, bridgeData.ID, settings); err != nil {
-			return wrapErr(err, "insert bridge")
+			return fmt.Errorf("failed to insert bridge: %w", err)
 		}
 
 		if _, err := txn.ExecContext(context.Background(), deleteBridgeChannelsQuery, bridgeData.ID); err != nil {
-			return wrapErr(err, "delete old channels")
+			return fmt.Errorf("failed to delete old channels: %w", err)
 		}
 
 		for _, channel := range bridgeData.Channels {
 			data, err := json.Marshal(channel.Data)
 			if err != nil {
-				return wrapErr(err, "marshal channel data")
+				return fmt.Errorf("failed to marshal channel data: %w", err)
 			}
 
 			disabled, err := json.Marshal(channel.Disabled)
 			if err != nil {
-				return wrapErr(err, "marshal channel disabled")
+				return fmt.Errorf("failed to marshal channel disable information: %w", err)
 			}
 
 			if _, err := txn.ExecContext(context.Background(), insertChannel,
 				bridgeData.ID, channel.ID, data, disabled); err != nil {
-				return wrapErr(err, "insert channel")
+				return fmt.Errorf("failed to insert channel: %w", err)
 			}
 		}
 
@@ -118,35 +115,35 @@ func (p *postgresDatabase) getBridge(brID string) (bridge, error) {
 			return bridge{}, nil
 		}
 
-		return bridgeData, wrapErr(err, "query bridge settings")
+		return bridge{}, fmt.Errorf("failed to query bridge settings: %w", err)
 	}
 
 	if err := json.Unmarshal(settings, &bridgeData.Settings); err != nil {
-		return bridgeData, wrapErr(err, "unmarshal settings")
+		return bridge{}, fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
 	rows, err := p.db.QueryContext(context.Background(), selectBridgeChannelsQuery, brID)
 	if err != nil {
-		return bridgeData, wrapErr(err, "query channels")
+		return bridge{}, fmt.Errorf("failed to query channels: %w", err)
 	}
 
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Warn("failed to close rows", "err", err)
+			slog.Warn(fmt.Errorf("failed to close rows: %w", err).Error())
 		}
 	}()
 
 	for rows.Next() {
 		channel, err := getChannelRow(rows)
 		if err != nil {
-			return bridge{}, wrapErr(err, "get channel row")
+			return bridge{}, fmt.Errorf("failed to get channels: %w", err)
 		}
 
 		bridgeData.Channels = append(bridgeData.Channels, channel)
 	}
 
 	if err := rows.Err(); err != nil {
-		return bridge{}, wrapErr(err, "iterate channels")
+		return bridge{}, fmt.Errorf("failed to iterate channels: %w", err)
 	}
 
 	return bridgeData, nil
@@ -159,15 +156,15 @@ func getChannelRow(rows *sql.Rows) (bridgeChannel, error) {
 	)
 
 	if err := rows.Scan(&channel.ID, &data, &disabled); err != nil {
-		return bridgeChannel{}, wrapErr(err, "scan channel")
+		return bridgeChannel{}, fmt.Errorf("failed to scan channel row: %w", err)
 	}
 
 	if err := json.Unmarshal(data, &channel.Data); err != nil {
-		return bridgeChannel{}, wrapErr(err, "unmarshal channel data")
+		return bridgeChannel{}, fmt.Errorf("failed to unmarshal channel data: %w", err)
 	}
 
 	if err := json.Unmarshal(disabled, &channel.Disabled); err != nil {
-		return bridgeChannel{}, wrapErr(err, "unmarshal disabled flag")
+		return bridgeChannel{}, fmt.Errorf("failed to unmarshal disabled information: %w", err)
 	}
 
 	return channel, nil
@@ -183,7 +180,7 @@ func (p *postgresDatabase) getBridgeByChannel(chID string) (bridge, error) {
 			return bridge{}, nil
 		}
 
-		return bridge{}, wrapErr(err, "query bridge by channel")
+		return bridge{}, fmt.Errorf("failed to query channel in bridge: %w", err)
 	}
 
 	return p.getBridge(bID)
@@ -192,7 +189,7 @@ func (p *postgresDatabase) getBridgeByChannel(chID string) (bridge, error) {
 func (p *postgresDatabase) createMessage(message bridgeMessageCollection) error {
 	data, err := json.Marshal(message.Messages)
 	if err != nil {
-		return wrapErr(err, "marshal messages")
+		return fmt.Errorf("failed to marshal messages: %w", err)
 	}
 
 	return p.exec(insertMessage, message.ID, message.BridgeID, data)
@@ -208,13 +205,13 @@ func (p *postgresDatabase) getMessage(msgID string) (bridgeMessageCollection, er
 		selectMessageCollectionQuery, msgID).
 		Scan(&message.ID, &message.BridgeID, &data)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return message, wrapErr(err, "query message")
+		return bridgeMessageCollection{}, fmt.Errorf("failed to query message: %w", err)
 	} else if errors.Is(err, sql.ErrNoRows) {
 		return bridgeMessageCollection{}, nil
 	}
 
 	if err := json.Unmarshal([]byte(data.String), &message.Messages); err != nil {
-		return message, wrapErr(err, "unmarshal messages")
+		return bridgeMessageCollection{}, fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
 	return message, nil
@@ -225,7 +222,7 @@ func (p *postgresDatabase) deleteMessage(id string) error {
 
 	err := p.db.QueryRowContext(context.Background(), selectMessageIDQuery, id).Scan(&realID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return wrapErr(err, "query message id")
+		return fmt.Errorf("failed to query message: %w", err)
 	}
 
 	if realID != "" {
@@ -237,7 +234,7 @@ func (p *postgresDatabase) deleteMessage(id string) error {
 
 func (p *postgresDatabase) setupDatabase() error {
 	if err := p.exec(createTables); err != nil {
-		return wrapErr(err, "create tables")
+		return fmt.Errorf("failed to create tables: %w", err)
 	}
 
 	version := "0.8.1"
@@ -245,10 +242,10 @@ func (p *postgresDatabase) setupDatabase() error {
 	err := p.db.QueryRowContext(context.Background(), selectDatabaseVersionQuery).Scan(&version)
 	if errors.Is(err, sql.ErrNoRows) {
 		if err = p.exec(insertDatabaseVersionQuery); err != nil {
-			return wrapErr(err, "init db version")
+			return fmt.Errorf("failed to get init version: %w", err)
 		}
 	} else if err != nil {
-		return wrapErr(err, "get db version")
+		return fmt.Errorf("failed to get db version: %w", err)
 	}
 
 	if version != "0.8.1" {

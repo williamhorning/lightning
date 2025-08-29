@@ -8,7 +8,7 @@ type disableChannelError struct {
 }
 
 func (e disableChannelError) Error() string {
-	return "disabling channel " + e.ChannelID + " in bridge " + e.BridgeID
+	return "disabling channel " + e.ChannelID + " in bridge " + e.BridgeID + " due to error"
 }
 
 type unsupportedTypeError struct {

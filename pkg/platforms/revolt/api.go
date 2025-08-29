@@ -25,7 +25,7 @@ func (p *revoltPlugin) getChannel(channelID string) *revoltChannel {
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -51,7 +51,7 @@ func (p *revoltPlugin) getDMChannel(user string) *revoltChannel {
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -77,7 +77,7 @@ func (p *revoltPlugin) getEmoji(emojiID string) *revoltEmoji {
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -104,7 +104,7 @@ func (p *revoltPlugin) getMember(serverID, userID string) *revoltServerMember {
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -130,7 +130,7 @@ func (p *revoltPlugin) getServer(serverID string) *revoltServer {
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -156,7 +156,7 @@ func (p *revoltPlugin) getUser(userID string) *revoltUser {
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -236,7 +236,7 @@ func sendRevoltMessage(token, channel string, message revoltMessageSend) (string
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close send body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -278,7 +278,7 @@ func editRevoltMessage(token, channel, messageID string, message revoltMessageEd
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close edit body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 
@@ -318,7 +318,7 @@ func bulkDeleteRevoltMessages(token, channel string, body revoltChannelMessageBu
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close bulk delete body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
 		}
 	}()
 

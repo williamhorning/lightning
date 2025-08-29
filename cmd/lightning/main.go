@@ -4,13 +4,12 @@ package main
 import (
 	"cmp"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/lmittmann/tint"
 	"github.com/williamhorning/lightning/internal/bridge"
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"github.com/williamhorning/lightning/pkg/platforms/discord"
@@ -23,17 +22,17 @@ func main() {
 	config := flag.String("config", "lightning.toml", "path to the configuration file")
 	flag.Parse()
 
-	slog.SetDefault(slog.New(
-		tint.NewHandler(os.Stderr, &tint.Options{
-			Level:      slog.LevelDebug,
-			TimeFormat: time.Kitchen,
-		}),
-	))
+	handler := bridge.NewLogHandler("", slog.LevelDebug)
+
+	slog.SetDefault(slog.New(handler))
 
 	cfg, ok := bridge.GetConfig(*config)
 	if !ok {
 		os.Exit(1)
 	}
+
+	handler.URL = cfg.ErrorURL
+	handler.Level = slog.Level(cfg.LogLevel)
 
 	profileURL := "https://williamhorning.eu.org/assets/lightning/logo_color.svg"
 
@@ -54,13 +53,13 @@ func main() {
 		bot.AddPluginType("revolt", revolt.New),
 		bot.AddPluginType("telegram", telegram.New),
 	); err != nil {
-		slog.Error("failed to setup platform plugins", "err", err)
+		slog.Error(fmt.Errorf("failed to setup platform plugins: %w", err).Error())
 		os.Exit(1)
 	}
 
 	database, err := cfg.DatabaseConfig.GetDatabase()
 	if err != nil {
-		slog.Error("failed to setup database", "err", err)
+		slog.Error(fmt.Errorf("failed to setup database: %w", err).Error())
 		os.Exit(1)
 	}
 
@@ -68,7 +67,7 @@ func main() {
 
 	for plugin, cfg := range cfg.Plugins {
 		if err := bot.UsePluginType(plugin, "", cfg); err != nil {
-			slog.Error("failed to setup a plugin", "err", err)
+			slog.Error(fmt.Errorf("failed to setup plugin for %s: %w", plugin, err).Error())
 			os.Exit(1)
 		}
 	}
@@ -77,5 +76,5 @@ func main() {
 	signal.Notify(quitChannel, os.Interrupt, syscall.SIGTERM)
 	<-quitChannel
 
-	slog.Error("bot stopped", "err", bridge.LogError(nil, "bot stopped", nil, nil))
+	slog.Error("bot stopped")
 }

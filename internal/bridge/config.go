@@ -1,8 +1,8 @@
 package bridge
 
 import (
+	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/BurntSushi/toml"
 )
@@ -21,13 +21,7 @@ func GetConfig(file string) (Config, bool) {
 	var config Config
 
 	if _, err := toml.DecodeFile(file, &config); err != nil {
-		slog.Error("error loading config", "err", err)
-
-		return config, false
-	}
-
-	if err := os.Setenv("LIGHTNING_ERROR_WEBHOOK", config.ErrorURL); err != nil {
-		slog.Error("error setting webhook url", "err", err)
+		slog.Error(fmt.Errorf("error loading config: %w", err).Error())
 
 		return config, false
 	}

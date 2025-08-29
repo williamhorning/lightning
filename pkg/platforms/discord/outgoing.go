@@ -76,14 +76,14 @@ type discordWebhook struct {
 func (p *discordPlugin) getWebhookFromChannel(channel string, options *lightning.SendOptions) (discordWebhook, error) {
 	webhookData, ok := options.ChannelData.(map[string]any)
 	if !ok {
-		return discordWebhook{}, discordInvalidWebhookError{channel}
+		return discordWebhook{}, &discordInvalidWebhookError{channel}
 	}
 
 	webhookID, okID := webhookData["id"].(string)
 	webhookToken, okToken := webhookData["token"].(string)
 
 	if !okID || !okToken || webhookID == "" || webhookToken == "" {
-		return discordWebhook{}, discordInvalidWebhookError{channel}
+		return discordWebhook{}, &discordInvalidWebhookError{channel}
 	}
 
 	p.webhookCache.Set(webhookID, true)

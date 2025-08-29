@@ -9,127 +9,121 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"github.com/lmittmann/tint"
 )
 
-// BotError is the wrapper for any error encountered by a [Bot].
-type BotError struct {
-	disable *lightning.ChannelDisabled
-
-	underlying error
-	message    string
+type non2xxError struct {
+	code int
 }
 
-// Disable implements the lightning.ChannelDisabler interface for BotError.
-func (botErr BotError) Disable() *lightning.ChannelDisabled {
-	return botErr.disable
+func (e *non2xxError) Error() string {
+	return "received non-2xx response: " + strconv.Itoa(e.code)
 }
 
-func (botErr BotError) Error() string {
-	return botErr.message
+// LogHandler is a custom slog handler that sends logs to a webhook and to tint.
+type LogHandler struct {
+	Parent slog.Handler
+	URL    string
+	group  []string
+	attrs  []slog.Attr
+	Level  slog.Level
 }
 
-func (botErr BotError) Unwrap() error {
-	return botErr.underlying
+// NewLogHandler creates a logger that deals with tint and webhooks.
+func NewLogHandler(url string, level slog.Level) *LogHandler {
+	return &LogHandler{tint.NewHandler(os.Stderr, &tint.Options{
+		Level:      slog.LevelDebug,
+		TimeFormat: time.Kitchen,
+	}), url, nil, nil, level}
 }
 
-// LogError logs a given error, with an addition message and extra information.
-func LogError(err error, message string, extra map[string]any, disable *lightning.ChannelDisabled) BotError {
-	var lightningErr BotError
-	if errors.As(err, &lightningErr) {
-		return lightningErr
-	}
-
-	if disabler, ok := err.(lightning.ChannelDisabler); ok {
-		disable = disabler.Disable()
-	}
-
-	if disable == nil {
-		disable = &lightning.ChannelDisabled{Read: false, Write: false}
-	}
-
-	errorID := time.Now().Format("15:04:05.000000")
-
-	slog.Error("lightning error: "+message,
-		"id", errorID, "read", disable.Read, "write", disable.Write, "error", err, "extra", extra)
-
-	debug.PrintStack()
-
-	lightningError := BotError{
-		disable,
-		err,
-		"Something went wrong!\n\n```\n" + errorID + "\n\n" + message + "\n```",
-	}
-
-	webhookLog(errorID, lightningError)
-
-	return lightningError
+// Enabled checks if the log level is enabled.
+func (handler *LogHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= handler.Level
 }
 
-func webhookLog(errorID string, botErr BotError) {
-	webhook := os.Getenv("LIGHTNING_ERROR_WEBHOOK")
+// Handle handles the log record by sending it to the webhook and to tint.
+func (handler *LogHandler) Handle(ctx context.Context, record slog.Record) error {
+	return errors.Join(handler.webhookHandle(ctx, record, handler.URL), handler.Parent.Handle(ctx, record))
+}
 
-	if webhook == "" {
-		return
+// WithGroup adds a group to the log handler.
+func (handler *LogHandler) WithGroup(name string) slog.Handler {
+	return &LogHandler{handler.Parent, handler.URL, append(handler.group, name), handler.attrs, handler.Level}
+}
+
+// WithAttrs adds attributes to the log handler.
+func (handler *LogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &LogHandler{handler.Parent, handler.URL, handler.group, append(handler.attrs, attrs...), handler.Level}
+}
+
+func (handler *LogHandler) webhookHandle(ctx context.Context, record slog.Record, url string) error {
+	if url == "" {
+		return nil
 	}
 
-	if botErr.underlying == nil {
-		botErr.underlying = fmt.Errorf("underlying is nil: %w", errors.ErrUnsupported)
-	}
-
-	if strings.Contains(botErr.underlying.Error(), "connection reset by peer") {
-		return
-	}
-
-	body, err := json.Marshal(map[string]any{
-		"content": botErr.message,
-		"embeds": []map[string]any{
-			{
-				"title": errorID,
-				"fields": []map[string]any{
-					{
-						"name": "Channel Status",
-						"value": "Read: " + strconv.FormatBool(botErr.disable.Read) +
-							", Write: " + strconv.FormatBool(botErr.disable.Write),
-					},
-					{"name": "Full Error", "value": "```\n" + botErr.underlying.Error() + "\n```"},
-				},
-			},
-		},
-	})
+	jsonData, err := json.Marshal(map[string]any{"embeds": []map[string]any{{
+		"title":     strings.ToLower(record.Level.String()) + ": " + record.Message,
+		"color":     0x487C7E,
+		"fields":    handler.getFields(record),
+		"footer":    map[string]string{"text": "lightning bridge logger"},
+		"timestamp": record.Time.Format(time.RFC3339),
+	}}})
 	if err != nil {
-		slog.Error("lightning: failed to marshal webhook body", "error", err, "id", errorID)
-
-		return
+		return fmt.Errorf("failed to marshal json: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(
-		context.Background(),
-		http.MethodPost,
-		webhook,
-		bytes.NewReader(body),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		slog.Error("lightning: failed to create webhook request", "error", err, "id", errorID)
-
-		return
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Do(req)
 	if err != nil {
-		slog.Error("lightning: error sending webhook request", "error", err, "id", errorID)
-
-		return
+		return fmt.Errorf("failed to send request: %w", err)
 	}
 
-	if err := resp.Body.Close(); err != nil {
-		slog.Error("lightning: error closing error webhook body", "error", err, "id", errorID)
+	if err = resp.Body.Close(); err != nil {
+		return fmt.Errorf("failed to close response body: %w", err)
 	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &non2xxError{resp.StatusCode}
+	}
+
+	return nil
+}
+
+func (handler *LogHandler) getFields(record slog.Record) []map[string]any {
+	fields := make([]map[string]any, 0, len(handler.group)+len(handler.attrs)+record.NumAttrs())
+
+	for _, group := range handler.group {
+		fields = append(fields, map[string]any{"name": "Group", "value": "```\n\n" + group + "\n\n```", "inline": true})
+	}
+
+	for _, attr := range handler.attrs {
+		fields = append(
+			fields,
+			map[string]any{"name": attr.Key, "value": "```\n\n" + attr.Value.String() + "\n\n```", "inline": true},
+		)
+	}
+
+	record.Attrs(func(attr slog.Attr) bool {
+		fields = append(
+			fields,
+			map[string]any{"name": attr.Key, "value": "```\n\n" + attr.Value.String() + "\n\n```", "inline": true},
+		)
+
+		return true
+	})
+
+	return fields
 }

@@ -1,6 +1,7 @@
 package lightning
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 )
@@ -12,8 +13,8 @@ func (b *Bot) AddCommand(command *Command) {
 
 	for _, plugin := range b.plugins {
 		if err := plugin.SetupCommands(b.commands); err != nil {
-			slog.Error("lightning: failed to setup commands for plugin", "err",
-				PluginMethodError{err, "", "AddCommand", "one or more plugins failed to register command"})
+			slog.Error(fmt.Errorf("failed to setup commands for plugin: %w",
+				PluginMethodError{err, "", "AddCommand", "one or more plugins failed to register command"}).Error())
 		}
 	}
 }
@@ -86,8 +87,8 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 	handleCommandOptions(command, event)
 
 	if err := event.Reply(command.Executor(event.CommandOptions), command.Sensitive); err != nil {
-		slog.Warn("lightning: failed to respond to command", "err",
-			PluginMethodError{err, event.ChannelID, "eventReply", "failed to reply to command event"})
+		slog.Warn(fmt.Errorf("lightning: failed to respond to command: %w",
+			PluginMethodError{err, event.ChannelID, "eventReply", "failed to reply to command event"}).Error())
 	}
 }
 

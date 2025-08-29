@@ -18,7 +18,7 @@ func (p *telegramPlugin) startProxy() {
 		req, err := http.NewRequestWithContext(request.Context(), request.Method, url, nil)
 		if err != nil {
 			http.Error(writer, "Failed to create request", http.StatusInternalServerError)
-			slog.Warn("telegram: failed to create request", "err", err)
+			slog.Warn(fmt.Errorf("telegram: failed to create request: %w", err).Error())
 
 			return
 		}
@@ -28,7 +28,7 @@ func (p *telegramPlugin) startProxy() {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			http.Error(writer, "Failed to fetch file from Telegram", http.StatusInternalServerError)
-			slog.Warn("telegram: failed to fetch file", "err", err)
+			slog.Warn(fmt.Errorf("telegram: failed to fetch file: %w", err).Error())
 
 			return
 		}
@@ -38,11 +38,11 @@ func (p *telegramPlugin) startProxy() {
 
 		if _, err = io.CopyBuffer(writer, resp.Body, nil); err != nil {
 			http.Error(writer, "Failed to write response", http.StatusInternalServerError)
-			slog.Warn("telegram: failed to write resp", "err", err)
+			slog.Warn(fmt.Errorf("telegram: failed to write response: %w", err).Error())
 		}
 
 		if err = resp.Body.Close(); err != nil {
-			slog.Warn("telegram: failed to close body", "err", err)
+			slog.Warn(fmt.Errorf("telegram: failed to close body: %w", err).Error())
 		}
 	})
 

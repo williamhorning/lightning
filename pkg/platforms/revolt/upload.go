@@ -39,7 +39,7 @@ func (p *revoltPlugin) uploadFile(tag, name string, reader io.Reader) (string, e
 
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
-			slog.Warn("revolt: failed to close upload body", "err", err)
+			slog.Warn(fmt.Errorf("revolt: failed to close upload body: %w", err).Error())
 		}
 	}()
 

@@ -43,7 +43,7 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 			slog.Warn("guilded: failed to close request body when making webhook")
 		}
 
-		return nil, guildedStatusError{"failed to create webhook", resp.StatusCode, false}
+		return nil, &guildedStatusError{"failed to create webhook", resp.StatusCode, false}
 	}
 
 	var webhookData guildedWebhookResponse
@@ -57,7 +57,7 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 	if webhookData.Webhook.Token == nil {
 		slog.Error("guilded: webhook token is nil", "channel", channel, "data", webhookData)
 
-		return nil, guildedWebhookTokenNilError{channel}
+		return nil, &guildedWebhookTokenNilError{channel}
 	}
 
 	return map[string]string{"id": webhookData.Webhook.ID, "token": *webhookData.Webhook.Token}, nil
@@ -86,7 +86,7 @@ func getChannel(token, channel string) (*guildedServerChannel, error) {
 		slog.Error("guilded: unexpected status code when getting channel",
 			"status", resp.StatusCode, "body", string(bodyBytes))
 
-		return nil, guildedStatusError{"failed to get channel", resp.StatusCode, false}
+		return nil, &guildedStatusError{"failed to get channel", resp.StatusCode, false}
 	}
 
 	var channelData guildedServerChannelResponse

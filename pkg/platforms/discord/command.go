@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -75,7 +76,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 
 	timestamp, err := discordgo.SnowflakeTimestamp(interaction.ID)
 	if err != nil {
-		slog.Warn("discord: failed to parse interaction timestamp", "err", err, "interaction_id", interaction.ID)
+		slog.Warn(fmt.Errorf("discord: failed to parse interaction timestamp: %w", err).Error(), "id", interaction.ID)
 		slog.Warn("discord: using current time as fallback for interaction timestamp")
 
 		timestamp = time.Now()

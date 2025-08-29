@@ -54,7 +54,7 @@ func New(config any) (lightning.Plugin, error) {
 	discord.LogLevel = 1
 	discord.UserAgent = "lightning/" + lightning.VERSION + " DiscordGo/" + discordgo.VERSION
 	discordgo.Logger = func(msgL, _ int, format string, args ...any) {
-		slog.Log(context.Background(), slog.Level(msgL), "discordgo: "+format, "args", args)
+		slog.Log(context.Background(), slog.Level(msgL), "discordgo: "+fmt.Sprintf(format, args...))
 	}
 
 	if err = discord.Open(); err != nil {

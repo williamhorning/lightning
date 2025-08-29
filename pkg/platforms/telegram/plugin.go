@@ -84,6 +84,7 @@ func New(config any) (lightning.Plugin, error) {
 	updater := ext.NewUpdater(dispatch, nil)
 	if err := updater.StartPolling(telegram, &ext.PollingOpts{
 		DropPendingUpdates: true,
+		GetUpdatesOpts:     &gotgbot.GetUpdatesOpts{Timeout: int64(defaultTimeout.Seconds())},
 	}); err != nil {
 		slog.Error("telegram: failed to start polling", "error", err)
 
@@ -126,7 +127,7 @@ func (p *telegramPlugin) SendCommandResponse(
 func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
-		return nil, channelIDError{message.ChannelID}
+		return nil, &channelIDError{message.ChannelID}
 	}
 
 	content := parseContent(message, opts)
@@ -174,7 +175,7 @@ func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning
 func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
-		return channelIDError{message.ChannelID}
+		return &channelIDError{message.ChannelID}
 	}
 
 	msgID, err := strconv.ParseInt(ids[0], 10, 64)
@@ -203,7 +204,7 @@ func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, o
 func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 	channel, err := strconv.ParseInt(channelID, 10, 64)
 	if err != nil {
-		return channelIDError{channelID}
+		return &channelIDError{channelID}
 	}
 
 	messageIDs := make([]int64, 0, len(ids))
