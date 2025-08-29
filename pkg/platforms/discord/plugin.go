@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -54,6 +55,10 @@ func New(config any) (lightning.Plugin, error) {
 	discord.LogLevel = 1
 	discord.UserAgent = "lightning/" + lightning.VERSION + " DiscordGo/" + discordgo.VERSION
 	discordgo.Logger = func(msgL, _ int, format string, args ...any) {
+		if strings.Contains(format, "unknown event") {
+			return
+		}
+
 		slog.Log(context.Background(), slog.Level(msgL), "discordgo: "+fmt.Sprintf(format, args...))
 	}
 
