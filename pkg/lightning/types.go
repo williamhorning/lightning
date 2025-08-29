@@ -102,6 +102,13 @@ type Embed struct {
 	Fields      []EmbedField
 }
 
+// Emoji represents custom emoji in a [Message].
+type Emoji struct {
+	URL  *string
+	ID   string
+	Name string
+}
+
 // Media represents images/videos on an [Embed].
 type Media struct {
 	URL    string
@@ -126,6 +133,7 @@ type Message struct {
 	Content     string
 	Attachments []Attachment
 	Embeds      []Embed
+	Emoji       []Emoji
 	RepliedTo   []string
 }
 

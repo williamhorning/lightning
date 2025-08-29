@@ -4,19 +4,20 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/williamhorning/lightning/internal/emoji"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func getOutgoing(
-	token string,
+func (p *revoltPlugin) getOutgoing(
 	message *lightning.Message,
 	opts *lightning.SendOptions,
 ) revoltMessageSend {
-	content := replaceOutgoingSpoilers(message.Content)
+	content := p.getOutgoingContent(message)
 
 	if opts != nil && !opts.AllowEveryonePings {
 		content = strings.ReplaceAll(content, "@everyone", "@\u2800everyone")
@@ -28,7 +29,7 @@ func getOutgoing(
 	}
 
 	msg := revoltMessageSend{
-		Attachments: getOutgoingAttachments(token, message.Attachments),
+		Attachments: p.getOutgoingAttachments(message.Attachments),
 		Content:     content,
 		Embeds:      getOutgoingEmbeds(message.Embeds),
 		Replies:     getOutgoingReplies(message.RepliedTo),
@@ -45,13 +46,43 @@ func getOutgoing(
 	return msg
 }
 
-func replaceOutgoingSpoilers(content string) string {
-	return spoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
+var emojiSendRegex = regexp.MustCompile(`:\w+:`)
+
+func (p *revoltPlugin) getOutgoingContent(message *lightning.Message) string {
+	message.Content = emojiSendRegex.ReplaceAllStringFunc(message.Content, p.replaceOutgoingEmoji(message))
+
+	return spoilerRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
 		return "!!" + match[2:len(match)-2] + "!!"
 	})
 }
 
-func getOutgoingAttachments(token string, attachments []lightning.Attachment) []string {
+func (p *revoltPlugin) replaceOutgoingEmoji(message *lightning.Message) func(string) string {
+	return func(match string) string {
+		if emoji.IsEmoji(match) {
+			return match
+		}
+
+		name := strings.ReplaceAll(match, ":", "")
+
+		channel := p.getChannel(message.ChannelID)
+
+		if channel != nil && channel.ChannelType == revoltChannelTypeText {
+			if emoji, ok := p.emojiNameCache.Get(channel.Server + "-" + name); ok {
+				return ":" + emoji.ID + ":"
+			}
+		}
+
+		for _, emoji := range message.Emoji {
+			if emoji.Name == name && emoji.URL != nil {
+				return "[" + emoji.Name + "](" + *emoji.URL + ")"
+			}
+		}
+
+		return match
+	}
+}
+
+func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment) []string {
 	if len(attachments) == 0 {
 		return nil
 	}
@@ -75,7 +106,7 @@ func getOutgoingAttachments(token string, attachments []lightning.Attachment) []
 			continue
 		}
 
-		file, err := uploadFile(token, "attachments", attachment.Name, resp.Body)
+		file, err := p.uploadFile("attachments", attachment.Name, resp.Body)
 		if err == nil {
 			attachmentIDs = append(attachmentIDs, file)
 		}

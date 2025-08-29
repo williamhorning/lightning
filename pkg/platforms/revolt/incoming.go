@@ -16,12 +16,7 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 		return nil
 	}
 
-	content := replaceSpoilers(message.Content)
-	content = p.replaceEmojis(content)
-	content = p.replaceMentions(message.Channel, content)
-	content = p.replaceChannels(content)
-
-	return &lightning.Message{
+	msg := &lightning.Message{
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.Channel,
@@ -29,10 +24,16 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 		},
 		Attachments: getLightningAttachment(message.Attachments),
 		Author:      p.getLightningAuthor(message.Author, message.Channel, message.Masquerade),
-		Content:     content,
 		Embeds:      getLightningEmbeds(message.Embeds),
 		RepliedTo:   message.Replies,
 	}
+
+	msg.Content = replaceSpoilers(message.Content)
+	msg.Content = p.replaceEmojis(msg)
+	msg.Content = p.replaceMentions(msg.ChannelID, msg.Content)
+	msg.Content = p.replaceChannels(msg.Content)
+
+	return msg
 }
 
 func getLightningTime(message revoltMessage) *time.Time {
@@ -156,11 +157,19 @@ func replaceSpoilers(content string) string {
 	})
 }
 
-func (p *revoltPlugin) replaceEmojis(content string) string {
-	return emojiRegex.ReplaceAllStringFunc(content, func(match string) string {
+func (p *revoltPlugin) replaceEmojis(message *lightning.Message) string {
+	return emojiRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
 		if emojiID := extractID(match, emojiRegex); emojiID != "" {
 			emoji := p.getEmoji(emojiID)
 			if emoji != nil {
+				url := "https://cdn.revoltusercontent.com/emojis/" + emoji.ID
+
+				message.Emoji = append(message.Emoji, lightning.Emoji{
+					URL:  &url,
+					ID:   emoji.ID,
+					Name: emoji.Name,
+				})
+
 				return ":" + emoji.Name + ":"
 			}
 		}

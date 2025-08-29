@@ -11,7 +11,7 @@ import (
 	"net/http"
 )
 
-func uploadFile(token, tag, name string, reader io.Reader) (string, error) {
+func (p *revoltPlugin) uploadFile(tag, name string, reader io.Reader) (string, error) {
 	url := "https://cdn.revoltusercontent.com/" + tag
 
 	payload, contentType, err := createMultipartPayload(name, reader, tag)
@@ -28,7 +28,7 @@ func uploadFile(token, tag, name string, reader io.Reader) (string, error) {
 
 	req.Header.Set("Content-Type", contentType)
 
-	req.Header.Set("X-Bot-Token", token)
+	req.Header.Set("X-Bot-Token", p.token)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

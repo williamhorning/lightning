@@ -6,6 +6,7 @@ type revoltCache struct {
 	channelCache   *cache.Expiring[string, revoltChannel]
 	dmChannelCache *cache.Expiring[string, revoltChannel]
 	emojiCache     *cache.Expiring[string, revoltEmoji]
+	emojiNameCache *cache.Expiring[string, revoltEmoji]
 	memberCache    *cache.Expiring[string, revoltServerMember]
 	serverCache    *cache.Expiring[string, revoltServer]
 	userCache      *cache.Expiring[string, revoltUser]
@@ -15,6 +16,7 @@ func newRevoltCache() revoltCache {
 	return revoltCache{
 		cache.New[string, revoltChannel](cache.DefaultTTL),
 		cache.New[string, revoltChannel](cache.DefaultTTL),
+		cache.New[string, revoltEmoji](cache.DefaultTTL),
 		cache.New[string, revoltEmoji](cache.DefaultTTL),
 		cache.New[string, revoltServerMember](cache.DefaultTTL),
 		cache.New[string, revoltServer](cache.DefaultTTL),
@@ -41,5 +43,9 @@ func (p *revoltPlugin) setCache(ready *revoltEventReady) {
 
 	for _, emoji := range ready.Emojis {
 		p.emojiCache.Set(emoji.ID, *emoji)
+
+		if emoji.Parent != nil {
+			p.emojiNameCache.Set(emoji.Parent.ID+"-"+emoji.Name, *emoji)
+		}
 	}
 }

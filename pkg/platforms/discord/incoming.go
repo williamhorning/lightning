@@ -20,7 +20,7 @@ func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightni
 		return nil
 	}
 
-	return &lightning.Message{
+	msg := &lightning.Message{
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.ChannelID,
@@ -32,6 +32,10 @@ func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightni
 		Embeds:      getLightningEmbeds(message.Embeds),
 		RepliedTo:   getLightningReplies(message),
 	}
+
+	msg.Content = replaceIncomingEmoji(msg)
+
+	return msg
 }
 
 func getLightningAttachments(
@@ -147,7 +151,7 @@ func getLightningContent(session *discordgo.Session, message *discordgo.Message)
 		return "#" + channelID
 	})
 
-	content = roleMention.ReplaceAllStringFunc(content, func(match string) string {
+	return roleMention.ReplaceAllStringFunc(content, func(match string) string {
 		roleID := roleMention.FindStringSubmatch(match)[1]
 
 		if guild, err := session.State.Guild(message.GuildID); err == nil {
@@ -160,9 +164,26 @@ func getLightningContent(session *discordgo.Session, message *discordgo.Message)
 
 		return "@&" + roleID
 	})
+}
 
-	return emojiMention.ReplaceAllStringFunc(content, func(match string) string {
-		return ":" + strings.Split(match, ":")[1] + ":"
+func replaceIncomingEmoji(msg *lightning.Message) string {
+	return emojiMention.ReplaceAllStringFunc(msg.Content, func(match string) string {
+		split := strings.Split(match, ":")
+		url := "https://cdn.discordapp.com/emojis/" + split[2]
+
+		if strings.Contains(match, "<a") {
+			url += ".gif"
+		} else {
+			url += ".png"
+		}
+
+		msg.Emoji = append(msg.Emoji, lightning.Emoji{
+			ID:   split[2],
+			Name: split[1],
+			URL:  &url,
+		})
+
+		return ":" + split[1] + ":"
 	})
 }
 

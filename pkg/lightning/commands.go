@@ -41,7 +41,7 @@ func handleMessageCommand(bot *Bot, event *Message) {
 				return MissingPluginError{}
 			}
 
-			msg := &Message{BaseMessage{ChannelID: channel}, bot.author, message, nil, nil, nil}
+			msg := &Message{BaseMessage: BaseMessage{ChannelID: channel}, Author: bot.author, Content: message}
 
 			var err error
 

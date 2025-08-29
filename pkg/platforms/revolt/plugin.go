@@ -87,7 +87,7 @@ func (p *revoltPlugin) SendCommandResponse(
 }
 
 func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
-	msg := getOutgoing(p.token, message, opts)
+	msg := p.getOutgoing(message, opts)
 	leftoverAttachments := make([]string, 0)
 
 	if len(msg.Attachments) > 5 {
@@ -122,7 +122,7 @@ func (p *revoltPlugin) EditMessage(message *lightning.Message, ids []string, opt
 	message.Attachments = nil
 
 	err := editRevoltMessage(p.token, message.ChannelID, ids[0],
-		getOutgoing(p.token, message, opts).toEdit())
+		p.getOutgoing(message, opts).toEdit())
 	if err != nil {
 		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to edit message on Revolt")
 	}

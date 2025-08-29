@@ -6,10 +6,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/williamhorning/lightning/internal/emoji"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -97,7 +99,7 @@ func getOutgoingMessage(
 	msg := discordOutgoingMessage{
 		AllowedMentions: getOutgoingMention(opts),
 		AvatarURL:       getOutgoingProfile(message),
-		Content:         getOutgoingContent(message),
+		Content:         getOutgoingContent(session, message),
 		Embeds:          getOutgoingEmbeds(message),
 		Files:           getOutgoingFiles(session, message),
 		Username:        message.Author.Nickname,
@@ -137,12 +139,46 @@ func getOutgoingProfile(message *lightning.Message) string {
 	return discordgo.EndpointDefaultUserAvatar(1)
 }
 
-func getOutgoingContent(message *lightning.Message) string {
+var emojiSendRegex = regexp.MustCompile(`:\w+:`)
+
+func getOutgoingContent(session *discordgo.Session, message *lightning.Message) string {
+	message.Content = emojiSendRegex.ReplaceAllStringFunc(message.Content, replaceOutgoingEmoji(session, message))
+
 	if len(message.Content) > maxContentLength {
 		return string([]rune(message.Content)[:maxContentLength-3]) + "..."
 	}
 
 	return message.Content
+}
+
+func replaceOutgoingEmoji(session *discordgo.Session, message *lightning.Message) func(string) string {
+	return func(match string) string {
+		if emoji.IsEmoji(match) {
+			return match
+		}
+
+		name := strings.ReplaceAll(match, ":", "")
+
+		channel, err := session.State.Channel(message.ChannelID)
+		if err == nil {
+			serverEmoji, err := session.GuildEmojis(channel.GuildID)
+			if err == nil {
+				for _, emoji := range serverEmoji {
+					if emoji.Name == name {
+						return emoji.MessageFormat()
+					}
+				}
+			}
+		}
+
+		for _, emoji := range message.Emoji {
+			if emoji.Name == name && emoji.URL != nil {
+				return "[" + emoji.Name + "](" + *emoji.URL + ")"
+			}
+		}
+
+		return match
+	}
 }
 
 func getOutgoingComponents(
