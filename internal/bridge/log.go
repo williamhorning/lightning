@@ -66,6 +66,10 @@ func (handler *LogHandler) webhookHandle(ctx context.Context, record slog.Record
 		return nil
 	}
 
+	if strings.Contains(record.Message, "connection reset by peer") {
+		return nil
+	}
+
 	jsonData, err := json.Marshal(map[string]any{"embeds": []map[string]any{{
 		"title":     strings.ToLower(record.Level.String()) + ": " + record.Message,
 		"color":     0x487C7E,
