@@ -91,7 +91,7 @@ func (p *discordPlugin) getWebhookFromChannel(channel string, options *lightning
 
 func getOutgoingMessage(
 	session *discordgo.Session,
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 ) *discordOutgoingMessage {
 	msg := discordOutgoingMessage{
@@ -129,7 +129,7 @@ func getOutgoingMention(opts *lightning.SendOptions) *discordgo.MessageAllowedMe
 	}
 }
 
-func getOutgoingProfile(message lightning.Message) string {
+func getOutgoingProfile(message *lightning.Message) string {
 	if message.Author.ProfilePicture != nil {
 		return *message.Author.ProfilePicture
 	}
@@ -137,7 +137,7 @@ func getOutgoingProfile(message lightning.Message) string {
 	return discordgo.EndpointDefaultUserAvatar(1)
 }
 
-func getOutgoingContent(message lightning.Message) string {
+func getOutgoingContent(message *lightning.Message) string {
 	if len(message.Content) > maxContentLength {
 		return string([]rune(message.Content)[:maxContentLength-3]) + "..."
 	}
@@ -147,7 +147,7 @@ func getOutgoingContent(message lightning.Message) string {
 
 func getOutgoingComponents(
 	session *discordgo.Session,
-	message lightning.Message,
+	message *lightning.Message,
 ) []discordgo.MessageComponent {
 	if len(message.RepliedTo) == 0 {
 		return nil
@@ -193,7 +193,7 @@ func getOutgoingComponents(
 	}
 }
 
-func getOutgoingEmbeds(message lightning.Message) []*discordgo.MessageEmbed {
+func getOutgoingEmbeds(message *lightning.Message) []*discordgo.MessageEmbed {
 	embeds := make([]*discordgo.MessageEmbed, 0)
 
 	for _, embed := range message.Embeds {
@@ -262,7 +262,7 @@ func setEmbedAuthor(discordEmbed *discordgo.MessageEmbed, embed lightning.Embed)
 	}
 }
 
-func getOutgoingFiles(session *discordgo.Session, message lightning.Message) []*discordgo.File {
+func getOutgoingFiles(session *discordgo.Session, message *lightning.Message) []*discordgo.File {
 	if len(message.Attachments) == 0 {
 		return nil
 	}
@@ -284,7 +284,7 @@ func getOutgoingFiles(session *discordgo.Session, message lightning.Message) []*
 	return files
 }
 
-func getMaxFileSize(session *discordgo.Session, message lightning.Message) int64 {
+func getMaxFileSize(session *discordgo.Session, message *lightning.Message) int64 {
 	maxFileSize := defaultMaxFileSize
 
 	if ch, err := session.State.Channel(message.ChannelID); err == nil && ch.GuildID != "" {
@@ -355,7 +355,7 @@ func (c *cancelableReadCloser) Close() error {
 	return nil
 }
 
-func getOutgoingReference(message lightning.Message) *discordgo.MessageReference {
+func getOutgoingReference(message *lightning.Message) *discordgo.MessageReference {
 	if len(message.RepliedTo) == 0 {
 		return nil
 	}

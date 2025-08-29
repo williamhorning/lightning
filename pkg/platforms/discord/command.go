@@ -8,7 +8,7 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func getDiscordCommandOptions(arguments lightning.Command) []*discordgo.ApplicationCommandOption {
+func getDiscordCommandOptions(arguments *lightning.Command) []*discordgo.ApplicationCommandOption {
 	options := make([]*discordgo.ApplicationCommandOption, 0)
 
 	for _, arg := range arguments.Arguments {
@@ -32,7 +32,7 @@ func getDiscordCommandOptions(arguments lightning.Command) []*discordgo.Applicat
 	return options
 }
 
-func getDiscordCommand(command map[string]lightning.Command) []*discordgo.ApplicationCommand {
+func getDiscordCommand(command map[string]*lightning.Command) []*discordgo.ApplicationCommand {
 	commands := make([]*discordgo.ApplicationCommand, 0)
 
 	for _, cmd := range command {
@@ -84,10 +84,10 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 	return &lightning.CommandEvent{
 		CommandOptions: lightning.CommandOptions{
 			Arguments: args,
-			BaseMessage: lightning.BaseMessage{
+			BaseMessage: &lightning.BaseMessage{
 				EventID:   interaction.ID,
 				ChannelID: interaction.ChannelID,
-				Time:      timestamp,
+				Time:      &timestamp,
 			},
 			Prefix: "/",
 		},

@@ -91,7 +91,7 @@ func (p *discordPlugin) SetupChannel(channel string) (any, error) {
 }
 
 func (p *discordPlugin) SendCommandResponse(
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 	user string,
 ) ([]string, error) {
@@ -105,7 +105,7 @@ func (p *discordPlugin) SendCommandResponse(
 	return p.SendMessage(message, opts)
 }
 
-func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+func (p *discordPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := getOutgoingMessage(p.discord, message, opts)
 
 	if opts != nil {
@@ -130,7 +130,7 @@ func (p *discordPlugin) SendMessage(message lightning.Message, opts *lightning.S
 	return nil, getError(err, map[string]any{"msg": msg}, "Failed to send message to Discord")
 }
 
-func (p *discordPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
+func (p *discordPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
 	webhook, err := p.getWebhookFromChannel(message.ChannelID, opts)
 	if err != nil {
 		return err
@@ -168,7 +168,7 @@ func (p *discordPlugin) DeleteMessage(channel string, ids []string) error {
 	return nil
 }
 
-func (p *discordPlugin) SetupCommands(command map[string]lightning.Command) error {
+func (p *discordPlugin) SetupCommands(command map[string]*lightning.Command) error {
 	app, err := p.discord.Application("@me")
 	if err != nil {
 		return getError(err, nil, "failed to get application info for Discord commands")
@@ -182,20 +182,20 @@ func (p *discordPlugin) SetupCommands(command map[string]lightning.Command) erro
 	return nil
 }
 
-func (p *discordPlugin) ListenMessages() <-chan lightning.Message {
-	channel := make(chan lightning.Message, 1000)
+func (p *discordPlugin) ListenMessages() <-chan *lightning.Message {
+	channel := make(chan *lightning.Message, 1000)
 
 	p.discord.AddHandler(func(_ *discordgo.Session, m *discordgo.MessageCreate) {
 		if msg := p.getLightningMessage(m.Message); msg != nil {
-			channel <- *msg
+			channel <- msg
 		}
 	})
 
 	return channel
 }
 
-func (p *discordPlugin) ListenEdits() <-chan lightning.EditedMessage {
-	channel := make(chan lightning.EditedMessage, 1000)
+func (p *discordPlugin) ListenEdits() <-chan *lightning.EditedMessage {
+	channel := make(chan *lightning.EditedMessage, 1000)
 
 	p.discord.AddHandler(func(_ *discordgo.Session, message *discordgo.MessageUpdate) {
 		if msg := p.getLightningMessage(message.Message); msg != nil {
@@ -204,38 +204,29 @@ func (p *discordPlugin) ListenEdits() <-chan lightning.EditedMessage {
 				message.EditedTimestamp = &now
 			}
 
-			channel <- lightning.EditedMessage{
-				Message: *msg,
-				Edited:  *message.EditedTimestamp,
-			}
+			channel <- &lightning.EditedMessage{Message: msg, Edited: message.EditedTimestamp}
 		}
 	})
 
 	return channel
 }
 
-func (p *discordPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	channel := make(chan lightning.BaseMessage, 1000)
+func (p *discordPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
+	channel := make(chan *lightning.BaseMessage, 1000)
 
 	p.discord.AddHandler(func(_ *discordgo.Session, m *discordgo.MessageDelete) {
-		channel <- lightning.BaseMessage{
-			EventID:   m.ID,
-			ChannelID: m.ChannelID,
-			Time:      m.Timestamp,
-		}
+		channel <- &lightning.BaseMessage{EventID: m.ID, ChannelID: m.ChannelID, Time: &m.Timestamp}
 	})
 
 	return channel
 }
 
-func (p *discordPlugin) ListenCommands() <-chan lightning.CommandEvent {
-	channel := make(chan lightning.CommandEvent, 1000)
+func (p *discordPlugin) ListenCommands() <-chan *lightning.CommandEvent {
+	channel := make(chan *lightning.CommandEvent, 1000)
 
 	p.discord.AddHandler(func(s *discordgo.Session, m *discordgo.InteractionCreate) {
-		cmd := getLightningCommand(s, m)
-
-		if cmd != nil {
-			channel <- *cmd
+		if cmd := getLightningCommand(s, m); cmd != nil {
+			channel <- cmd
 		}
 	})
 

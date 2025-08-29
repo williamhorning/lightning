@@ -32,7 +32,7 @@ func (b *Bot) AddHandler(listener any) {
 
 func processEventHandlers[C any](
 	incoming <-chan C,
-	handlers *atomic.Pointer[[]func(*Bot, *C)],
+	handlers *atomic.Pointer[[]func(*Bot, C)],
 	store *atomic.Bool,
 	bot *Bot,
 ) {
@@ -43,7 +43,7 @@ func processEventHandlers[C any](
 	for msg := range incoming {
 		for _, handler := range *handlers.Load() {
 			localMsg := msg
-			go handler(bot, &localMsg)
+			go handler(bot, localMsg)
 		}
 	}
 

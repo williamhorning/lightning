@@ -7,7 +7,7 @@ import (
 
 // AddCommand takes a [Command] and registers it with the built-in
 // text command handler and any platform-specific command systems.
-func (b *Bot) AddCommand(command Command) {
+func (b *Bot) AddCommand(command *Command) {
 	b.commands[command.Name] = command
 
 	for _, plugin := range b.plugins {
@@ -32,7 +32,7 @@ func handleMessageCommand(bot *Bot, event *Message) {
 	options := args[1:]
 
 	handleCommandEvent(bot, &CommandEvent{
-		CommandOptions: CommandOptions{event.BaseMessage, make(map[string]string), bot, bot.prefix},
+		CommandOptions: CommandOptions{&event.BaseMessage, make(map[string]string), bot, bot.prefix},
 		Command:        commandName,
 		Options:        options,
 		Reply: func(message string, sensitive bool) error {
@@ -41,7 +41,7 @@ func handleMessageCommand(bot *Bot, event *Message) {
 				return MissingPluginError{}
 			}
 
-			msg := Message{BaseMessage{ChannelID: channel}, bot.author, message, nil, nil, nil}
+			msg := &Message{BaseMessage{ChannelID: channel}, bot.author, message, nil, nil, nil}
 
 			var err error
 
@@ -83,7 +83,7 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 		}
 	}
 
-	handleCommandOptions(&command, event)
+	handleCommandOptions(command, event)
 
 	if err := event.Reply(command.Executor(event.CommandOptions), command.Sensitive); err != nil {
 		slog.Warn("lightning: failed to respond to command", "err",

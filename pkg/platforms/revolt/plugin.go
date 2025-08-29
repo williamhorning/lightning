@@ -72,7 +72,7 @@ type revoltPlugin struct {
 }
 
 func (p *revoltPlugin) SendCommandResponse(
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 	user string,
 ) ([]string, error) {
@@ -86,7 +86,7 @@ func (p *revoltPlugin) SendCommandResponse(
 	return p.SendMessage(message, opts)
 }
 
-func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := getOutgoing(p.token, message, opts)
 	leftoverAttachments := make([]string, 0)
 
@@ -118,7 +118,7 @@ func (p *revoltPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 	return ids, nil
 }
 
-func (p *revoltPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
+func (p *revoltPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
 	message.Attachments = nil
 
 	err := editRevoltMessage(p.token, message.ChannelID, ids[0],
@@ -138,30 +138,30 @@ func (p *revoltPlugin) DeleteMessage(channel string, ids []string) error {
 	return nil
 }
 
-func (*revoltPlugin) SetupCommands(_ map[string]lightning.Command) error {
+func (*revoltPlugin) SetupCommands(_ map[string]*lightning.Command) error {
 	return nil
 }
 
-func (p *revoltPlugin) ListenMessages() <-chan lightning.Message {
-	channel := make(chan lightning.Message, 1000)
+func (p *revoltPlugin) ListenMessages() <-chan *lightning.Message {
+	channel := make(chan *lightning.Message, 1000)
 
 	p.socket.OnMessageCreated(func(m *revoltEventMessage) {
 		if msg := p.getIncomingMessage(m.revoltMessage); msg != nil {
-			channel <- *msg
+			channel <- msg
 		}
 	})
 
 	return channel
 }
 
-func (p *revoltPlugin) ListenEdits() <-chan lightning.EditedMessage {
-	channel := make(chan lightning.EditedMessage, 1000)
+func (p *revoltPlugin) ListenEdits() <-chan *lightning.EditedMessage {
+	channel := make(chan *lightning.EditedMessage, 1000)
 
 	p.socket.OnMessageUpdated(func(m *revoltEventMessageUpdate) {
 		if msg := p.getIncomingMessage(m.Data); msg != nil {
-			channel <- lightning.EditedMessage{
-				Message: *msg,
-				Edited:  m.Data.Edited,
+			channel <- &lightning.EditedMessage{
+				Message: msg,
+				Edited:  &m.Data.Edited,
 			}
 		}
 	})
@@ -169,20 +169,21 @@ func (p *revoltPlugin) ListenEdits() <-chan lightning.EditedMessage {
 	return channel
 }
 
-func (p *revoltPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	channel := make(chan lightning.BaseMessage, 1000)
+func (p *revoltPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
+	channel := make(chan *lightning.BaseMessage, 1000)
 
 	p.socket.OnMessageDeleted(func(m *revoltEventMessageDelete) {
-		channel <- lightning.BaseMessage{
+		timestamp := time.Now()
+		channel <- &lightning.BaseMessage{
 			EventID:   m.ID,
 			ChannelID: m.Channel,
-			Time:      time.Now(),
+			Time:      &timestamp,
 		}
 	})
 
 	return channel
 }
 
-func (*revoltPlugin) ListenCommands() <-chan lightning.CommandEvent {
+func (*revoltPlugin) ListenCommands() <-chan *lightning.CommandEvent {
 	return nil
 }

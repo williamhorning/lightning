@@ -176,7 +176,7 @@ func (p *guildedPlugin) getIncomingMessage(msg *guildedChatMessage) *lightning.M
 		BaseMessage: lightning.BaseMessage{
 			EventID:   msg.ID,
 			ChannelID: msg.ChannelID,
-			Time:      msg.CreatedAt,
+			Time:      &msg.CreatedAt,
 		},
 		Attachments: p.getIncomingAttachments(urls),
 		Author:      p.getIncomingAuthor(msg),
@@ -186,7 +186,7 @@ func (p *guildedPlugin) getIncomingMessage(msg *guildedChatMessage) *lightning.M
 	}
 }
 
-func (p *guildedPlugin) getIncomingAuthor(msg *guildedChatMessage) lightning.MessageAuthor {
+func (p *guildedPlugin) getIncomingAuthor(msg *guildedChatMessage) *lightning.MessageAuthor {
 	defaultAuthor := lightning.MessageAuthor{
 		Nickname: "Guilded User",
 		Username: "GuildedUser",
@@ -199,10 +199,10 @@ func (p *guildedPlugin) getIncomingAuthor(msg *guildedChatMessage) lightning.Mes
 
 	author, err := p.getAuthor(msg)
 	if err != nil {
-		return defaultAuthor
+		return &defaultAuthor
 	}
 
-	return author
+	return &author
 }
 
 func (p *guildedPlugin) getAuthor(msg *guildedChatMessage) (lightning.MessageAuthor, error) {

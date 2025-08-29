@@ -11,7 +11,7 @@ type Attachment struct {
 
 // BaseMessage is basic message information, such as an ID, channel, and timestamp.
 type BaseMessage struct {
-	Time      time.Time
+	Time      *time.Time
 	EventID   string
 	ChannelID string
 }
@@ -31,7 +31,7 @@ type CommandArgument struct {
 
 // CommandOptions are provided to a [Command] executor.
 type CommandOptions struct {
-	BaseMessage
+	*BaseMessage
 
 	Arguments map[string]string
 	Bot       *Bot
@@ -43,8 +43,8 @@ type Command struct {
 	Executor    func(options CommandOptions) string
 	Name        string
 	Description string
-	Arguments   []CommandArgument
-	Subcommands []Command
+	Arguments   []*CommandArgument
+	Subcommands []*Command
 	Sensitive   bool
 }
 
@@ -63,8 +63,8 @@ type DeletedMessage = BaseMessage
 
 // EditedMessage is information about an edited message.
 type EditedMessage struct {
-	Edited  time.Time
-	Message Message
+	Edited  *time.Time
+	Message *Message
 }
 
 // EmbedAuthor is an author on an [Embed].
@@ -122,7 +122,7 @@ type MessageAuthor struct {
 type Message struct {
 	BaseMessage
 
-	Author      MessageAuthor
+	Author      *MessageAuthor
 	Content     string
 	Attachments []Attachment
 	Embeds      []Embed

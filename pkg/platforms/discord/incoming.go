@@ -24,7 +24,7 @@ func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightni
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.ChannelID,
-			Time:      message.Timestamp,
+			Time:      &message.Timestamp,
 		},
 		Attachments: getLightningAttachments(message.Attachments, message.StickerItems),
 		Author:      getLightningAuthor(p.discord, message),
@@ -74,7 +74,7 @@ func getLightningAttachments(
 	return result
 }
 
-func getLightningAuthor(session *discordgo.Session, message *discordgo.Message) lightning.MessageAuthor {
+func getLightningAuthor(session *discordgo.Session, message *discordgo.Message) *lightning.MessageAuthor {
 	profilePicture := message.Author.AvatarURL("")
 	author := lightning.MessageAuthor{
 		ID:             message.Author.ID,
@@ -85,13 +85,13 @@ func getLightningAuthor(session *discordgo.Session, message *discordgo.Message) 
 	}
 
 	if message.GuildID == "" {
-		return author
+		return &author
 	}
 
 	if message.Member == nil {
 		member, err := session.State.Member(message.GuildID, message.Author.ID)
 		if err != nil {
-			return author
+			return &author
 		}
 
 		message.Member = member
@@ -106,7 +106,7 @@ func getLightningAuthor(session *discordgo.Session, message *discordgo.Message) 
 	profilePicture = message.Member.AvatarURL("")
 	author.ProfilePicture = &profilePicture
 
-	return author
+	return &author
 }
 
 var (

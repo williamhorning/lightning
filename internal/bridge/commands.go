@@ -10,14 +10,14 @@ import (
 
 const notInBridge = "You're not in a bridge"
 
-func bridgeCommand(database Database) lightning.Command {
-	return lightning.Command{
+func bridgeCommand(database Database) *lightning.Command {
+	return &lightning.Command{
 		Name:        "bridge",
 		Description: "manage bridges between channels",
 		Executor: func(_ lightning.CommandOptions) string {
 			return "take a look at the subcommands of this command"
 		},
-		Subcommands: []lightning.Command{
+		Subcommands: []*lightning.Command{
 			{
 				Name:        "create",
 				Description: "create a new bridge",
@@ -55,7 +55,7 @@ func bridgeCommand(database Database) lightning.Command {
 			{
 				Name:        "toggle",
 				Description: "toggle settings for a bridge",
-				Arguments: []lightning.CommandArgument{
+				Arguments: []*lightning.CommandArgument{
 					{Name: "setting", Description: "the bridge setting to toggle", Required: true},
 				},
 				Executor: func(options lightning.CommandOptions) string {
@@ -73,8 +73,8 @@ func bridgeCommand(database Database) lightning.Command {
 	}
 }
 
-func arguments(to string) []lightning.CommandArgument {
-	return []lightning.CommandArgument{
+func arguments(to string) []*lightning.CommandArgument {
+	return []*lightning.CommandArgument{
 		{Name: "id", Description: "the ID of the bridge to " + to, Required: true},
 	}
 }

@@ -12,15 +12,17 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func getBase(ctx *ext.Context) lightning.BaseMessage {
-	return lightning.BaseMessage{
+func getBase(ctx *ext.Context) *lightning.BaseMessage {
+	timestamp := time.UnixMilli(ctx.EffectiveMessage.Date * 1000)
+
+	return &lightning.BaseMessage{
 		EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
 		ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-		Time:      time.UnixMilli(ctx.EffectiveMessage.Date * 1000),
+		Time:      &timestamp,
 	}
 }
 
-func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) lightning.CommandEvent {
+func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) *lightning.CommandEvent {
 	if cmdName == "start" {
 		cmdName = "help"
 	}
@@ -32,7 +34,7 @@ func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) lightning.Co
 		args = strings.Fields(fullText[spaceIndex+1:])
 	}
 
-	return lightning.CommandEvent{
+	return &lightning.CommandEvent{
 		CommandOptions: lightning.CommandOptions{
 			BaseMessage: getBase(ctx),
 			Prefix:      "/",
@@ -51,7 +53,7 @@ func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) lightning.Co
 
 func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {
 	msg := lightning.Message{
-		BaseMessage: getBase(ctx),
+		BaseMessage: *getBase(ctx),
 		Attachments: []lightning.Attachment{},
 		Author:      getLightningAuthor(bot, ctx, proxyPath),
 		Embeds:      []lightning.Embed{},
@@ -161,7 +163,7 @@ func handleAttachment(
 	}
 }
 
-func getLightningAuthor(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.MessageAuthor {
+func getLightningAuthor(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) *lightning.MessageAuthor {
 	author := lightning.MessageAuthor{
 		ID:             strconv.FormatInt(ctx.EffectiveSender.Id(), 10),
 		Nickname:       ctx.EffectiveSender.Name(),
@@ -171,7 +173,7 @@ func getLightningAuthor(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) li
 	}
 
 	if ctx.EffectiveUser == nil {
-		return author
+		return &author
 	}
 
 	pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
@@ -193,7 +195,7 @@ func getLightningAuthor(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) li
 		}
 	}
 
-	return author
+	return &author
 }
 
 func getLightningReply(ctx *ext.Context) []string {

@@ -52,9 +52,9 @@ func New(config any) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("telegram: failed to create bot: %w", err)
 	}
 
-	commands := make(chan lightning.CommandEvent, 1000)
-	messages := make(chan lightning.Message, 1000)
-	edits := make(chan lightning.EditedMessage, 1000)
+	commands := make(chan *lightning.CommandEvent, 1000)
+	messages := make(chan *lightning.Message, 1000)
+	edits := make(chan *lightning.EditedMessage, 1000)
 
 	dispatch := ext.NewDispatcher(nil)
 
@@ -68,12 +68,13 @@ func New(config any) (lightning.Plugin, error) {
 		Response: func(b *gotgbot.Bot, ctx *ext.Context) error {
 			msg := getMessage(b, ctx, cfg.proxyURL)
 			if ctx.EditedMessage != nil {
-				edits <- lightning.EditedMessage{
-					Message: msg,
-					Edited:  time.UnixMilli(ctx.EditedMessage.GetDate() * 1000),
+				time := time.UnixMilli(ctx.EditedMessage.GetDate() * 1000)
+				edits <- &lightning.EditedMessage{
+					Message: &msg,
+					Edited:  &time,
 				}
 			} else {
-				messages <- msg
+				messages <- &msg
 			}
 
 			return nil
@@ -99,9 +100,9 @@ func New(config any) (lightning.Plugin, error) {
 }
 
 type telegramPlugin struct {
-	commandChannel chan lightning.CommandEvent
-	messageChannel chan lightning.Message
-	editChannel    chan lightning.EditedMessage
+	commandChannel chan *lightning.CommandEvent
+	messageChannel chan *lightning.Message
+	editChannel    chan *lightning.EditedMessage
 	dispatch       *ext.Dispatcher
 	cfg            *telegramConfig
 	telegram       *gotgbot.Bot
@@ -113,7 +114,7 @@ func (*telegramPlugin) SetupChannel(_ string) (any, error) {
 }
 
 func (p *telegramPlugin) SendCommandResponse(
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 	user string,
 ) ([]string, error) {
@@ -122,7 +123,7 @@ func (p *telegramPlugin) SendCommandResponse(
 	return p.SendMessage(message, opts)
 }
 
-func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
 		return nil, channelIDError{message.ChannelID}
@@ -170,7 +171,7 @@ func (p *telegramPlugin) SendMessage(message lightning.Message, opts *lightning.
 	return ids, nil
 }
 
-func (p *telegramPlugin) EditMessage(message lightning.Message, ids []string, opts *lightning.SendOptions) error {
+func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
 		return channelIDError{message.ChannelID}
@@ -225,7 +226,7 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 	return fmt.Errorf("telegram: failed to delete message %s in channel %s: %w", ids, channelID, err)
 }
 
-func (p *telegramPlugin) SetupCommands(commands map[string]lightning.Command) error {
+func (p *telegramPlugin) SetupCommands(commands map[string]*lightning.Command) error {
 	if help, exists := commands["help"]; exists {
 		commands["start"] = help
 	}
@@ -252,18 +253,18 @@ func (p *telegramPlugin) SetupCommands(commands map[string]lightning.Command) er
 	return fmt.Errorf("telegram: failed to set commands: %w", err)
 }
 
-func (p *telegramPlugin) ListenMessages() <-chan lightning.Message {
+func (p *telegramPlugin) ListenMessages() <-chan *lightning.Message {
 	return p.messageChannel
 }
 
-func (p *telegramPlugin) ListenEdits() <-chan lightning.EditedMessage {
+func (p *telegramPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	return p.editChannel
 }
 
-func (*telegramPlugin) ListenDeletes() <-chan lightning.BaseMessage {
+func (*telegramPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	return nil
 }
 
-func (p *telegramPlugin) ListenCommands() <-chan lightning.CommandEvent {
+func (p *telegramPlugin) ListenCommands() <-chan *lightning.CommandEvent {
 	return p.commandChannel
 }

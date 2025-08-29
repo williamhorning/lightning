@@ -12,7 +12,7 @@ import (
 func Setup(bot *lightning.Bot, database Database) {
 	slog.Info("bridge: setting up")
 
-	bot.AddCommand(lightning.Command{
+	bot.AddCommand(&lightning.Command{
 		Name:        "help",
 		Description: "get help with the bot",
 		Executor: func(_ lightning.CommandOptions) string {
@@ -20,11 +20,11 @@ func Setup(bot *lightning.Bot, database Database) {
 		},
 	})
 
-	bot.AddCommand(lightning.Command{
+	bot.AddCommand(&lightning.Command{
 		Name:        "ping",
 		Description: "check if the bot is alive",
 		Executor: func(options lightning.CommandOptions) string {
-			return "Pong! 🏓 " + strconv.FormatInt(time.Since(options.Time).Milliseconds(), 10) + "ms"
+			return "Pong! 🏓 " + strconv.FormatInt(time.Since(*options.Time).Milliseconds(), 10) + "ms"
 		},
 	})
 

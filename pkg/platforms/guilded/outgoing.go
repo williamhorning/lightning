@@ -12,7 +12,7 @@ import (
 
 var usernameRegex = regexp.MustCompile(`(?ms)^[a-zA-Z0-9_ ()-]{1,25}$`)
 
-func getValidUsername(author lightning.MessageAuthor) string {
+func getValidUsername(author *lightning.MessageAuthor) string {
 	if usernameRegex.MatchString(author.Nickname) {
 		return author.Nickname
 	} else if usernameRegex.MatchString(author.Username) {
@@ -22,7 +22,7 @@ func getValidUsername(author lightning.MessageAuthor) string {
 	return author.ID
 }
 
-func (p *guildedPlugin) getOutgoingMessage(message lightning.Message, opts *lightning.SendOptions) *guildedPayload {
+func (p *guildedPlugin) getOutgoingMessage(message *lightning.Message, opts *lightning.SendOptions) *guildedPayload {
 	base := &guildedPayload{
 		Content:         message.Content,
 		Username:        getValidUsername(message.Author),
@@ -46,7 +46,7 @@ func (p *guildedPlugin) getOutgoingMessage(message lightning.Message, opts *ligh
 	return base
 }
 
-func (p *guildedPlugin) getOutgoingEmbeds(message lightning.Message, opts *lightning.SendOptions) []guildedChatEmbed {
+func (p *guildedPlugin) getOutgoingEmbeds(message *lightning.Message, opts *lightning.SendOptions) []guildedChatEmbed {
 	guildedEmbeds := make([]guildedChatEmbed, 0)
 
 	for _, embed := range message.Embeds {
@@ -151,7 +151,7 @@ func getEmbedFields(embed *lightning.Embed) *[]guildedChatEmbedField {
 	return nil
 }
 
-func (p *guildedPlugin) appendReplyEmbed(embeds []guildedChatEmbed, message lightning.Message) []guildedChatEmbed {
+func (p *guildedPlugin) appendReplyEmbed(embeds []guildedChatEmbed, message *lightning.Message) []guildedChatEmbed {
 	resp, err := guildedMakeRequest(p.token, "GET",
 		"/channels/"+message.ChannelID+"/messages/"+message.RepliedTo[0], nil)
 	if err != nil {

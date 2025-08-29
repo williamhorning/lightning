@@ -18,7 +18,7 @@ func (e channelIDError) Error() string {
 	return "telegram: invalid channel ID: " + e.channelID
 }
 
-func parseContent(message lightning.Message, opts *lightning.SendOptions) string {
+func parseContent(message *lightning.Message, opts *lightning.SendOptions) string {
 	content := ""
 
 	if opts != nil {

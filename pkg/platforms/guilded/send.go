@@ -13,14 +13,14 @@ import (
 )
 
 func (p *guildedPlugin) SendCommandResponse(
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 	_ string,
 ) ([]string, error) {
 	return p.SendMessage(message, opts)
 }
 
-func (p *guildedPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+func (p *guildedPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := p.getOutgoingMessage(message, opts)
 
 	jsonMsg, err := json.Marshal(msg)
@@ -39,7 +39,7 @@ func (p *guildedPlugin) SendMessage(message lightning.Message, opts *lightning.S
 	return p.sendWebhookMessage(message, opts, reader)
 }
 
-func (p *guildedPlugin) apiSendMessage(message lightning.Message, reader io.Reader) ([]string, error) {
+func (p *guildedPlugin) apiSendMessage(message *lightning.Message, reader io.Reader) ([]string, error) {
 	resp, err := guildedMakeRequest(p.token, "POST", "/channels/"+message.ChannelID+"/messages", reader)
 	if err != nil {
 		slog.Error("guilded: failed to send message", "error", err, "message", message)
@@ -80,7 +80,7 @@ func getWebhookInfo(data any) (guildedWebhook, error) {
 }
 
 func (p *guildedPlugin) sendWebhookMessage(
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 	reader io.Reader,
 ) ([]string, error) {

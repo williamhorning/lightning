@@ -28,16 +28,16 @@ type Bot struct {
 	delHandlers     atomic.Pointer[[]func(*Bot, *BaseMessage)]
 	commandHandlers atomic.Pointer[[]func(*Bot, *CommandEvent)]
 
-	messageChannel chan Message
-	editChannel    chan EditedMessage
-	delChannel     chan BaseMessage
-	commandChannel chan CommandEvent
+	messageChannel chan *Message
+	editChannel    chan *EditedMessage
+	delChannel     chan *BaseMessage
+	commandChannel chan *CommandEvent
 
-	commands map[string]Command
+	commands map[string]*Command
 	plugins  map[string]Plugin
 	types    map[string]PluginConstructor
 
-	author MessageAuthor
+	author *MessageAuthor
 	prefix string
 
 	pluginMutex sync.RWMutex
@@ -56,17 +56,17 @@ func NewBot(opts BotOptions) *Bot {
 	}
 
 	bot := &Bot{
-		author: opts.Author,
+		author: &opts.Author,
 		prefix: opts.Prefix,
 
-		commands: make(map[string]Command),
+		commands: make(map[string]*Command),
 		plugins:  make(map[string]Plugin),
 		types:    make(map[string]PluginConstructor),
 
-		messageChannel: make(chan Message, 1000),
-		editChannel:    make(chan EditedMessage, 1000),
-		delChannel:     make(chan BaseMessage, 1000),
-		commandChannel: make(chan CommandEvent, 1000),
+		messageChannel: make(chan *Message, 1000),
+		editChannel:    make(chan *EditedMessage, 1000),
+		delChannel:     make(chan *BaseMessage, 1000),
+		commandChannel: make(chan *CommandEvent, 1000),
 	}
 
 	bot.messageHandlers.Store(&[]func(*Bot, *Message){})

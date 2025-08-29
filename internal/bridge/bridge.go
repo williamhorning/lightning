@@ -72,7 +72,7 @@ func getBase(data any) (lightning.BaseMessage, error) {
 func getMessage(data any) (lightning.Message, error) {
 	switch msg := data.(type) {
 	case lightning.EditedMessage:
-		return msg.Message, nil
+		return *msg.Message, nil
 	case lightning.Message:
 		return msg, nil
 	default:
@@ -108,7 +108,7 @@ func processMessage(
 	priorMessage *bridgeMessageCollection,
 ) channelMessageArray {
 	messages := make(channelMessageArray, 0, len(bridgeData.Channels)+1)
-	messageMutex := sync.Mutex{}
+	results := make(chan *channelMessage, len(bridgeData.Channels))
 	waitGroup := sync.WaitGroup{}
 
 	for _, channel := range bridgeData.Channels {
@@ -116,30 +116,28 @@ func processMessage(
 			continue
 		}
 
-		waitGroup.Add(1)
-
-		go func(channelCopy *bridgeChannel) {
-			priorMessageIDs := priorMessage.getChannelMessageIDs(channelCopy.ID)
+		waitGroup.Go(func() {
+			priorMessageIDs := priorMessage.getChannelMessageIDs(channel.ID)
 
 			if event != typeCreate && len(priorMessageIDs) == 0 {
 				return
 			}
 
-			defer waitGroup.Done()
-
-			message := handleChannel(bot, database, bridgeData, channelCopy, event, data,
+			message := handleChannel(bot, database, bridgeData, &channel, event, data,
 				repliedTo, priorMessageIDs)
 
 			if message != nil {
-				messageMutex.Lock()
-				defer messageMutex.Unlock()
-
-				messages = append(messages, *message)
+				results <- message
 			}
-		}(&channel)
+		})
 	}
 
 	waitGroup.Wait()
+	close(results)
+
+	for message := range results {
+		messages = append(messages, *message)
+	}
 
 	return append(messages, channelMessage{base.ChannelID, []string{base.EventID}})
 }
@@ -182,9 +180,9 @@ func handleChannel(
 		newMessage.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID)
 
 		if event == typeCreate {
-			resultIDs, err = bot.SendMessage(newMessage, opts)
+			resultIDs, err = bot.SendMessage(&newMessage, opts)
 		} else if len(priorMessageIDs) != 0 {
-			err = bot.EditMessage(newMessage, priorMessageIDs, opts)
+			err = bot.EditMessage(&newMessage, priorMessageIDs, opts)
 		}
 	case typeDelete:
 		err = bot.DeleteMessages(channel.ID, priorMessageIDs)

@@ -7,15 +7,15 @@ type PluginConstructor func(config any) (Plugin, error)
 // about platform specifics, as each Plugin handles that.
 type Plugin interface {
 	SetupChannel(channel string) (any, error)
-	SendCommandResponse(message Message, opts *SendOptions, user string) ([]string, error)
-	SendMessage(message Message, opts *SendOptions) ([]string, error)
-	EditMessage(message Message, ids []string, opts *SendOptions) error
+	SendCommandResponse(message *Message, opts *SendOptions, user string) ([]string, error)
+	SendMessage(message *Message, opts *SendOptions) ([]string, error)
+	EditMessage(message *Message, ids []string, opts *SendOptions) error
 	DeleteMessage(channel string, ids []string) error
-	SetupCommands(command map[string]Command) error
-	ListenMessages() <-chan Message
-	ListenEdits() <-chan EditedMessage
-	ListenDeletes() <-chan BaseMessage
-	ListenCommands() <-chan CommandEvent
+	SetupCommands(command map[string]*Command) error
+	ListenMessages() <-chan *Message
+	ListenEdits() <-chan *EditedMessage
+	ListenDeletes() <-chan *BaseMessage
+	ListenCommands() <-chan *CommandEvent
 }
 
 // AddPluginType takes in a [PluginConstructor] and registers it so you can later

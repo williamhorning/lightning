@@ -22,7 +22,7 @@ func (b *Bot) SetupChannel(channelID string) (any, error) {
 // SendMessage allows you to send a message to the channel and plugin specified
 // on the provided [Message]. You may additionally provide [*SendOptions]. It
 // returns the IDs of the messages sent, which may be nil if an error occurs.
-func (b *Bot) SendMessage(message Message, opts *SendOptions) ([]string, error) {
+func (b *Bot) SendMessage(message *Message, opts *SendOptions) ([]string, error) {
 	plugin, channel, ok := b.getPluginFromChannel(message.ChannelID)
 	if !ok {
 		return nil, MissingPluginError{}
@@ -42,7 +42,7 @@ func (b *Bot) SendMessage(message Message, opts *SendOptions) ([]string, error) 
 // EditMessage allows you to edit a message in the channel and plugin specified.
 // The 'ids' parameter should contain the IDs of the messages to be edited, as
 // returned by SendMessage.
-func (b *Bot) EditMessage(message Message, ids []string, opts *SendOptions) error {
+func (b *Bot) EditMessage(message *Message, ids []string, opts *SendOptions) error {
 	plugin, channel, ok := b.getPluginFromChannel(message.ChannelID)
 	if !ok {
 		return MissingPluginError{}

@@ -68,7 +68,7 @@ type guildedPlugin struct {
 	token           string
 }
 
-func (*guildedPlugin) EditMessage(_ lightning.Message, _ []string, _ *lightning.SendOptions) error {
+func (*guildedPlugin) EditMessage(_ *lightning.Message, _ []string, _ *lightning.SendOptions) error {
 	return nil
 }
 
@@ -90,53 +90,46 @@ func (p *guildedPlugin) DeleteMessage(channel string, ids []string) error {
 	return nil
 }
 
-func (*guildedPlugin) SetupCommands(_ map[string]lightning.Command) error {
+func (*guildedPlugin) SetupCommands(_ map[string]*lightning.Command) error {
 	return nil
 }
 
-func (p *guildedPlugin) ListenMessages() <-chan lightning.Message {
-	channel := make(chan lightning.Message, 1000)
+func (p *guildedPlugin) ListenMessages() <-chan *lightning.Message {
+	channel := make(chan *lightning.Message, 1000)
 
 	p.socket.OnMessageCreated(func(msg *guildedChatMessageCreated) {
-		message := p.getIncomingMessage(&msg.Message)
-		if message != nil {
-			channel <- *message
+		if message := p.getIncomingMessage(&msg.Message); message != nil {
+			channel <- message
 		}
 	})
 
 	return channel
 }
 
-func (p *guildedPlugin) ListenEdits() <-chan lightning.EditedMessage {
-	channel := make(chan lightning.EditedMessage, 1000)
+func (p *guildedPlugin) ListenEdits() <-chan *lightning.EditedMessage {
+	channel := make(chan *lightning.EditedMessage, 1000)
 
 	p.socket.OnMessageUpdated(func(msg *guildedChatMessageUpdated) {
-		message := p.getIncomingMessage(&msg.Message)
-		if message != nil {
-			channel <- lightning.EditedMessage{
-				Message: *message,
-				Edited:  *msg.Message.UpdatedAt,
-			}
+		if message := p.getIncomingMessage(&msg.Message); message != nil {
+			channel <- &lightning.EditedMessage{Message: message, Edited: msg.Message.UpdatedAt}
 		}
 	})
 
 	return channel
 }
 
-func (p *guildedPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	channel := make(chan lightning.BaseMessage, 1000)
+func (p *guildedPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
+	channel := make(chan *lightning.BaseMessage, 1000)
 
 	p.socket.OnMessageDeleted(func(msg *guildedChatMessageDeleted) {
-		channel <- lightning.BaseMessage{
-			EventID:   msg.Message.ID,
-			ChannelID: msg.Message.ChannelID,
-			Time:      msg.DeletedAt,
+		channel <- &lightning.BaseMessage{
+			EventID: msg.Message.ID, ChannelID: msg.Message.ChannelID, Time: &msg.DeletedAt,
 		}
 	})
 
 	return channel
 }
 
-func (*guildedPlugin) ListenCommands() <-chan lightning.CommandEvent {
+func (*guildedPlugin) ListenCommands() <-chan *lightning.CommandEvent {
 	return nil
 }

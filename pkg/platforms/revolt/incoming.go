@@ -1,7 +1,6 @@
 package revolt
 
 import (
-	"fmt"
 	"log/slog"
 	"regexp"
 	"strconv"
@@ -17,11 +16,6 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 		return nil
 	}
 
-	timestamp, err := getLightningTime(message)
-	if err != nil {
-		timestamp = time.Now()
-	}
-
 	content := replaceSpoilers(message.Content)
 	content = p.replaceEmojis(content)
 	content = p.replaceMentions(message.Channel, content)
@@ -31,7 +25,7 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.Channel,
-			Time:      timestamp,
+			Time:      getLightningTime(message),
 		},
 		Attachments: getLightningAttachment(message.Attachments),
 		Author:      p.getLightningAuthor(message.Author, message.Channel, message.Masquerade),
@@ -41,19 +35,23 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 	}
 }
 
-func getLightningTime(message revoltMessage) (time.Time, error) {
+func getLightningTime(message revoltMessage) *time.Time {
 	if !message.Edited.IsZero() {
-		return message.Edited, nil
+		return &message.Edited
 	}
 
 	msgID, err := ulid.Parse(message.ID)
 	if err != nil {
 		slog.Error("revolt: failed to parse message ID", "error", err, "messageID", message.ID)
 
-		return time.Time{}, fmt.Errorf("failed to parse ULID from Revolt message ID: %w", err)
+		timestamp := time.Now()
+
+		return &timestamp
 	}
 
-	return msgID.Timestamp(), nil
+	timestamp := msgID.Timestamp()
+
+	return &timestamp
 }
 
 func getLightningAttachment(attachments []*revoltAttachment) []lightning.Attachment {
@@ -73,7 +71,7 @@ func (p *revoltPlugin) getLightningAuthor(
 	authorID string,
 	channelID string,
 	masquerade *revoltMessageMasquerade,
-) lightning.MessageAuthor {
+) *lightning.MessageAuthor {
 	author := lightning.MessageAuthor{
 		ID:       authorID,
 		Username: "RevoltUser",
@@ -124,9 +122,9 @@ func getURL(file *revoltAttachment) string {
 	return "https://cdn.revoltusercontent.com/" + file.Tag + "/" + file.ID
 }
 
-func applyMasquerade(author lightning.MessageAuthor, masquerade *revoltMessageMasquerade) lightning.MessageAuthor {
+func applyMasquerade(author lightning.MessageAuthor, masquerade *revoltMessageMasquerade) *lightning.MessageAuthor {
 	if masquerade == nil {
-		return author
+		return &author
 	}
 
 	if masquerade.Name != "" {
@@ -141,7 +139,7 @@ func applyMasquerade(author lightning.MessageAuthor, masquerade *revoltMessageMa
 		author.ProfilePicture = &masquerade.Avatar
 	}
 
-	return author
+	return &author
 }
 
 var (

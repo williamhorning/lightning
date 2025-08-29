@@ -13,7 +13,7 @@ import (
 
 func getOutgoing(
 	token string,
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 ) revoltMessageSend {
 	content := replaceOutgoingSpoilers(message.Content)
@@ -182,7 +182,7 @@ func getOutgoingReplies(replyIDs []string) []*revoltMessageReplies {
 	return replies
 }
 
-func getOutgoingMasquerade(author lightning.MessageAuthor) *revoltMessageMasquerade {
+func getOutgoingMasquerade(author *lightning.MessageAuthor) *revoltMessageMasquerade {
 	avatar := ""
 	if author.ProfilePicture != nil && len([]rune(*author.ProfilePicture)) > 1 &&
 		len([]rune(*author.ProfilePicture)) <= 256 {
