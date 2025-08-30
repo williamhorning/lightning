@@ -5,12 +5,18 @@ import (
 	"strings"
 )
 
-// AddCommand takes a [Command] and registers it with the built-in
+// AddCommand takes [Command]s and registers it with the built-in
 // text command handler and any platform-specific command systems.
-func (b *Bot) AddCommand(command *Command) error {
+func (b *Bot) AddCommand(commands ...*Command) error {
 	var errs []error
 
-	b.commands[command.Name] = command
+	for _, command := range commands {
+		if command == nil {
+			continue
+		}
+
+		b.commands[command.Name] = command
+	}
 
 	for _, plugin := range b.plugins {
 		if err := plugin.SetupCommands(b.commands); err != nil {

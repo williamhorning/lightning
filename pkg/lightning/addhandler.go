@@ -8,34 +8,28 @@ import "sync/atomic"
 func (b *Bot) AddHandler(listener any) {
 	switch listener := listener.(type) {
 	case func(*Bot, *EditedMessage):
-		newHandlers := append(*b.editHandlers.Load(), listener)
-		b.editHandlers.Store(&newHandlers)
-
-		go processEventHandlers(b.editChannel, &b.editHandlers, &b.editProcessorActive, b)
+		go processEventHandlers(&listener, b.editChannel, &b.editHandlers, &b.editProcessorActive, b)
 	case func(*Bot, *Message):
-		newHandlers := append(*b.messageHandlers.Load(), listener)
-		b.messageHandlers.Store(&newHandlers)
-
-		go processEventHandlers(b.messageChannel, &b.messageHandlers, &b.messageProcessorActive, b)
+		go processEventHandlers(&listener, b.messageChannel, &b.messageHandlers, &b.messageProcessorActive, b)
 	case func(*Bot, *BaseMessage):
-		newHandlers := append(*b.delHandlers.Load(), listener)
-		b.delHandlers.Store(&newHandlers)
-
-		go processEventHandlers(b.delChannel, &b.delHandlers, &b.delProcessorActive, b)
+		go processEventHandlers(&listener, b.delChannel, &b.delHandlers, &b.delProcessorActive, b)
 	case func(*Bot, *CommandEvent):
-		newHandlers := append(*b.commandHandlers.Load(), listener)
-		b.commandHandlers.Store(&newHandlers)
-
-		go processEventHandlers(b.commandChannel, &b.commandHandlers, &b.commandProcessorActive, b)
+		go processEventHandlers(&listener, b.commandChannel, &b.commandHandlers, &b.commandProcessorActive, b)
 	}
 }
 
 func processEventHandlers[C any](
+	listener *func(*Bot, C),
 	incoming <-chan C,
 	handlers *atomic.Pointer[[]func(*Bot, C)],
 	store *atomic.Bool,
 	bot *Bot,
 ) {
+	if listener != nil {
+		newHandlers := append(*handlers.Load(), *listener)
+		handlers.Store(&newHandlers)
+	}
+
 	if store.Swap(true) {
 		return
 	}

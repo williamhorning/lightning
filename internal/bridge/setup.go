@@ -1,7 +1,6 @@
 package bridge
 
 import (
-	"cmp"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -14,24 +13,22 @@ import (
 func Setup(bot *lightning.Bot, database Database) {
 	slog.Info("bridge: setting up")
 
-	if err := cmp.Or(
-		bot.AddCommand(&lightning.Command{
+	if err := bot.AddCommand(
+		bridgeCommand(database),
+		&lightning.Command{
 			Name:        "help",
 			Description: "get help with the bot",
 			Executor: func(_ lightning.CommandOptions) string {
 				return "hi, i'm lightning " + lightning.VERSION + "! [docs](https://williamhorning.eu.org/lightning/)"
 			},
-		}),
-
-		bot.AddCommand(&lightning.Command{
+		},
+		&lightning.Command{
 			Name:        "ping",
 			Description: "check if the bot is alive",
 			Executor: func(options lightning.CommandOptions) string {
 				return "Pong! 🏓 " + strconv.FormatInt(time.Since(*options.Time).Milliseconds(), 10) + "ms"
 			},
-		}),
-
-		bot.AddCommand(bridgeCommand(database)),
+		},
 	); err != nil {
 		slog.Error(fmt.Errorf("bridge: failed to add commands: %w", err).Error())
 	}
