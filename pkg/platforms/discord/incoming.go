@@ -69,7 +69,7 @@ func getLightningAttachments(
 		}
 
 		result = append(result, lightning.Attachment{
-			URL:  stickerURL,
+			URL:  stickerURL + "?size=160",
 			Name: sticker.Name,
 			Size: 0, // size information isn't available for stickers?
 		})
@@ -172,9 +172,9 @@ func replaceIncomingEmoji(msg *lightning.Message) string {
 		url := "https://cdn.discordapp.com/emojis/" + split[2]
 
 		if strings.Contains(match, "<a") {
-			url += ".gif"
+			url += ".gif?size=48"
 		} else {
-			url += ".png"
+			url += ".png?size=48"
 		}
 
 		msg.Emoji = append(msg.Emoji, lightning.Emoji{
