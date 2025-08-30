@@ -32,16 +32,22 @@ func (p PluginConfigError) Error() string {
 
 // PluginMethodError is a wrapped error that occurs when a plugin method fails.
 type PluginMethodError struct {
-	err     error
 	ID      string
 	Method  string
 	Message string
+	err     []error
 }
 
 func (p PluginMethodError) Error() string {
-	return "plugin " + p.ID + " method " + p.Method + " failed: " + p.Message + ": " + p.err.Error()
+	str := "plugin " + p.ID + " method " + p.Method + " failed: " + p.Message + ": "
+
+	for _, err := range p.err {
+		str += "\n\t" + err.Error()
+	}
+
+	return str
 }
 
-func (p PluginMethodError) Unwrap() error {
+func (p PluginMethodError) Unwrap() []error {
 	return p.err
 }

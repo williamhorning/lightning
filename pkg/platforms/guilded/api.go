@@ -19,9 +19,11 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 
 	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
-		slog.Error("guilded: failed to create request", "error", err, "method", method, "endpoint", endpoint)
+		wrapped := fmt.Errorf("guilded: creating request: %w\n\tendpoint: %s\n\tmethod: %s", err, endpoint, method)
 
-		return nil, fmt.Errorf("guilded: failed to create request: %w", err)
+		slog.Error(wrapped.Error())
+
+		return nil, wrapped
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -31,9 +33,11 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		slog.Error("guilded: failed to make API request", "error", err, "method", method, "endpoint", endpoint)
+		wrapped := fmt.Errorf("guilded: making request: %w\n\tendpoint: %s\n\tmethod: %s", err, endpoint, method)
 
-		return nil, fmt.Errorf("guilded: failed to make API request: %w", err)
+		slog.Error(wrapped.Error())
+
+		return nil, wrapped
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {
@@ -139,9 +143,11 @@ func (s *guildedSocketManager) connectWebsocket() error {
 
 	s.conn, resp, err = dialer.Dial("wss://www.guilded.gg/websocket/v1", header)
 	if err != nil {
-		slog.Error("guilded: failed to dial WebSocket", "error", err, "response", resp)
+		wrapped := fmt.Errorf("guilded: failed to dial WebSocket: %w", err)
 
-		return fmt.Errorf("guilded: failed to dial WebSocket: %w", err)
+		slog.Error(wrapped.Error(), "response", resp)
+
+		return wrapped
 	}
 
 	err = resp.Body.Close()
@@ -197,7 +203,7 @@ func (s *guildedSocketManager) readMessages() {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				slog.Error("guilded: error reading from socket", "error", err)
+				slog.Error(fmt.Errorf("guilded: error reading from socket: %w", err).Error())
 			} else {
 				slog.Debug("guilded: socket closed normally")
 			}
@@ -207,7 +213,7 @@ func (s *guildedSocketManager) readMessages() {
 
 		var data guildedSocketEventEnvelope
 		if err := json.Unmarshal(message, &data); err != nil {
-			slog.Error("guilded: error parsing WebSocket message", "error", err, "message", string(message))
+			slog.Error(fmt.Errorf("guilded: error parsing WebSocket message: %w", err).Error(), "msg", string(message))
 
 			continue
 		}
@@ -235,7 +241,8 @@ func (s *guildedSocketManager) handleReconnect() {
 		}
 
 		backoff = min(time.Duration(float64(backoff)*1.5), maxBackoff)
-		slog.Error("guilded: failed to reconnect to WebSocket", "attempt", attempts, "backoff", backoff, "error", err)
+		slog.Error(fmt.Errorf("guilded: failed to reconnect to WebSocket: %w", err).Error(),
+			"attempt", attempts, "backoff", backoff)
 	}
 }
 
@@ -266,7 +273,7 @@ func (s *guildedSocketManager) handleReadyEvent(data guildedSocketEventEnvelope)
 
 	var welcome guildedWelcomeMessage
 	if err := json.Unmarshal(data.D, &welcome); err != nil {
-		slog.Warn("guilded: failed to unmarshal ready data", "error", err, "data", data.D)
+		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ready data: %w", err).Error(), "data", data.D)
 
 		return
 	}
@@ -281,7 +288,7 @@ func (s *guildedSocketManager) handleMessageCreatedEvent(data guildedSocketEvent
 
 	var msg guildedChatMessageCreated
 	if err := json.Unmarshal(data.D, &msg); err != nil {
-		slog.Warn("guilded: failed to unmarshal ChatMessageCreated data", "error", err, "data", data.D)
+		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ChatMessageCreated data: %w", err).Error(), "data", data.D)
 
 		return
 	}
@@ -296,7 +303,7 @@ func (s *guildedSocketManager) handleMessageUpdatedEvent(data guildedSocketEvent
 
 	var msg guildedChatMessageUpdated
 	if err := json.Unmarshal(data.D, &msg); err != nil {
-		slog.Warn("guilded: failed to unmarshal ChatMessageUpdated data", "error", err, "data", data.D)
+		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ChatMessageUpdated data: %w", err).Error(), "data", data.D)
 
 		return
 	}
@@ -311,7 +318,7 @@ func (s *guildedSocketManager) handleMessageDeletedEvent(data guildedSocketEvent
 
 	var msg guildedChatMessageDeleted
 	if err := json.Unmarshal(data.D, &msg); err != nil {
-		slog.Warn("guilded: failed to unmarshal ChatMessageDeleted data", "error", err, "data", data.D)
+		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ChatMessageDeleted data: %w", err).Error(), "data", data.D)
 
 		return
 	}

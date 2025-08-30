@@ -383,9 +383,11 @@ func (c *cancelableReadCloser) Close() error {
 	c.cancel()
 
 	if err != nil {
-		slog.Error("discord: failed closing cancelable read closer", "error", err)
+		wrapped := fmt.Errorf("discord: failed closing cancelable read closer: %w", err)
 
-		return fmt.Errorf("discord: failed closing cancelable read closer: %w", err)
+		slog.Error(wrapped.Error())
+
+		return wrapped
 	}
 
 	return nil

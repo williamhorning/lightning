@@ -1,9 +1,6 @@
 package revolt
 
-import (
-	"log/slog"
-	"time"
-)
+import "time"
 
 const (
 	correctPermissionValue = uint(481301504)
@@ -21,15 +18,13 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	case revoltChannelTypeText, revoltChannelTypeVoice:
 		return p.handleTextOrVoiceChannel(channelData)
 	default:
-		return nil, &revoltPermissionsError{"unknown channel type"}
+		return nil, &revoltPermissionsError{"unknown channel type", 0, 0}
 	}
 }
 
 func handleDMChannel(channel *revoltChannel) (any, error) {
 	if channel.Permissions == nil || *channel.Permissions&messageSendPermission != messageSendPermission {
-		slog.Error("revolt: insufficient permissions for DM channel", "permissions", channel.Permissions)
-
-		return nil, &revoltPermissionsError{"DM"}
+		return nil, &revoltPermissionsError{"DM", *channel.Permissions, messageSendPermission}
 	}
 
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
@@ -38,7 +33,7 @@ func handleDMChannel(channel *revoltChannel) (any, error) {
 func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, error) {
 	server := p.getServer(channel.Server)
 	if server == nil {
-		return nil, &revoltPermissionsError{"nil server (" + channel.Server + ")"}
+		return nil, &revoltPermissionsError{"nil server (" + channel.Server + ")", 0, correctPermissionValue}
 	}
 
 	if server.Owner == p.self.ID {
@@ -47,26 +42,19 @@ func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, er
 
 	member := p.getMember(channel.Server, p.self.ID)
 	if member == nil {
-		slog.Error("revolt: bot member is nil", "server", channel.Server)
-
-		return nil, &revoltPermissionsError{"server (with nil bot member)"}
+		return nil, &revoltPermissionsError{"server (with nil bot member)", 0, correctPermissionValue}
 	}
 
 	if member.Timeout != nil && time.Now().Before(*member.Timeout) {
-		slog.Error("revolt: bot is in timeout", "server", channel.Server, "timeout", member.Timeout)
-
-		return nil, &revoltPermissionsError{"server (with bot in timeout)"}
+		return nil, &revoltPermissionsError{"server (with bot in timeout)", 0, correctPermissionValue}
 	}
 
 	permissions := calculatePermissions(server, member, channel)
 
-	slog.Debug("revolt: permissions", "channel", channel.ID, "permissions", permissions)
-
 	if (permissions & correctPermissionValue) != correctPermissionValue {
-		slog.Error("revolt: insufficient permissions", "channel", channel.ID, "current_permissions", permissions,
-			"expected_permissions", correctPermissionValue)
-
-		return nil, &revoltPermissionsError{"server channel (with missing permissions)"}
+		return nil, &revoltPermissionsError{
+			"server channel (with missing permissions)", permissions, correctPermissionValue,
+		}
 	}
 
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later

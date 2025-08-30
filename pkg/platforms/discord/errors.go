@@ -3,7 +3,6 @@ package discord
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 
 	"github.com/bwmarrin/discordgo"
@@ -23,6 +22,7 @@ func (err discordInvalidWebhookError) Error() string {
 }
 
 type discordAPIError struct {
+	extra   map[string]any
 	Message string
 	Code    int
 }
@@ -42,7 +42,8 @@ func (e discordAPIError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e discordAPIError) Error() string {
-	return "Discord API Error " + strconv.Itoa(e.Code) + ": " + e.Message
+	return "Discord API Error " + strconv.Itoa(e.Code) + ": " +
+		fmt.Sprintf("%#+v, disable %#+v", e.extra, e.Disable()) + ": " + e.Message
 }
 
 func getError(err error, extra map[string]any, message string) error {
@@ -52,18 +53,8 @@ func getError(err error, extra map[string]any, message string) error {
 			return nil
 		}
 
-		newError := &discordAPIError{
-			Code:    restErr.Message.Code,
-			Message: message + ": " + restErr.Message.Message,
-		}
-
-		slog.Error("discord: API error", "code", restErr.Message.Code, "message", restErr.Message.Message,
-			"extra", extra, "disable", newError.Disable())
-
-		return newError
+		return &discordAPIError{extra, message + ": " + restErr.Message.Message, restErr.Message.Code}
 	}
 
-	slog.Error("discord: unknown error", "error", err, "extra", extra)
-
-	return fmt.Errorf("discord: unknown error: %w", err)
+	return fmt.Errorf("discord: unknown error: %w\n\textra: %#+v", err, extra)
 }

@@ -18,6 +18,7 @@ func (guildedWebhookDataError) Error() string {
 
 type guildedStatusError struct {
 	msg          string
+	data         string
 	code         int
 	disableWrite bool
 }
@@ -27,7 +28,7 @@ func (e guildedStatusError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e guildedStatusError) Error() string {
-	return strconv.Itoa(e.code) + ": " + e.msg
+	return strconv.Itoa(e.code) + ":" + e.msg + "\n\tdata: " + e.data
 }
 
 type guildedWebhookTokenNilError struct {

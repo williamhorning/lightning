@@ -46,7 +46,7 @@ func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) *lightning.C
 				ParseMode: gotgbot.ParseModeMarkdownV2,
 			})
 
-			return fmt.Errorf("telegram: failed to reply to command %s: %w", cmdName, err)
+			return fmt.Errorf("telegram: failed to reply to command: %w\n\tname:%s", err, cmdName)
 		},
 	}
 }

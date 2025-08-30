@@ -148,7 +148,7 @@ func (s *revoltSocketManager) readMessages() {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				slog.Error("revolt: error reading from socket", "error", err)
+				slog.Error(fmt.Errorf("revolt: error reading from socket: %w", err).Error())
 			} else {
 				slog.Debug("revolt: socket closed normally")
 			}
@@ -179,14 +179,15 @@ func (s *revoltSocketManager) handleReconnect() {
 		}
 
 		backoff = min(time.Duration(float64(backoff)*1.5), maxBackoff)
-		slog.Error("revolt: failed to reconnect to WebSocket", "attempt", attempts, "backoff", backoff, "error", err)
+		slog.Error(fmt.Errorf("revolt: failed to reconnect to WebSocket: %w", err).Error(),
+			"attempt", attempts, "backoff", backoff)
 	}
 }
 
 func (s *revoltSocketManager) handleEvent(message []byte) {
 	var data revoltEvent
 	if err := json.Unmarshal(message, &data); err != nil {
-		slog.Error("revolt: error parsing WebSocket message", "error", err, "message", string(message))
+		slog.Error(fmt.Errorf("revolt: error parsing WebSocket message: %w", err).Error(), "message", string(message))
 
 		return
 	}
@@ -211,7 +212,7 @@ func (s *revoltSocketManager) handleEvent(message []byte) {
 func (s *revoltSocketManager) handleBulkEvent(message []byte) {
 	var bulk revoltEventBulk
 	if err := json.Unmarshal(message, &bulk); err != nil {
-		slog.Warn("revolt: failed to unmarshal bulk data", "error", err, "data", message)
+		slog.Warn(fmt.Errorf("revolt: failed to unmarshal bulk data: %w", err).Error(), "data", message)
 
 		return
 	}
@@ -224,7 +225,7 @@ func (s *revoltSocketManager) handleBulkEvent(message []byte) {
 func (*revoltSocketManager) handleErrorEvent(message []byte) {
 	var errorEvent revoltEventError
 	if err := json.Unmarshal(message, &errorEvent); err != nil {
-		slog.Warn("revolt: failed to unmarshal error data", "error", err, "data", message)
+		slog.Warn(fmt.Errorf("revolt: failed to unmarshal error data: %w", err).Error(), "data", message)
 
 		return
 	}
@@ -239,7 +240,7 @@ func (s *revoltSocketManager) handleReadyEvent(data []byte) {
 
 	var welcome revoltEventReady
 	if err := json.Unmarshal(data, &welcome); err != nil {
-		slog.Warn("revolt: failed to unmarshal ready data", "error", err, "data", data)
+		slog.Warn(fmt.Errorf("revolt: failed to unmarshal ready data: %w", err).Error(), "data", data)
 
 		return
 	}
@@ -254,7 +255,7 @@ func (s *revoltSocketManager) handleMessageCreatedEvent(data []byte) {
 
 	var msg revoltEventMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
-		slog.Warn("revolt: failed to unmarshal message created data", "error", err, "data", data)
+		slog.Warn(fmt.Errorf("revolt: failed to unmarshal message created data: %w", err).Error(), "data", data)
 
 		return
 	}
@@ -269,7 +270,7 @@ func (s *revoltSocketManager) handleMessageUpdatedEvent(data []byte) {
 
 	var msg revoltEventMessageUpdate
 	if err := json.Unmarshal(data, &msg); err != nil {
-		slog.Warn("revolt: failed to unmarshal message update data", "error", err, "data", data)
+		slog.Warn(fmt.Errorf("revolt: failed to unmarshal message update data: %w", err).Error(), "data", data)
 
 		return
 	}
@@ -284,7 +285,7 @@ func (s *revoltSocketManager) handleMessageDeletedEvent(data []byte) {
 
 	var msg revoltEventMessageDelete
 	if err := json.Unmarshal(data, &msg); err != nil {
-		slog.Warn("revolt: failed to unmarshal message deleted data", "error", err, "data", data)
+		slog.Warn(fmt.Errorf("revolt: failed to unmarshal message deleted data: %w", err).Error(), "data", data)
 
 		return
 	}

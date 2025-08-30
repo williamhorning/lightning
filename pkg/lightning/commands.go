@@ -1,22 +1,28 @@
 package lightning
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 )
 
 // AddCommand takes a [Command] and registers it with the built-in
 // text command handler and any platform-specific command systems.
-func (b *Bot) AddCommand(command *Command) {
+func (b *Bot) AddCommand(command *Command) error {
+	var errs []error
+
 	b.commands[command.Name] = command
 
 	for _, plugin := range b.plugins {
 		if err := plugin.SetupCommands(b.commands); err != nil {
-			slog.Error(fmt.Errorf("failed to setup commands for plugin: %w",
-				PluginMethodError{err, "", "AddCommand", "one or more plugins failed to register command"}).Error())
+			errs = append(errs, err)
 		}
 	}
+
+	if len(errs) > 0 {
+		return &PluginMethodError{"", "AddCommand", "failed to register command", errs}
+	}
+
+	return nil
 }
 
 func handleMessageCommand(bot *Bot, event *Message) {
@@ -56,7 +62,7 @@ func handleMessageCommand(bot *Bot, event *Message) {
 				return nil
 			}
 
-			return PluginMethodError{err, event.ChannelID, "CommandReply", "failed to send command response"}
+			return PluginMethodError{event.ChannelID, "CommandReply", "failed to send command response", []error{err}}
 		},
 	})
 }
@@ -87,8 +93,8 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 	handleCommandOptions(command, event)
 
 	if err := event.Reply(command.Executor(event.CommandOptions), command.Sensitive); err != nil {
-		slog.Warn(fmt.Errorf("lightning: failed to respond to command: %w",
-			PluginMethodError{err, event.ChannelID, "eventReply", "failed to reply to command event"}).Error())
+		slog.Warn(
+			PluginMethodError{event.ChannelID, "eventReply", "failed to reply to command event", []error{err}}.Error())
 	}
 }
 

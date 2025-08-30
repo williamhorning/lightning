@@ -110,6 +110,8 @@ func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment
 		file, err := p.uploadFile("attachments", attachment.Name, resp.Body)
 		if err == nil {
 			attachmentIDs = append(attachmentIDs, file)
+		} else {
+			slog.Warn(err.Error())
 		}
 
 		err = resp.Body.Close()

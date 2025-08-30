@@ -54,8 +54,6 @@ func New(config any) (lightning.Plugin, error) {
 	})
 
 	if err := socket.Connect(); err != nil {
-		slog.Error("revolt: failed to connect to socket", "error", err)
-
 		return nil, fmt.Errorf("revolt: failed to connect to socket: %w", err)
 	}
 
@@ -88,10 +86,10 @@ func (p *revoltPlugin) SendCommandResponse(
 
 func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := p.getOutgoing(message, opts)
-	leftoverAttachments := make([]string, 0)
+	leftover := make([]string, 0)
 
 	if len(msg.Attachments) > 5 {
-		leftoverAttachments = msg.Attachments[5:]
+		leftover = msg.Attachments[5:]
 		msg.Attachments = msg.Attachments[:5]
 	}
 
@@ -102,14 +100,14 @@ func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 
 	ids := []string{res}
 
-	if len(leftoverAttachments) > 0 {
+	if len(leftover) > 0 {
 		res, err := sendRevoltMessage(p.token, message.ChannelID, revoltMessageSend{
-			Attachments: leftoverAttachments,
+			Attachments: leftover,
 			Masquerade:  msg.Masquerade,
 			Replies:     msg.Replies,
 		})
 		if err != nil {
-			slog.Warn("revolt: failed to send leftover attachments", "attachments", leftoverAttachments, "error", err)
+			slog.Warn(fmt.Errorf("revolt: failed to send leftover attachments: %w", err).Error(), "leftover", leftover)
 		} else {
 			ids = append(ids, res)
 		}

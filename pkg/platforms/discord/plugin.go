@@ -71,11 +71,8 @@ func New(config any) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("discord: failed to get application info: %w", err)
 	}
 
-	slog.Info("discord: ready!",
-		"username", app.Name,
-		"servers", len(discord.State.Guilds),
-		"invite", "https://discord.com/oauth2/authorize?client_id="+app.ID+"&scope=bot&permissions=8",
-	)
+	slog.Info("discord: ready!", "username", app.Name, "servers", len(discord.State.Guilds),
+		"invite", "https://discord.com/oauth2/authorize?client_id="+app.ID+"&scope=bot&permissions=8")
 
 	return &discordPlugin{cfg, discord, cache.New[string, bool](cache.DefaultTTL)}, nil
 }

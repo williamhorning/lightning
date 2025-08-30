@@ -21,9 +21,7 @@ func (p *revoltPlugin) uploadFile(tag, name string, reader io.Reader) (string, e
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, payload)
 	if err != nil {
-		slog.Error("revolt: failed to create request in upload", "error", err, "tag", tag, "name", name)
-
-		return "", fmt.Errorf("revolt: failed to create request in upload: %w", err)
+		return "", fmt.Errorf("revolt: failed to create request in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	req.Header.Set("Content-Type", contentType)
@@ -32,9 +30,7 @@ func (p *revoltPlugin) uploadFile(tag, name string, reader io.Reader) (string, e
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		slog.Error("revolt: failed to do request in upload", "error", err, "tag", tag, "name", name)
-
-		return "", fmt.Errorf("revolt: failed to do request in upload: %w", err)
+		return "", fmt.Errorf("revolt: failed to do request in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	defer func() {
@@ -49,17 +45,12 @@ func (p *revoltPlugin) uploadFile(tag, name string, reader io.Reader) (string, e
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("revolt: failed to read response in upload", "error", err, "tag", tag, "name", name)
-
-		return "", fmt.Errorf("revolt: failed to read response in upload: %w", err)
+		return "", fmt.Errorf("revolt: failed to read response in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	var response revoltUploadResponse
 	if err = json.Unmarshal(body, &response); err != nil {
-		slog.Error("revolt: failed to unmarshal response in upload", "error", err, "body", string(body),
-			"tag", tag, "name", name)
-
-		return "", fmt.Errorf("revolt: failed to unmarshal response in upload: %w", err)
+		return "", fmt.Errorf("revolt: failed to unmarshal file in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	return response.ID, nil
@@ -71,22 +62,16 @@ func createMultipartPayload(name string, reader io.Reader, tag string) (*bytes.B
 
 	fileWriter, err := writer.CreateFormFile("file", name)
 	if err != nil {
-		slog.Error("revolt: failed to create file field in upload", "error", err, "tag", tag, "name", name)
-
-		return nil, "", fmt.Errorf("revolt: failed to create file field in upload: %w", err)
+		return nil, "", fmt.Errorf("revolt: failed to create file in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	_, err = io.Copy(fileWriter, reader)
 	if err != nil {
-		slog.Error("revolt: failed to copy file in upload", "error", err, "tag", tag, "name", name)
-
-		return nil, "", fmt.Errorf("revolt: failed to copy file in upload: %w", err)
+		return nil, "", fmt.Errorf("revolt: failed to copy file in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	if err = writer.Close(); err != nil {
-		slog.Error("revolt: failed to close writer in upload", "error", err, "tag", tag, "name", name)
-
-		return nil, "", fmt.Errorf("revolt: failed to close writer in upload: %w", err)
+		return nil, "", fmt.Errorf("revolt: failed to close upload writer: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	return payload, writer.FormDataContentType(), nil

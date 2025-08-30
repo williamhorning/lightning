@@ -17,6 +17,8 @@
 package telegram
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -81,13 +83,17 @@ func New(config any) (lightning.Plugin, error) {
 		},
 	})
 
-	updater := ext.NewUpdater(dispatch, nil)
+	updater := ext.NewUpdater(dispatch, &ext.UpdaterOpts{
+		UnhandledErrFunc: func(err error) {
+			if err != nil && errors.Is(err, context.DeadlineExceeded) {
+				slog.Error(fmt.Errorf("telegram: unhandled error in dispatcher: %w", err).Error())
+			}
+		},
+	})
 	if err := updater.StartPolling(telegram, &ext.PollingOpts{
 		DropPendingUpdates: true,
 		GetUpdatesOpts:     &gotgbot.GetUpdatesOpts{Timeout: int64(defaultTimeout.Seconds())},
 	}); err != nil {
-		slog.Error("telegram: failed to start polling", "error", err)
-
 		return nil, fmt.Errorf("telegram: failed to start polling: %w", err)
 	}
 
@@ -155,10 +161,8 @@ func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning
 	if err != nil && strings.Contains(err.Error(), "context deadline exceeded") {
 		return []string{}, nil
 	} else if err != nil {
-		slog.Error("telegram: failed to send message", "error", err, "channel", message.ChannelID, "content", content,
-			"reply", sendOpts.ReplyParameters)
-
-		return nil, fmt.Errorf("telegram: failed to send message: %w", err)
+		return nil, fmt.Errorf("telegram: failed to send message: %w\n\tchannel: %s\n\tcontent: %s\n\treply: %#+v",
+			err, message.ChannelID, content, sendOpts.ReplyParameters)
 	}
 
 	ids := []string{strconv.FormatInt(msg.MessageId, 10)}
@@ -180,7 +184,8 @@ func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, o
 
 	msgID, err := strconv.ParseInt(ids[0], 10, 64)
 	if err != nil {
-		return fmt.Errorf("telegram: failed to parse message ID %s in channel %s: %w", ids[0], message.ChannelID, err)
+		return fmt.Errorf("telegram: failed to parse message ID: %w\n\tchannel: %s\n\tmessage: %s",
+			err, message.ChannelID, ids[0])
 	}
 
 	content := parseContent(message, opts)
@@ -198,7 +203,8 @@ func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, o
 		return nil
 	}
 
-	return fmt.Errorf("telegram: failed to edit message %s in channel %s: %w", ids[0], message.ChannelID, err)
+	return fmt.Errorf("telegram: failed to edit message: %w\n\tchannel: %s\n\tmessage: %s",
+		err, message.ChannelID, ids[0])
 }
 
 func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
@@ -213,7 +219,8 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 
 		msgID, err = strconv.ParseInt(id, 10, 64)
 		if err != nil {
-			return fmt.Errorf("telegram: failed to parse message ID %s in channel %s: %w", id, channelID, err)
+			return fmt.Errorf("telegram: failed to parse message ID: %w\n\tchannel: %s\n\tmessage: %d",
+				err, channelID, msgID)
 		}
 
 		messageIDs = append(messageIDs, msgID)
@@ -224,7 +231,7 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 		return nil
 	}
 
-	return fmt.Errorf("telegram: failed to delete message %s in channel %s: %w", ids, channelID, err)
+	return fmt.Errorf("telegram: failed to delete message: %w\n\tchannel: %s\n\tmessage: %#+v", err, channelID, ids)
 }
 
 func (p *telegramPlugin) SetupCommands(commands map[string]*lightning.Command) error {

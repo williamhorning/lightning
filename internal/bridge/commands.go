@@ -109,7 +109,7 @@ func createCommand(database Database, opts lightning.CommandOptions) string {
 	}
 
 	if err := database.createBridge(bridgeData); err != nil {
-		errorString := fmt.Errorf("failed to create bridge (for ID %s) from database: %w", bridgeData.ID, err).Error()
+		errorString := fmt.Errorf("failed to create bridge from database: %w\n\tid: %s", err, bridgeData.ID).Error()
 
 		slog.Error(errorString)
 
@@ -133,7 +133,7 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 
 	bridgeData, err := database.getBridge(opts.Arguments["id"])
 	if err != nil {
-		errorString := fmt.Errorf("failed to get bridge (%s) from database: %w", opts.Arguments["id"], err).Error()
+		errorString := fmt.Errorf("failed to get bridge from database: %w\n\tid: %s", err, opts.Arguments["id"]).Error()
 
 		slog.Error(errorString)
 
@@ -146,7 +146,7 @@ func joinCommand(database Database, opts lightning.CommandOptions, subscribe boo
 	bridgeData.Channels = append(bridgeData.Channels, channel)
 
 	if err := database.createBridge(bridgeData); err != nil {
-		errorString := fmt.Errorf("failed to update bridge (for ID %s) from database: %w", bridgeData.ID, err).Error()
+		errorString := fmt.Errorf("failed to update bridge from database: %w\n\tid: %s", err, bridgeData.ID).Error()
 
 		slog.Error(errorString)
 
@@ -163,7 +163,7 @@ func leaveCommand(database Database, opts lightning.CommandOptions) string {
 
 	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
-		errorString := fmt.Errorf("failed to get bridge (for ID %s) from database: %w", opts.ChannelID, err).Error()
+		errorString := fmt.Errorf("failed to get bridge from database: %w\n\tchannel: %s", err, opts.ChannelID).Error()
 
 		slog.Error(errorString)
 
@@ -185,7 +185,7 @@ func leaveCommand(database Database, opts lightning.CommandOptions) string {
 	}
 
 	if err := database.createBridge(bridgeData); err != nil {
-		errorString := fmt.Errorf("failed to update bridge (for ID %s) from database: %w", bridgeData.ID, err).Error()
+		errorString := fmt.Errorf("failed to update bridge from database: %w\n\tid: %s", err, bridgeData.ID).Error()
 
 		slog.Error(errorString)
 
@@ -204,7 +204,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) string {
 
 	bridgeData, err := database.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
-		errorString := fmt.Errorf("failed to get bridge (for ID %s) from database: %w", opts.ChannelID, err).Error()
+		errorString := fmt.Errorf("failed to get bridge from database: %w\n\tchannel: %s", err, opts.ChannelID).Error()
 
 		slog.Error(errorString)
 
@@ -220,7 +220,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) string {
 	bridgeData.Settings.AllowEveryone = !bridgeData.Settings.AllowEveryone
 
 	if err := database.createBridge(bridgeData); err != nil {
-		errorString := fmt.Errorf("failed to update bridge (for ID %s) from database: %w", bridgeData.ID, err).Error()
+		errorString := fmt.Errorf("failed to update bridge from database: %w\n\tid: %s", err, bridgeData.ID).Error()
 
 		slog.Error(errorString)
 
@@ -233,7 +233,7 @@ func toggleCommand(database Database, opts lightning.CommandOptions) string {
 func statusCommand(db Database, opts lightning.CommandOptions) string {
 	bridgeData, err := db.getBridgeByChannel(opts.ChannelID)
 	if err != nil {
-		errorString := fmt.Errorf("failed to get bridge (for %s) from database: %w", opts.ChannelID, err).Error()
+		errorString := fmt.Errorf("failed to get bridge from database: %w\n\tchannel: %s", err, opts.ChannelID).Error()
 
 		slog.Error(errorString)
 

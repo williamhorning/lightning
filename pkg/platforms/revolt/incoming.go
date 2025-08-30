@@ -1,6 +1,7 @@
 package revolt
 
 import (
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strconv"
@@ -43,7 +44,7 @@ func getLightningTime(message revoltMessage) *time.Time {
 
 	msgID, err := ulid.Parse(message.ID)
 	if err != nil {
-		slog.Error("revolt: failed to parse message ID", "error", err, "messageID", message.ID)
+		slog.Error(fmt.Errorf("revolt: failed to parse message ID: %w\n\tmessage: %s", err, message.ID).Error())
 
 		timestamp := time.Now()
 

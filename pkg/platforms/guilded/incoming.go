@@ -264,9 +264,7 @@ func (p *guildedPlugin) getWebhookAuthor(msg *guildedChatMessage) (lightning.Mes
 func parseResponse(resp *http.Response, result any) error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("guilded: failed to read response body", "error", err, "status", resp.StatusCode)
-
-		return fmt.Errorf("guilded: failed to read response body: %w", err)
+		return fmt.Errorf("guilded: failed to read response body: %w\n\tstatus: %d", err, resp.StatusCode)
 	}
 
 	if resp.Body.Close() != nil {
@@ -274,9 +272,7 @@ func parseResponse(resp *http.Response, result any) error {
 	}
 
 	if err := json.Unmarshal(body, result); err != nil {
-		slog.Error("guilded: failed to unmarshal response body", "error", err, "body", string(body))
-
-		return fmt.Errorf("guilded: failed to unmarshal response body: %w", err)
+		return fmt.Errorf("guilded: failed to unmarshal response body: %w\n\tbody: %s", err, body)
 	}
 
 	return nil

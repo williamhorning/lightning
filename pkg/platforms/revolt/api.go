@@ -175,9 +175,8 @@ func revoltMakeRequest(token, method, endpoint string, body io.Reader) (*http.Re
 
 	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
-		slog.Error("revolt: failed to create request", "error", err, "method", method, "endpoint", endpoint)
-
-		return nil, fmt.Errorf("revolt: failed to create request: %w", err)
+		return nil, fmt.Errorf("revolt: failed to create request: %w\n\tendpoint: %s\n\tmethod: %s",
+			err, endpoint, method)
 	}
 
 	req.Header.Set("X-Bot-Token", token)
@@ -189,9 +188,8 @@ func revoltMakeRequest(token, method, endpoint string, body io.Reader) (*http.Re
 		return resp, nil
 	}
 
-	slog.Error("revolt: failed to make API request", "error", err, "method", method, "endpoint", endpoint)
-
-	return nil, fmt.Errorf("revolt: failed to make API request: %w", err)
+	return nil, fmt.Errorf("revolt: failed to make request: %w\n\tendpoint: %s\n\tmethod: %s",
+		err, endpoint, method)
 }
 
 func ratelimitRetry[T any](
@@ -219,17 +217,11 @@ func ratelimitRetry[T any](
 func sendRevoltMessage(token, channel string, message revoltMessageSend) (string, error) {
 	payload, err := json.Marshal(message)
 	if err != nil {
-		slog.Error("revolt: failed to marshal message", "error", err, "message", message)
-
-		return "", fmt.Errorf("revolt: failed to marshal message: %w", err)
+		return "", fmt.Errorf("revolt: failed to marshal message: %w\n\tmessage: %#+v", err, message)
 	}
 
-	resp, err := revoltMakeRequest(
-		token,
-		http.MethodPost,
-		"/channels/"+channel+"/messages",
-		bytes.NewBuffer(payload),
-	)
+	resp, err := revoltMakeRequest(token, http.MethodPost, "/channels/"+channel+"/messages",
+		bytes.NewBuffer(payload))
 	if err != nil {
 		return "", err
 	}
@@ -250,9 +242,7 @@ func sendRevoltMessage(token, channel string, message revoltMessageSend) (string
 
 	var response revoltMessage
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		slog.Error("revolt: failed to decode response", "error", err, "status", resp.StatusCode)
-
-		return "", fmt.Errorf("revolt: failed to decode response: %w", err)
+		return "", fmt.Errorf("revolt: failed to decode %d response: %w", resp.StatusCode, err)
 	}
 
 	return response.ID, nil
@@ -261,17 +251,11 @@ func sendRevoltMessage(token, channel string, message revoltMessageSend) (string
 func editRevoltMessage(token, channel, messageID string, message revoltMessageEditData) error {
 	payload, err := json.Marshal(message)
 	if err != nil {
-		slog.Error("revolt: failed to marshal message", "error", err, "message", message)
-
-		return fmt.Errorf("revolt: failed to marshal message: %w", err)
+		return fmt.Errorf("revolt: failed to marshal message: %w\n\tmessage: %#+v", err, message)
 	}
 
-	resp, err := revoltMakeRequest(
-		token,
-		http.MethodPatch,
-		"/channels/"+channel+"/messages/"+messageID,
-		bytes.NewBuffer(payload),
-	)
+	resp, err := revoltMakeRequest(token, http.MethodPatch, "/channels/"+channel+"/messages/"+messageID,
+		bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -301,17 +285,11 @@ func editRevoltMessage(token, channel, messageID string, message revoltMessageEd
 func bulkDeleteRevoltMessages(token, channel string, body revoltChannelMessageBulkDeleteData) error {
 	payload, err := json.Marshal(body)
 	if err != nil {
-		slog.Error("revolt: failed to marshal deletion", "error", err, "body", body)
-
-		return fmt.Errorf("revolt: failed to marshal deletion: %w", err)
+		return fmt.Errorf("revolt: failed to marshal deletion: %w\n\body: %#+v", err, body)
 	}
 
-	resp, err := revoltMakeRequest(
-		token,
-		http.MethodDelete,
-		"/channels/"+channel+"/messages/bulk",
-		bytes.NewBuffer(payload),
-	)
+	resp, err := revoltMakeRequest(token, http.MethodDelete, "/channels/"+channel+"/messages/bulk",
+		bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}

@@ -3,14 +3,15 @@ package revolt
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 type revoltPermissionsError struct {
-	msg string
+	msg         string
+	permissions uint
+	expected    uint
 }
 
 func (revoltPermissionsError) Disable() *lightning.ChannelDisabled {
@@ -18,7 +19,9 @@ func (revoltPermissionsError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e revoltPermissionsError) Error() string {
-	return "insufficient permissions in Revolt " + e.msg + " channel, please check them"
+	return "insufficient permissions in Revolt (have " +
+		strconv.FormatUint(uint64(e.permissions), 10) + ", want " +
+		strconv.FormatUint(uint64(e.expected), 10) + ")" + e.msg + " channel, please check them"
 }
 
 type revoltStatusError struct {
@@ -37,18 +40,12 @@ func (e revoltStatusError) Error() string {
 
 func getRevoltError(err error, extra map[string]any, message string) error {
 	if errors.Is(err, revoltPermissionsError{}) {
-		slog.Error("revolt: insufficient permissions", "error", err, "extra", extra)
-
 		return err
 	}
 
 	if errors.Is(err, revoltStatusError{}) {
-		slog.Error("revolt: status error", "error", err, "extra", extra)
-
-		return err
+		return fmt.Errorf("revolt: status error: %w\n\textra: %#+v", err, extra)
 	}
 
-	slog.Error("revolt: error", "error", err, "message", message, "extra", extra)
-
-	return fmt.Errorf("revolt: %s: %w", message, err)
+	return fmt.Errorf("revolt: %s: %w\n\textra: %#+v", message, err, extra)
 }

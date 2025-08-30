@@ -81,9 +81,7 @@ func (p *guildedPlugin) DeleteMessage(channel string, ids []string) error {
 		}
 
 		if err != nil {
-			slog.Error("guilded: failed to delete message", "error", err, "messageID", msgID, "channelID", channel)
-
-			return fmt.Errorf("guilded: failed to delete message %s in channel %s: %w", msgID, channel, err)
+			return fmt.Errorf("guilded: failed to delete message: %w\n\tchannel %s\n\tmessage: %s", err, channel, msgID)
 		}
 	}
 
