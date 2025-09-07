@@ -14,8 +14,8 @@ import (
 func setupEvents(
 	syncer *mautrix.DefaultSyncer,
 	client *mautrix.Client,
-	msgChannel chan<- lightning.Message,
-	editChannel chan<- lightning.EditedMessage,
+	msgChannel chan<- *lightning.Message,
+	editChannel chan<- *lightning.EditedMessage,
 ) {
 	syncer.OnSync(func(ctx context.Context, resp *mautrix.RespSync, since string) bool {
 		if since != "" {
@@ -64,8 +64,8 @@ func setupEvents(
 
 func onMessageHandler(
 	client *mautrix.Client,
-	msgChannel chan<- lightning.Message,
-	editChannel chan<- lightning.EditedMessage,
+	msgChannel chan<- *lightning.Message,
+	editChannel chan<- *lightning.EditedMessage,
 ) mautrix.EventHandler {
 	return func(_ context.Context, evt *event.Event) {
 		msg := evt.Content.AsMessage()
@@ -86,6 +86,7 @@ func onMessageHandler(
 
 		attachments := make([]lightning.Attachment, 0)
 		content := ""
+		timestamp := time.UnixMilli(evt.Timestamp)
 
 		if msg.FileName == msg.Body {
 			attachments = append(attachments, lightning.Attachment{
@@ -99,14 +100,14 @@ func onMessageHandler(
 
 		newMessage := lightning.Message{
 			BaseMessage: lightning.BaseMessage{
-				Time:      time.UnixMilli(evt.Timestamp),
+				Time:      &timestamp,
 				EventID:   evt.ID.String(),
 				ChannelID: evt.RoomID.String(),
 			},
 			Attachments: attachments,
 			// TODO: get message author information. color is also currently just white,
 			// this may be odd on revolt. there's not really a good matrix color to use here.
-			Author: lightning.MessageAuthor{
+			Author: &lightning.MessageAuthor{
 				ID:             evt.Sender.String(),
 				Nickname:       "",
 				Username:       "",
@@ -125,9 +126,9 @@ func onMessageHandler(
 			newContent, _ := format.HTMLToMarkdownFull(nil, msg.NewContent.FormattedBody)
 			newMessage.Content = newContent
 
-			editChannel <- lightning.EditedMessage{Edited: evt.Mautrix.EditedAt, Message: newMessage}
+			editChannel <- &lightning.EditedMessage{Edited: &evt.Mautrix.EditedAt, Message: &newMessage}
 		} else {
-			msgChannel <- newMessage
+			msgChannel <- &newMessage
 		}
 	}
 }

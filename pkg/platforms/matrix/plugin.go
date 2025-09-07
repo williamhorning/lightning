@@ -68,8 +68,8 @@ func New(config any) (lightning.Plugin, error) {
 		client.Syncer = mautrix.NewDefaultSyncer()
 	}
 
-	msgChannel := make(chan lightning.Message, 1000)
-	editChannel := make(chan lightning.EditedMessage, 1000)
+	msgChannel := make(chan *lightning.Message, 1000)
+	editChannel := make(chan *lightning.EditedMessage, 1000)
 
 	setupEvents(syncer, client, msgChannel, editChannel)
 
@@ -82,8 +82,8 @@ type matrixPlugin struct {
 
 	mxcCache *cache.Expiring[string, string]
 
-	msgChannel  chan lightning.Message
-	editChannel chan lightning.EditedMessage
+	msgChannel  chan *lightning.Message
+	editChannel chan *lightning.EditedMessage
 }
 
 func (*matrixPlugin) SetupChannel(_ string) (any, error) {
@@ -91,14 +91,14 @@ func (*matrixPlugin) SetupChannel(_ string) (any, error) {
 }
 
 func (p *matrixPlugin) SendCommandResponse(
-	message lightning.Message,
+	message *lightning.Message,
 	opts *lightning.SendOptions,
 	_ string,
 ) ([]string, error) {
 	return p.SendMessage(message, opts)
 }
 
-func (p *matrixPlugin) SendMessage(message lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := format.RenderMarkdown(message.Content, true, false)
 
 	var url *id.ContentURIString
@@ -147,7 +147,7 @@ func (p *matrixPlugin) SendMessage(message lightning.Message, opts *lightning.Se
 	return []string{resp.EventID.String()}, nil
 }
 
-func (*matrixPlugin) EditMessage(_ lightning.Message, _ []string, _ *lightning.SendOptions) error {
+func (*matrixPlugin) EditMessage(_ *lightning.Message, _ []string, _ *lightning.SendOptions) error {
 	return nil
 }
 
@@ -164,24 +164,26 @@ func (p *matrixPlugin) DeleteMessage(channel string, ids []string) error {
 	return nil
 }
 
-func (*matrixPlugin) SetupCommands(_ map[string]lightning.Command) error {
+func (*matrixPlugin) SetupCommands(_ map[string]*lightning.Command) error {
 	return nil
 }
 
-func (p *matrixPlugin) ListenMessages() <-chan lightning.Message {
+func (p *matrixPlugin) ListenMessages() <-chan *lightning.Message {
 	return p.msgChannel
 }
 
-func (p *matrixPlugin) ListenEdits() <-chan lightning.EditedMessage {
+func (p *matrixPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	return p.editChannel
 }
 
-func (p *matrixPlugin) ListenDeletes() <-chan lightning.BaseMessage {
-	channel := make(chan lightning.BaseMessage, 1000)
+func (p *matrixPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
+	channel := make(chan *lightning.BaseMessage, 1000)
 
 	p.syncer.OnEventType(event.EventRedaction, func(_ context.Context, evt *event.Event) {
-		channel <- lightning.BaseMessage{
-			Time:      time.UnixMilli(evt.Timestamp),
+		timestamp := time.UnixMilli(evt.Timestamp)
+
+		channel <- &lightning.BaseMessage{
+			Time:      &timestamp,
 			EventID:   evt.Content.AsRedaction().Redacts.String(),
 			ChannelID: evt.RoomID.String(),
 		}
@@ -190,6 +192,6 @@ func (p *matrixPlugin) ListenDeletes() <-chan lightning.BaseMessage {
 	return channel
 }
 
-func (*matrixPlugin) ListenCommands() <-chan lightning.CommandEvent {
+func (*matrixPlugin) ListenCommands() <-chan *lightning.CommandEvent {
 	return nil
 }
