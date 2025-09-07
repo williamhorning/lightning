@@ -81,7 +81,7 @@ type guildedChatMessageUpdated struct {
 }
 
 type guildedPayload struct {
-	Content         string             `json:"content"`
+	Content         string             `json:"content,omitempty"`
 	AvatarURL       string             `json:"avatar_url,omitempty"`
 	Username        string             `json:"username,omitempty"`
 	Embeds          []guildedChatEmbed `json:"embeds,omitempty"`

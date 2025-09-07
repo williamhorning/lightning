@@ -68,6 +68,15 @@ func (o *discordOutgoingMessage) Message() *discordgo.MessageSend {
 	}
 }
 
+func (o *discordOutgoingMessage) Interaction() *discordgo.InteractionResponseData {
+	return &discordgo.InteractionResponseData{
+		AllowedMentions: o.AllowedMentions,
+		Components:      o.Components,
+		Content:         o.Content,
+		Embeds:          o.Embeds,
+	}
+}
+
 type discordWebhook struct {
 	ID    string `json:"id"`
 	Token string `json:"token"`
@@ -102,7 +111,10 @@ func getOutgoingMessage(
 		Content:         getOutgoingContent(session, message),
 		Embeds:          getOutgoingEmbeds(message),
 		Files:           getOutgoingFiles(session, message),
-		Username:        message.Author.Nickname,
+	}
+
+	if message.Author != nil {
+		msg.Username = message.Author.Nickname
 	}
 
 	if opts != nil {
@@ -132,7 +144,7 @@ func getOutgoingMention(opts *lightning.SendOptions) *discordgo.MessageAllowedMe
 }
 
 func getOutgoingProfile(message *lightning.Message) string {
-	if message.Author.ProfilePicture != nil {
+	if message.Author != nil && message.Author.ProfilePicture != nil {
 		return *message.Author.ProfilePicture
 	}
 
@@ -247,6 +259,10 @@ func getOutgoingEmbeds(message *lightning.Message) []*discordgo.MessageEmbed {
 func setEmbedBasicProperties(discordEmbed *discordgo.MessageEmbed, embed lightning.Embed) {
 	if embed.Title != nil {
 		discordEmbed.Title = *embed.Title
+	}
+
+	if embed.Description != nil {
+		discordEmbed.Description = *embed.Description
 	}
 
 	if embed.Timestamp != nil {

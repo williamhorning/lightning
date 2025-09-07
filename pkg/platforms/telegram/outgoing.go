@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
@@ -25,7 +26,7 @@ func parseContent(message *lightning.Message, opts *lightning.SendOptions) strin
 		content += getMarkdownV2(message.Author.Nickname) + " » "
 	}
 
-	mdV2 := getMarkdownV2(message.Content)
+	mdV2 := getMarkdownV2(strings.ReplaceAll(message.Content, "\n", "\n\n"))
 
 	if len(mdV2) > 0 &&
 		slices.Contains(

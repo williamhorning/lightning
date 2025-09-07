@@ -14,61 +14,55 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	case revoltChannelTypeSavedMessages, revoltChannelTypeGroup:
 		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 	case revoltChannelTypeDM:
-		return handleDMChannel(channelData)
+		return nil, handleDMChannel(channelData)
 	case revoltChannelTypeText, revoltChannelTypeVoice:
-		return p.handleTextOrVoiceChannel(channelData)
+		return nil, p.handleTextOrVoiceChannel(channelData)
 	default:
 		return nil, &revoltPermissionsError{"unknown channel type", 0, 0}
 	}
 }
 
-func handleDMChannel(channel *revoltChannel) (any, error) {
+func handleDMChannel(channel *revoltChannel) error {
 	if channel.Permissions == nil || *channel.Permissions&messageSendPermission != messageSendPermission {
-		return nil, &revoltPermissionsError{"DM", *channel.Permissions, messageSendPermission}
+		return &revoltPermissionsError{"DM", *channel.Permissions, messageSendPermission}
 	}
 
-	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
+	return nil
 }
 
-func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) (any, error) {
+func (p *revoltPlugin) handleTextOrVoiceChannel(channel *revoltChannel) error {
 	server := p.getServer(channel.Server)
 	if server == nil {
-		return nil, &revoltPermissionsError{"nil server (" + channel.Server + ")", 0, correctPermissionValue}
+		return &revoltPermissionsError{"nil server (" + channel.Server + ")", 0, correctPermissionValue}
 	}
 
 	if server.Owner == p.self.ID {
-		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
+		return nil
 	}
 
 	member := p.getMember(channel.Server, p.self.ID)
 	if member == nil {
-		return nil, &revoltPermissionsError{"server (with nil bot member)", 0, correctPermissionValue}
+		return &revoltPermissionsError{"server (with nil bot member)", 0, correctPermissionValue}
 	}
 
 	if member.Timeout != nil && time.Now().Before(*member.Timeout) {
-		return nil, &revoltPermissionsError{"server (with bot in timeout)", 0, correctPermissionValue}
+		return &revoltPermissionsError{"server (with bot in timeout)", 0, correctPermissionValue}
 	}
 
 	permissions := calculatePermissions(server, member, channel)
 
 	if (permissions & correctPermissionValue) != correctPermissionValue {
-		return nil, &revoltPermissionsError{
-			"server channel (with missing permissions)", permissions, correctPermissionValue,
-		}
+		return &revoltPermissionsError{"server channel (with missing permissions)", permissions, correctPermissionValue}
 	}
 
-	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
+	return nil
 }
 
-func calculatePermissions(
-	server *revoltServer,
-	member *revoltServerMember,
-	channel *revoltChannel,
-) uint {
-	permissions := *server.DefaultPermissions
+func calculatePermissions(svr *revoltServer, member *revoltServerMember, channel *revoltChannel) uint {
+	permissions := *svr.DefaultPermissions
 
 	for _, roleID := range member.Roles {
-		role, ok := server.Roles[roleID]
+		role, ok := svr.Roles[roleID]
 		if ok {
 			permissions |= role.Permissions.Allow
 			permissions &= ^role.Permissions.Deny

@@ -35,24 +35,23 @@ type CommandOptions struct {
 
 	Arguments map[string]string
 	Bot       *Bot
+	Reply     func(message *Message, sensitive bool) error
 	Prefix    string
 }
 
 // A Command registered with [Bot].
 type Command struct {
-	Executor    func(options CommandOptions) string
+	Executor    func(options *CommandOptions)
 	Name        string
 	Description string
 	Arguments   []*CommandArgument
 	Subcommands []*Command
-	Sensitive   bool
 }
 
 // CommandEvent represents an execution of a command on a platform.
 type CommandEvent struct {
-	CommandOptions
+	*CommandOptions
 
-	Reply      func(message string, sensitive bool) error
 	Subcommand *string
 	Command    string
 	Options    []string
@@ -118,11 +117,11 @@ type Media struct {
 
 // MessageAuthor is an author on an [Message].
 type MessageAuthor struct {
-	ID             string
-	Nickname       string
-	Username       string
-	ProfilePicture *string
-	Color          string
+	ID             string  `toml:"id"`
+	Nickname       string  `toml:"nickname"`
+	Username       string  `toml:"username"`
+	ProfilePicture *string `toml:"profile_picture,omitempty"`
+	Color          string  `toml:"color,omitempty"`
 }
 
 // Message is a representation of a message on a platform.

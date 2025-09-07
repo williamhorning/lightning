@@ -1,4 +1,4 @@
-package bridge
+package data
 
 import (
 	"context"
@@ -35,38 +35,7 @@ func newPostgresDatabase(conn string) (Database, error) {
 	return pgdb, nil
 }
 
-func (p *postgresDatabase) exec(query string, args ...any) error {
-	if _, err := p.db.ExecContext(context.Background(), query, args...); err != nil {
-		return fmt.Errorf("exec failed: %w", err)
-	}
-
-	return nil
-}
-
-func (p *postgresDatabase) withTx(txnfn func(*sql.Tx) error) error {
-	txn, err := p.db.BeginTx(context.Background(), nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin txn: %w", err)
-	}
-
-	defer func() {
-		if err := txn.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-			slog.Warn(fmt.Errorf("txn rollback failed: %w", err).Error())
-		}
-	}()
-
-	if err := txnfn(txn); err != nil {
-		return err
-	}
-
-	if err := txn.Commit(); err != nil {
-		return fmt.Errorf("failed to commit txn: %w", err)
-	}
-
-	return nil
-}
-
-func (p *postgresDatabase) createBridge(bridgeData bridge) error {
+func (p *postgresDatabase) CreateBridge(bridgeData Bridge) error {
 	return p.withTx(func(txn *sql.Tx) error {
 		settings, err := json.Marshal(bridgeData.Settings)
 		if err != nil {
@@ -102,9 +71,9 @@ func (p *postgresDatabase) createBridge(bridgeData bridge) error {
 	})
 }
 
-func (p *postgresDatabase) getBridge(brID string) (bridge, error) {
+func (p *postgresDatabase) GetBridge(brID string) (Bridge, error) {
 	var (
-		bridgeData bridge
+		bridgeData Bridge
 		settings   json.RawMessage
 	)
 
@@ -112,19 +81,19 @@ func (p *postgresDatabase) getBridge(brID string) (bridge, error) {
 
 	if err := p.db.QueryRowContext(context.Background(), selectBridgeSettingsByID, brID).Scan(&settings); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return bridge{}, nil
+			return Bridge{}, nil
 		}
 
-		return bridge{}, fmt.Errorf("failed to query bridge settings: %w", err)
+		return Bridge{}, fmt.Errorf("failed to query bridge settings: %w", err)
 	}
 
 	if err := json.Unmarshal(settings, &bridgeData.Settings); err != nil {
-		return bridge{}, fmt.Errorf("failed to unmarshal settings: %w", err)
+		return Bridge{}, fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
 	rows, err := p.db.QueryContext(context.Background(), selectBridgeChannelsQuery, brID)
 	if err != nil {
-		return bridge{}, fmt.Errorf("failed to query channels: %w", err)
+		return Bridge{}, fmt.Errorf("failed to query channels: %w", err)
 	}
 
 	defer func() {
@@ -136,57 +105,36 @@ func (p *postgresDatabase) getBridge(brID string) (bridge, error) {
 	for rows.Next() {
 		channel, err := getChannelRow(rows)
 		if err != nil {
-			return bridge{}, fmt.Errorf("failed to get channels: %w", err)
+			return Bridge{}, fmt.Errorf("failed to get channels: %w", err)
 		}
 
 		bridgeData.Channels = append(bridgeData.Channels, channel)
 	}
 
 	if err := rows.Err(); err != nil {
-		return bridge{}, fmt.Errorf("failed to iterate channels: %w", err)
+		return Bridge{}, fmt.Errorf("failed to iterate channels: %w", err)
 	}
 
 	return bridgeData, nil
 }
 
-func getChannelRow(rows *sql.Rows) (bridgeChannel, error) {
-	var (
-		channel        bridgeChannel
-		data, disabled json.RawMessage
-	)
-
-	if err := rows.Scan(&channel.ID, &data, &disabled); err != nil {
-		return bridgeChannel{}, fmt.Errorf("failed to scan channel row: %w", err)
-	}
-
-	if err := json.Unmarshal(data, &channel.Data); err != nil {
-		return bridgeChannel{}, fmt.Errorf("failed to unmarshal channel data: %w", err)
-	}
-
-	if err := json.Unmarshal(disabled, &channel.Disabled); err != nil {
-		return bridgeChannel{}, fmt.Errorf("failed to unmarshal disabled information: %w", err)
-	}
-
-	return channel, nil
-}
-
-func (p *postgresDatabase) getBridgeByChannel(chID string) (bridge, error) {
+func (p *postgresDatabase) GetBridgeByChannel(chID string) (Bridge, error) {
 	var bID string
 
 	err := p.db.QueryRowContext(context.Background(),
 		selectBridgeByChannelQuery, chID).Scan(&bID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return bridge{}, nil
+			return Bridge{}, nil
 		}
 
-		return bridge{}, fmt.Errorf("failed to query channel in bridge: %w", err)
+		return Bridge{}, fmt.Errorf("failed to query channel in bridge: %w", err)
 	}
 
-	return p.getBridge(bID)
+	return p.GetBridge(bID)
 }
 
-func (p *postgresDatabase) createMessage(message bridgeMessageCollection) error {
+func (p *postgresDatabase) CreateMessage(message BridgeMessageCollection) error {
 	data, err := json.Marshal(message.Messages)
 	if err != nil {
 		return fmt.Errorf("failed to marshal messages: %w", err)
@@ -195,9 +143,9 @@ func (p *postgresDatabase) createMessage(message bridgeMessageCollection) error 
 	return p.exec(insertMessage, message.ID, message.BridgeID, data)
 }
 
-func (p *postgresDatabase) getMessage(msgID string) (bridgeMessageCollection, error) {
+func (p *postgresDatabase) GetMessage(msgID string) (BridgeMessageCollection, error) {
 	var (
-		message bridgeMessageCollection
+		message BridgeMessageCollection
 		data    sql.NullString
 	)
 
@@ -205,19 +153,19 @@ func (p *postgresDatabase) getMessage(msgID string) (bridgeMessageCollection, er
 		selectMessageCollectionQuery, msgID).
 		Scan(&message.ID, &message.BridgeID, &data)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return bridgeMessageCollection{}, fmt.Errorf("failed to query message: %w", err)
+		return BridgeMessageCollection{}, fmt.Errorf("failed to query message: %w", err)
 	} else if errors.Is(err, sql.ErrNoRows) {
-		return bridgeMessageCollection{}, nil
+		return BridgeMessageCollection{}, nil
 	}
 
 	if err := json.Unmarshal([]byte(data.String), &message.Messages); err != nil {
-		return bridgeMessageCollection{}, fmt.Errorf("failed to unmarshal message: %w", err)
+		return BridgeMessageCollection{}, fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
 	return message, nil
 }
 
-func (p *postgresDatabase) deleteMessage(id string) error {
+func (p *postgresDatabase) DeleteMessage(id string) error {
 	var realID string
 
 	err := p.db.QueryRowContext(context.Background(), selectMessageIDQuery, id).Scan(&realID)
@@ -257,4 +205,56 @@ func (p *postgresDatabase) setupDatabase() error {
 	}
 
 	return nil
+}
+
+func (p *postgresDatabase) exec(query string, args ...any) error {
+	if _, err := p.db.ExecContext(context.Background(), query, args...); err != nil {
+		return fmt.Errorf("exec failed: %w", err)
+	}
+
+	return nil
+}
+
+func (p *postgresDatabase) withTx(txnfn func(*sql.Tx) error) error {
+	txn, err := p.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin txn: %w", err)
+	}
+
+	defer func() {
+		if err := txn.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			slog.Warn(fmt.Errorf("txn rollback failed: %w", err).Error())
+		}
+	}()
+
+	if err := txnfn(txn); err != nil {
+		return err
+	}
+
+	if err := txn.Commit(); err != nil {
+		return fmt.Errorf("failed to commit txn: %w", err)
+	}
+
+	return nil
+}
+
+func getChannelRow(rows *sql.Rows) (BridgeChannel, error) {
+	var (
+		channel        BridgeChannel
+		data, disabled json.RawMessage
+	)
+
+	if err := rows.Scan(&channel.ID, &data, &disabled); err != nil {
+		return BridgeChannel{}, fmt.Errorf("failed to scan channel row: %w", err)
+	}
+
+	if err := json.Unmarshal(data, &channel.Data); err != nil {
+		return BridgeChannel{}, fmt.Errorf("failed to unmarshal channel data: %w", err)
+	}
+
+	if err := json.Unmarshal(disabled, &channel.Disabled); err != nil {
+		return BridgeChannel{}, fmt.Errorf("failed to unmarshal disabled information: %w", err)
+	}
+
+	return channel, nil
 }

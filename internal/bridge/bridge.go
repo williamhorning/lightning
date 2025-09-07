@@ -6,33 +6,34 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/williamhorning/lightning/internal/data"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType, data any) error {
-	base, err := getBase(data)
+func handleBridgeMessage(bot *lightning.Bot, database data.Database, event data.EventType, dat any) error {
+	base, err := getBase(dat)
 	if err != nil {
 		return err
 	}
 
-	var bridgeData bridge
+	var bridge data.Bridge
 
-	var priorMessage *bridgeMessageCollection
+	var priorMessage *data.BridgeMessageCollection
 
-	if event == typeCreate {
-		bridgeData, err = database.getBridgeByChannel(base.ChannelID)
+	if event == data.TypeCreate {
+		bridge, err = database.GetBridgeByChannel(base.ChannelID)
 	} else {
-		var prior bridgeMessageCollection
+		var prior data.BridgeMessageCollection
 
-		prior, err = database.getMessage(base.EventID)
+		prior, err = database.GetMessage(base.EventID)
 		if err == nil {
 			priorMessage = &prior
 
-			if priorMessage.ID != base.EventID && event == typeEdit {
+			if priorMessage.ID != base.EventID && event == data.TypeEdit {
 				return nil
 			}
 
-			bridgeData, err = database.getBridge(prior.BridgeID)
+			bridge, err = database.GetBridge(prior.BridgeID)
 		}
 	}
 
@@ -40,24 +41,24 @@ func handleBridgeMessage(bot *lightning.Bot, database Database, event eventType,
 		return fmt.Errorf("failed to get bridge for (%s in %s): %w", base.EventID, base.ChannelID, err)
 	}
 
-	if bridgeData.ID == "" {
+	if bridge.ID == "" {
 		return nil
 	}
 
-	if bridgeData.getChannelDisabled(base.ChannelID).Read {
+	if bridge.GetChannelDisabled(base.ChannelID).Read {
 		slog.Debug("bridge: channel is subscribed, skipping", "channel", base.ChannelID)
 
 		return nil
 	}
 
-	repliedTo := getRepliedToMessage(database, data)
-	messages := processMessage(bot, database, &bridgeData, event, base, data, repliedTo, priorMessage)
+	repliedTo := getRepliedToMessage(database, dat)
+	messages := processMessage(bot, database, &bridge, event, base, dat, repliedTo, priorMessage)
 
-	return setDatabase(database, event, base, &bridgeData, messages)
+	return setDatabase(database, event, base, &bridge, messages)
 }
 
-func getBase(data any) (lightning.BaseMessage, error) {
-	switch msg := data.(type) {
+func getBase(dat any) (lightning.BaseMessage, error) {
+	switch msg := dat.(type) {
 	case lightning.EditedMessage:
 		return msg.Message.BaseMessage, nil
 	case lightning.Message:
@@ -65,65 +66,73 @@ func getBase(data any) (lightning.BaseMessage, error) {
 	case lightning.BaseMessage:
 		return msg, nil
 	default:
-		return lightning.BaseMessage{}, unsupportedTypeError{data}
+		return lightning.BaseMessage{}, unsupportedTypeError{dat}
 	}
 }
 
-func getMessage(data any) (lightning.Message, error) {
-	switch msg := data.(type) {
+func getMessage(dat any) (lightning.Message, error) {
+	switch msg := dat.(type) {
 	case lightning.EditedMessage:
 		return *msg.Message, nil
 	case lightning.Message:
 		return msg, nil
 	default:
-		return lightning.Message{}, unsupportedTypeError{data}
+		return lightning.Message{}, unsupportedTypeError{dat}
 	}
 }
 
 func setDatabase(
-	database Database,
-	event eventType,
+	database data.Database,
+	event data.EventType,
 	base lightning.BaseMessage,
-	bridgeData *bridge,
-	messages channelMessageArray,
+	bridge *data.Bridge,
+	messages []data.ChannelMessage,
 ) error {
 	switch event {
-	case typeCreate, typeEdit:
-		return database.createMessage(bridgeMessageCollection{base.EventID, bridgeData.ID, messages})
-	case typeDelete:
-		return database.deleteMessage(base.EventID)
+	case data.TypeCreate, data.TypeEdit:
+		if err := database.CreateMessage(
+			data.BridgeMessageCollection{ID: base.EventID, BridgeID: bridge.ID, Messages: messages},
+		); err != nil {
+			return fmt.Errorf("setDatabase failed: %w", err)
+		}
+	case data.TypeDelete:
+		if err := database.DeleteMessage(base.EventID); err != nil {
+			return fmt.Errorf("setDatabase failed: %w", err)
+		}
 	default:
 		return unsupportedTypeError{event}
 	}
+
+	return nil
 }
 
 func processMessage(
 	bot *lightning.Bot,
-	database Database,
-	bridgeData *bridge,
-	event eventType,
+	database data.Database,
+	bridge *data.Bridge,
+	event data.EventType,
 	base lightning.BaseMessage,
-	data any,
-	repliedTo *bridgeMessageCollection,
-	priorMessage *bridgeMessageCollection,
-) channelMessageArray {
-	messages := make(channelMessageArray, 0, len(bridgeData.Channels)+1)
-	results := make(chan *channelMessage, len(bridgeData.Channels))
+	dat any,
+	repliedTo *data.BridgeMessageCollection,
+	priorMessage *data.BridgeMessageCollection,
+) []data.ChannelMessage {
+	messages := make([]data.ChannelMessage, 0, len(bridge.Channels)+1)
+	results := make(chan *data.ChannelMessage, len(bridge.Channels))
 	waitGroup := sync.WaitGroup{}
 
-	for _, channel := range bridgeData.Channels {
+	for _, channel := range bridge.Channels {
 		if channel.ID == base.ChannelID || channel.Disabled.Write {
 			continue
 		}
 
 		waitGroup.Go(func() {
-			priorMessageIDs := priorMessage.getChannelMessageIDs(channel.ID)
+			priorMessageIDs := priorMessage.GetChannelMessageIDs(channel.ID)
 
-			if event != typeCreate && len(priorMessageIDs) == 0 {
+			if event != data.TypeCreate && len(priorMessageIDs) == 0 {
 				return
 			}
 
-			message := handleChannel(bot, database, bridgeData, &channel, event, data,
+			message := handleChannel(bot, database, bridge, &channel, event, dat,
 				repliedTo, priorMessageIDs)
 
 			if message != nil {
@@ -139,34 +148,34 @@ func processMessage(
 		messages = append(messages, *message)
 	}
 
-	return append(messages, channelMessage{base.ChannelID, []string{base.EventID}})
+	return append(messages, data.ChannelMessage{ChannelID: base.ChannelID, MessageIDs: []string{base.EventID}})
 }
 
 func handleChannel(
 	bot *lightning.Bot,
-	database Database,
-	bridgeData *bridge,
-	channel *bridgeChannel,
-	event eventType,
-	data any,
-	repliedTo *bridgeMessageCollection,
+	database data.Database,
+	bridge *data.Bridge,
+	channel *data.BridgeChannel,
+	event data.EventType,
+	dat any,
+	repliedTo *data.BridgeMessageCollection,
 	priorMessageIDs []string,
-) *channelMessage {
-	defer func(channel *bridgeChannel) {
+) *data.ChannelMessage {
+	defer func(channel *data.BridgeChannel) {
 		if r := recover(); r != nil {
 			slog.Error("bridge: panic in handling", "recover", r, "channel", channel.ID)
 		}
 	}(channel)
 
-	opts := &lightning.SendOptions{AllowEveryonePings: bridgeData.Settings.AllowEveryone, ChannelData: channel.Data}
+	opts := &lightning.SendOptions{AllowEveryonePings: bridge.Settings.AllowEveryone, ChannelData: channel.Data}
 
 	var err error
 
 	resultIDs := priorMessageIDs
 
 	switch event {
-	case typeCreate, typeEdit:
-		newMessage, msgErr := getMessage(data)
+	case data.TypeCreate, data.TypeEdit:
+		newMessage, msgErr := getMessage(dat)
 		if msgErr != nil {
 			slog.Warn(fmt.Errorf("unsupported message type for bridge channel: %w", msgErr).Error(),
 				"channel", channel.ID, "event", event)
@@ -175,34 +184,34 @@ func handleChannel(
 		}
 
 		newMessage.ChannelID = channel.ID
-		newMessage.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID)
+		newMessage.RepliedTo = repliedTo.GetChannelMessageIDs(channel.ID)
 
-		if event == typeCreate {
+		if event == data.TypeCreate {
 			resultIDs, err = bot.SendMessage(&newMessage, opts)
 		} else if len(priorMessageIDs) != 0 {
 			err = bot.EditMessage(&newMessage, priorMessageIDs, opts)
 		}
-	case typeDelete:
+	case data.TypeDelete:
 		err = bot.DeleteMessages(channel.ID, priorMessageIDs)
 	default:
 	}
 
 	if err != nil {
-		handleError(database, err, channel, bridgeData, event)
+		handleError(database, err, channel, bridge, event)
 
 		return nil
 	}
 
-	return &channelMessage{channel.ID, resultIDs}
+	return &data.ChannelMessage{ChannelID: channel.ID, MessageIDs: resultIDs}
 }
 
-func getRepliedToMessage(database Database, data any) *bridgeMessageCollection {
-	msg, err := getMessage(data)
+func getRepliedToMessage(database data.Database, dat any) *data.BridgeMessageCollection {
+	msg, err := getMessage(dat)
 	if err != nil || len(msg.RepliedTo) == 0 {
 		return nil
 	}
 
-	repliedTo, err := database.getMessage(msg.RepliedTo[0])
+	repliedTo, err := database.GetMessage(msg.RepliedTo[0])
 	if err != nil {
 		slog.Warn(fmt.Errorf("failed to get replied to message: %w", err).Error(), "replied_to", msg.RepliedTo[0])
 
@@ -212,7 +221,13 @@ func getRepliedToMessage(database Database, data any) *bridgeMessageCollection {
 	return &repliedTo
 }
 
-func handleError(database Database, err error, channel *bridgeChannel, bridgeData *bridge, event eventType) {
+func handleError(
+	database data.Database,
+	err error,
+	channel *data.BridgeChannel,
+	bridge *data.Bridge,
+	event data.EventType,
+) {
 	disabled := &lightning.ChannelDisabled{}
 
 	if disabler, ok := err.(lightning.ChannelDisabler); ok {
@@ -220,24 +235,24 @@ func handleError(database Database, err error, channel *bridgeChannel, bridgeDat
 	}
 
 	slog.Error(fmt.Errorf("error handling bridge message: %w", err).Error(),
-		"channel", channel.ID, "bridge", bridgeData.ID, "event", event, "disable", disabled)
+		"channel", channel.ID, "bridge", bridge.ID, "event", event, "disable", disabled)
 
 	if !disabled.Read && !disabled.Write {
 		return
 	}
 
-	for idx, channelData := range bridgeData.Channels {
+	for idx, channelData := range bridge.Channels {
 		if channelData.ID == channel.ID {
-			bridgeData.Channels[idx].Disabled = *disabled
+			bridge.Channels[idx].Disabled = *disabled
 
 			break
 		}
 	}
 
-	slog.Warn(disableChannelError{bridgeData.ID, channel.ID}.Error(), "event", event, "disable", disabled)
+	slog.Warn(disableChannelError{bridge.ID, channel.ID}.Error(), "event", event, "disable", disabled)
 
-	if err := database.createBridge(*bridgeData); err != nil {
+	if err := database.CreateBridge(*bridge); err != nil {
 		slog.Warn(fmt.Errorf("bridge: failed to disable channel: %w", err).Error(),
-			"channel", channel.ID, "bridge", bridgeData.ID)
+			"channel", channel.ID, "bridge", bridge.ID)
 	}
 }

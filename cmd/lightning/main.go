@@ -34,16 +34,7 @@ func main() {
 	handler.URL = cfg.ErrorURL
 	handler.Level = slog.Level(cfg.LogLevel)
 
-	profileURL := "https://williamhorning.eu.org/assets/lightning/logo_color.svg"
-
 	bot := lightning.NewBot(lightning.BotOptions{
-		Author: lightning.MessageAuthor{
-			Username:       "lightning",
-			Nickname:       "lightning",
-			ID:             "lightning",
-			ProfilePicture: &profileURL,
-			Color:          "#487C7E",
-		},
 		Prefix: cfg.CommandPrefix,
 	})
 
@@ -63,7 +54,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	bridge.Setup(bot, database)
+	bridge.Setup(bot, cfg.Author, database)
 
 	for plugin, cfg := range cfg.Plugins {
 		if err := bot.UsePluginType(plugin, "", cfg); err != nil {

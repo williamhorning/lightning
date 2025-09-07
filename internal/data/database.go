@@ -1,13 +1,14 @@
-package bridge
+// Package data provides the database used by the Lightning bridge bot.
+package data
 
 // The Database implementation used by the bridge system.
 type Database interface {
-	createBridge(bridge bridge) error
-	getBridge(id string) (bridge, error)
-	getBridgeByChannel(channelID string) (bridge, error)
-	createMessage(message bridgeMessageCollection) error
-	deleteMessage(id string) error
-	getMessage(id string) (bridgeMessageCollection, error)
+	CreateBridge(bridge Bridge) error
+	GetBridge(id string) (Bridge, error)
+	GetBridgeByChannel(channelID string) (Bridge, error)
+	CreateMessage(message BridgeMessageCollection) error
+	DeleteMessage(id string) error
+	GetMessage(id string) (BridgeMessageCollection, error)
 }
 
 // DatabaseConfig is the configuration for a database used by the bridge system.

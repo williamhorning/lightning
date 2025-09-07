@@ -1,7 +1,6 @@
 package lightning
 
 import (
-	"log/slog"
 	"strings"
 )
 
@@ -44,32 +43,33 @@ func handleMessageCommand(bot *Bot, event *Message) {
 	commandName := args[0]
 	options := args[1:]
 
+	reply := func(msg *Message, sensitive bool) error {
+		plugin, channel, ok := bot.getPluginFromChannel(event.ChannelID)
+		if !ok {
+			return MissingPluginError{}
+		}
+
+		msg.ChannelID = channel
+
+		var err error
+
+		if sensitive {
+			_, err = plugin.SendCommandResponse(msg, nil, event.Author.ID)
+		} else {
+			_, err = plugin.SendMessage(msg, nil)
+		}
+
+		if err == nil {
+			return nil
+		}
+
+		return PluginMethodError{event.ChannelID, "CommandReply", "failed to send command response", []error{err}}
+	}
+
 	handleCommandEvent(bot, &CommandEvent{
-		CommandOptions: CommandOptions{&event.BaseMessage, make(map[string]string), bot, bot.prefix},
+		CommandOptions: &CommandOptions{&event.BaseMessage, make(map[string]string), bot, reply, bot.prefix},
 		Command:        commandName,
 		Options:        options,
-		Reply: func(message string, sensitive bool) error {
-			plugin, channel, ok := bot.getPluginFromChannel(event.ChannelID)
-			if !ok {
-				return MissingPluginError{}
-			}
-
-			msg := &Message{BaseMessage: BaseMessage{ChannelID: channel}, Author: bot.author, Content: message}
-
-			var err error
-
-			if sensitive {
-				_, err = plugin.SendCommandResponse(msg, nil, event.Author.ID)
-			} else {
-				_, err = plugin.SendMessage(msg, nil)
-			}
-
-			if err == nil {
-				return nil
-			}
-
-			return PluginMethodError{event.ChannelID, "CommandReply", "failed to send command response", []error{err}}
-		},
 	})
 }
 
@@ -98,10 +98,7 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 
 	handleCommandOptions(command, event)
 
-	if err := event.Reply(command.Executor(event.CommandOptions), command.Sensitive); err != nil {
-		slog.Warn(
-			PluginMethodError{event.ChannelID, "eventReply", "failed to reply to command event", []error{err}}.Error())
-	}
+	command.Executor(event.CommandOptions)
 }
 
 func handleCommandOptions(command *Command, event *CommandEvent) {

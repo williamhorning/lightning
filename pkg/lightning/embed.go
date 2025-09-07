@@ -18,10 +18,10 @@ func formatTitle(embed *Embed) string {
 	}
 
 	if embed.URL != nil {
-		return ": [" + *embed.Title + "](" + *embed.URL + ")"
+		return "[" + *embed.Title + "](" + *embed.URL + ")"
 	}
 
-	return ": " + *embed.Title + ""
+	return *embed.Title
 }
 
 func formatTimestamp(embed *Embed) string {

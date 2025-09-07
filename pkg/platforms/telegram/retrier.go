@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
+	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,18 +19,12 @@ type retrier struct {
 }
 
 func newRetrier() *retrier {
-	return &retrier{&gotgbot.BaseBotClient{
-		Client: http.Client{},
-		DefaultRequestOpts: &gotgbot.RequestOpts{
-			Timeout: defaultTimeout,
-		},
-	}}
+	return &retrier{&gotgbot.BaseBotClient{DefaultRequestOpts: &gotgbot.RequestOpts{Timeout: defaultTimeout}}}
 }
 
 func (r *retrier) RequestWithContext(
 	ctx context.Context,
-	token string,
-	method string,
+	token, method string,
 	params map[string]string,
 	data map[string]gotgbot.FileReader,
 	opts *gotgbot.RequestOpts,
@@ -39,13 +34,16 @@ func (r *retrier) RequestWithContext(
 		return resp, nil
 	}
 
-	telegramError := &gotgbot.TelegramError{}
-	if !errors.As(err, &telegramError) {
-		return resp, errors.New(strings.ReplaceAll(err.Error(), token, "")) //nolint:err113 // token replacer is useful
+	urlError := &url.Error{}
+	if errors.As(err, &urlError) {
+		urlError.URL = strings.ReplaceAll(urlError.URL, token, "")
+
+		return resp, urlError
 	}
 
-	if telegramError.Code != http.StatusTooManyRequests {
-		return resp, err //nolint:wrapcheck // might be used in the future
+	telegramError := &gotgbot.TelegramError{}
+	if !errors.As(err, &telegramError) || telegramError.Code != 429 {
+		return resp, fmt.Errorf("error making request in retrier: %w", err)
 	}
 
 	time.Sleep(time.Second * time.Duration(telegramError.ResponseParams.RetryAfter))
@@ -57,6 +55,6 @@ func (r *retrier) GetAPIURL(opts *gotgbot.RequestOpts) string {
 	return r.baseClient.GetAPIURL(opts)
 }
 
-func (r *retrier) FileURL(token string, tgFilePath string, opts *gotgbot.RequestOpts) string {
+func (r *retrier) FileURL(token, tgFilePath string, opts *gotgbot.RequestOpts) string {
 	return r.baseClient.FileURL(token, tgFilePath, opts)
 }

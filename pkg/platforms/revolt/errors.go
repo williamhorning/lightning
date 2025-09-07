@@ -25,13 +25,17 @@ func (e revoltPermissionsError) Error() string {
 }
 
 type revoltStatusError struct {
-	msg            string
-	code           int
-	disableDisable bool
+	msg  string
+	code int
+	edit bool
 }
 
 func (e revoltStatusError) Disable() *lightning.ChannelDisabled {
-	return &lightning.ChannelDisabled{Read: false, Write: e.code == 403 || (e.code == 404 && !e.disableDisable)}
+	if e.code == 403 || (e.code == 404 && !e.edit) {
+		return &lightning.ChannelDisabled{Read: false, Write: true}
+	}
+
+	return &lightning.ChannelDisabled{Read: false, Write: false}
 }
 
 func (e revoltStatusError) Error() string {

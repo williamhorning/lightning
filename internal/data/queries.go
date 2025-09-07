@@ -1,4 +1,4 @@
-package bridge
+package data
 
 const (
 	createTables = `

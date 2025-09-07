@@ -59,8 +59,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 	var subcommand *string
 
 	for _, option := range data.Options {
-		switch option.Type { //nolint:exhaustive // we only have string and subcommand options
-		case discordgo.ApplicationCommandOptionSubCommand:
+		if option.Type == discordgo.ApplicationCommandOptionSubCommand {
 			subcommand = &option.Name
 
 			for _, subOption := range option.Options {
@@ -68,9 +67,8 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 					args[subOption.Name] = subOption.StringValue()
 				}
 			}
-		case discordgo.ApplicationCommandOptionString:
+		} else {
 			args[option.Name] = option.StringValue()
-		default:
 		}
 	}
 
@@ -83,7 +81,7 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 	}
 
 	return &lightning.CommandEvent{
-		CommandOptions: lightning.CommandOptions{
+		CommandOptions: &lightning.CommandOptions{
 			Arguments: args,
 			BaseMessage: &lightning.BaseMessage{
 				EventID:   interaction.ID,
@@ -91,20 +89,23 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 				Time:      &timestamp,
 			},
 			Prefix: "/",
+			Reply: func(message *lightning.Message, sensitive bool) error {
+				flags := discordgo.MessageFlags(0)
+
+				if sensitive {
+					flags = discordgo.MessageFlagsEphemeral
+				}
+
+				msg := getOutgoingMessage(session, message, nil).Interaction()
+
+				msg.Flags = flags
+
+				return session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource, Data: msg,
+				})
+			},
 		},
 		Command:    data.Name,
 		Subcommand: subcommand,
-		Reply: func(message string, sensitive bool) error {
-			flags := discordgo.MessageFlags(0)
-
-			if sensitive {
-				flags = discordgo.MessageFlagsEphemeral
-			}
-
-			return session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{Content: message, Flags: flags},
-			})
-		},
 	}
 }

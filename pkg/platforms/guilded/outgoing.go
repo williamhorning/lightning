@@ -12,26 +12,27 @@ import (
 
 var usernameRegex = regexp.MustCompile(`(?ms)^[a-zA-Z0-9_ ()-]{1,25}$`)
 
-func getValidUsername(author *lightning.MessageAuthor) string {
-	if usernameRegex.MatchString(author.Nickname) {
-		return author.Nickname
-	} else if usernameRegex.MatchString(author.Username) {
-		return author.Username
-	}
-
-	return author.ID
-}
-
 func (p *guildedPlugin) getOutgoingMessage(message *lightning.Message, opts *lightning.SendOptions) *guildedPayload {
 	base := &guildedPayload{
 		Content:         message.Content,
-		Username:        getValidUsername(message.Author),
 		ReplyMessageIDs: message.RepliedTo,
 		Embeds:          p.getOutgoingEmbeds(message, opts),
 	}
 
-	if message.Author.ProfilePicture != nil {
-		base.AvatarURL = *message.Author.ProfilePicture
+	if message.Author != nil {
+		if message.Author.ProfilePicture != nil {
+			base.AvatarURL = *message.Author.ProfilePicture
+		}
+
+		base.Username = message.Author.ID
+
+		if usernameRegex.MatchString(message.Author.Username) {
+			base.Username = message.Author.Username
+		}
+
+		if usernameRegex.MatchString(message.Author.Nickname) {
+			base.Username = message.Author.Nickname
+		}
 	}
 
 	if len(base.Content) == 0 && len(base.Embeds) == 0 {

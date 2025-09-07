@@ -23,6 +23,7 @@ linters: {
       ignore-names: [err, ok],
     },
   },
+  exclusions: { warn-unused: false, paths: [internal/cache] },
 }
 formatters: {
   enable: [gci, gofmt, gofumpt, goimports, golines, swaggo],

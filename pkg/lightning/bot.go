@@ -7,16 +7,12 @@ import (
 )
 
 // VERSION is the version of the lightning bot framework.
-const VERSION = "0.8.0-beta.12"
+const VERSION = "0.8.0-beta.13"
 
-// BotOptions allows you to configure the default author used by commands
-// and the prefix used by the bot for registered commands, in addition to
-// any platform specifics (like slash commands). If a zero value is provided
-// for the Author, it'll use the zero value as-if you meant to do that, which
-// you should not do. If a zero value is provided for the Prefix, it will
-// default to "!".
+// BotOptions allows you to configure the prefix used by the bot for registered
+// commands, in addition to any platform specifics (like slash commands). If a
+// zero value is provided for the Prefix, it will default to "!".
 type BotOptions struct {
-	Author MessageAuthor
 	Prefix string
 }
 
@@ -37,7 +33,6 @@ type Bot struct {
 	plugins  map[string]Plugin
 	types    map[string]PluginConstructor
 
-	author *MessageAuthor
 	prefix string
 
 	pluginMutex sync.RWMutex
@@ -56,7 +51,6 @@ func NewBot(opts BotOptions) *Bot {
 	}
 
 	bot := &Bot{
-		author: &opts.Author,
 		prefix: opts.Prefix,
 
 		commands: make(map[string]*Command),

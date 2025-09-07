@@ -3,33 +3,18 @@ package bridge
 import (
 	"fmt"
 	"log/slog"
-	"strconv"
-	"time"
 
+	"github.com/williamhorning/lightning/internal/commands"
+	"github.com/williamhorning/lightning/internal/data"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 // Setup the bridge system with the given database.
-func Setup(bot *lightning.Bot, database Database) {
+func Setup(bot *lightning.Bot, author *lightning.MessageAuthor, database data.Database) {
 	slog.Info("bridge: setting up")
 
 	if err := bot.AddCommand(
-		bridgeCommand(database),
-		&lightning.Command{
-			Name:        "help",
-			Description: "get help with the bot",
-			Executor: func(_ lightning.CommandOptions) string {
-				return "hi, i'm lightning " + lightning.VERSION + "! [docs](https://williamhorning.eu.org/lightning/)"
-			},
-		},
-		&lightning.Command{
-			Name:        "ping",
-			Description: "check if the bot is alive",
-			Executor: func(options lightning.CommandOptions) string {
-				return "Pong! 🏓 " + strconv.FormatInt(time.Since(*options.Time).Milliseconds(), 10) + "ms"
-			},
-		},
-	); err != nil {
+		commands.BridgeCommand(database), commands.HelpCommand(author.Nickname), commands.PingCommand()); err != nil {
 		slog.Error(fmt.Errorf("bridge: failed to add commands: %w", err).Error())
 	}
 

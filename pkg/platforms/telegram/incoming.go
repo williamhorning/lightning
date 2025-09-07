@@ -35,19 +35,19 @@ func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) *lightning.C
 	}
 
 	return &lightning.CommandEvent{
-		CommandOptions: lightning.CommandOptions{
+		CommandOptions: &lightning.CommandOptions{
 			BaseMessage: getBase(ctx),
 			Prefix:      "/",
+			Reply: func(message *lightning.Message, _ bool) error {
+				_, err := ctx.EffectiveMessage.Reply(bot, parseContent(message, nil), &gotgbot.SendMessageOpts{
+					ParseMode: gotgbot.ParseModeMarkdownV2,
+				})
+
+				return fmt.Errorf("telegram: failed to reply to command: %w\n\tname:%s", err, cmdName)
+			},
 		},
 		Command: cmdName,
 		Options: args,
-		Reply: func(message string, _ bool) error {
-			_, err := ctx.EffectiveMessage.Reply(bot, getMarkdownV2(message), &gotgbot.SendMessageOpts{
-				ParseMode: gotgbot.ParseModeMarkdownV2,
-			})
-
-			return fmt.Errorf("telegram: failed to reply to command: %w\n\tname:%s", err, cmdName)
-		},
 	}
 }
 

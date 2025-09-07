@@ -28,7 +28,7 @@ func (e guildedStatusError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e guildedStatusError) Error() string {
-	return strconv.Itoa(e.code) + ":" + e.msg + "\n\tdata: " + e.data
+	return strconv.Itoa(e.code) + ": " + e.msg + "\n\tdata: " + e.data
 }
 
 type guildedWebhookTokenNilError struct {

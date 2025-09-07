@@ -85,7 +85,7 @@ func New(config any) (lightning.Plugin, error) {
 
 	updater := ext.NewUpdater(dispatch, &ext.UpdaterOpts{
 		UnhandledErrFunc: func(err error) {
-			if err != nil && errors.Is(err, context.DeadlineExceeded) {
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 				slog.Error(fmt.Errorf("telegram: unhandled error in dispatcher: %w", err).Error())
 			}
 		},
