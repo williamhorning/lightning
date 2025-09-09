@@ -4,12 +4,12 @@ go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.5.0
+	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.33
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/jackc/pgx/v5 v5.7.5
+	github.com/jackc/pgx/v5 v5.7.6
 	github.com/lmittmann/tint v1.1.2
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.33
 	github.com/yuin/goldmark v1.7.13
 )
 
