@@ -11,6 +11,7 @@ func bridgeLeave(database data.Database) *lightning.Command {
 	return &lightning.Command{
 		Name:        "leave",
 		Description: "leave the bridge that this channel is part of",
+		Arguments:   []*lightning.CommandArgument{{Name: "id", Description: "the bridge id to use", Required: true}},
 		Executor: func(opts *lightning.CommandOptions) {
 			if opts.Arguments["id"] == "" {
 				sendErr(missingArgumentError{argument: "id"}, "missing argument", opts)

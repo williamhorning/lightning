@@ -9,6 +9,7 @@ func bridgeToggle(database data.Database) *lightning.Command {
 	return &lightning.Command{
 		Name:        "toggle",
 		Description: "toggle a setting for the bridge that this channel is part of",
+		Arguments:   []*lightning.CommandArgument{{Name: "setting", Description: "setting to toggle", Required: true}},
 		Executor: func(opts *lightning.CommandOptions) {
 			if opts.Arguments["setting"] == "" {
 				sendErr(missingArgumentError{argument: "setting"}, "missing argument", opts)
