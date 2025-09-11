@@ -63,7 +63,7 @@ func handleMessageCommand(bot *Bot, event *Message) {
 			return nil
 		}
 
-		return PluginMethodError{event.ChannelID, "CommandReply", "failed to send command response", []error{err}}
+		return &PluginMethodError{event.ChannelID, "CommandReply", "failed to send command response", []error{err}}
 	}
 
 	handleCommandEvent(bot, &CommandEvent{

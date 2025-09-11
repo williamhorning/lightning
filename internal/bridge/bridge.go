@@ -2,6 +2,7 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -228,10 +229,13 @@ func handleError(
 	bridge *data.Bridge,
 	event data.EventType,
 ) {
-	disabled := &lightning.ChannelDisabled{}
+	var disabled lightning.ChannelDisabled
 
-	if disabler, ok := err.(lightning.ChannelDisabler); ok {
-		disabled = disabler.Disable()
+	disabler := new(lightning.ChannelDisabler)
+	if errors.As(err, disabler) {
+		if result := (*disabler).Disable(); result != nil {
+			disabled = *result
+		}
 	}
 
 	slog.Error(fmt.Errorf("error handling bridge message: %w", err).Error(),
@@ -243,7 +247,7 @@ func handleError(
 
 	for idx, channelData := range bridge.Channels {
 		if channelData.ID == channel.ID {
-			bridge.Channels[idx].Disabled = *disabled
+			bridge.Channels[idx].Disabled = disabled
 
 			break
 		}

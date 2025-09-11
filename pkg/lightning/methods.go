@@ -16,7 +16,7 @@ func (b *Bot) SetupChannel(channelID string) (any, error) {
 		return result, nil
 	}
 
-	return nil, PluginMethodError{channelID, "SetupChannel", "failed to setup channel", []error{err}}
+	return nil, &PluginMethodError{channelID, "SetupChannel", "failed to setup channel", []error{err}}
 }
 
 // SendMessage allows you to send a message to the channel and plugin specified
@@ -36,7 +36,7 @@ func (b *Bot) SendMessage(message *Message, opts *SendOptions) ([]string, error)
 		return result, nil
 	}
 
-	return nil, PluginMethodError{oldID, "SendMessage", "failed to send message", []error{err}}
+	return nil, &PluginMethodError{oldID, "SendMessage", "failed to send message", []error{err}}
 }
 
 // EditMessage allows you to edit a message in the channel and plugin specified.
@@ -52,7 +52,7 @@ func (b *Bot) EditMessage(message *Message, ids []string, opts *SendOptions) err
 	message.ChannelID = channel
 
 	if err := plugin.EditMessage(message, ids, opts); err != nil {
-		return PluginMethodError{oldID, "EditMessage", "failed to edit message", []error{err}}
+		return &PluginMethodError{oldID, "EditMessage", "failed to edit message", []error{err}}
 	}
 
 	return nil
@@ -68,7 +68,7 @@ func (b *Bot) DeleteMessages(channelID string, ids []string) error {
 	}
 
 	if err := plugin.DeleteMessage(channel, ids); err != nil {
-		return PluginMethodError{channelID, "DeleteMessages", "failed to delete messages", []error{err}}
+		return &PluginMethodError{channelID, "DeleteMessages", "failed to delete messages", []error{err}}
 	}
 
 	return nil
