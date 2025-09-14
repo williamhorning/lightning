@@ -26,7 +26,7 @@ func getTime() *string {
 
 func getMessage(title, description string) *lightning.Message {
 	color := 0x487C7E
-	lightningProfileURL := "https://williamhorning.eu.org/assets/clouds.jpg"
+	lightningProfileURL := "https://williamhorning.eu.org/assets/lightning.png"
 
 	if title == "something went wrong :(" {
 		color = 0xFF0000

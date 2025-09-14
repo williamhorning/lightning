@@ -39,7 +39,7 @@ what do you do, what options do you have?
 **Bridging!** Everyone can use their favorite app, gets the same messages, and
 is on the same page. Lightning is an easy to use bridge bot that supports
 Discord, Guilded, Revolt, and Telegram. To get started, check out the
-[getting started guide](https://williamhorning.eu.org/lightning/bridge/getting-started),
+[getting started guide](https://williamhorning.eu.org/lightning/bridge/users),
 which will walk you through using Bolt, the hosted version of the Lightning bot.
 If you want to self-host, read the
 [self-hosting guide](https://williamhorning.eu.org/lightning/bridge/hosting) to
