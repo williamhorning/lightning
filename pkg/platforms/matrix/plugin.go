@@ -15,11 +15,14 @@ package matrix
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/crypto"
+	"maunium.net/go/mautrix/crypto/cryptohelper"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
@@ -29,22 +32,46 @@ import (
 // It only takes in a map with the following structure:
 //
 //	map[string]any{
-//		"access_token": "", // a string with your Matrix bot token
-//		"homeserver": "",  // a string with your Matrix homeserver URL
-//		"mxid": "",        // a string with your Matrix bot's user ID
+//		"access_token": "", // a string with your Matrix bot's token.
+//						    // note: this should be set after initial login
+//		"device_id": "", // a string with your Matrix bot's device ID.
+//					     // note: this should be set after initial login
+//		"homeserver": "",  // a string with your Matrix homeserver URL.
+//						   // note: this MUST be set
+//		"mxid": "",  // a string with your Matrix homeserver URL.
+//					 // note: this should be set after initial login
+//		"password": "", // a string with your Matrix bot password
+//					    // note: this MUST be set
+//		"random": "", // a random encryption key which MUST be set
+//		"recovery_key": "", // a string with your Matrix bot recovery key
+//					        // note: this MUST be set
+//		"username": "", // a string with your Matrix bot username
+//					    // note: this MUST be set
 //	}
-//
-// TODO: setup encryption or something based on
-// https://chrastecky.dev/programming/creating-a-simple-encrypted-matrix-bot-in-go
 func New(config any) (lightning.Plugin, error) {
 	cfg, ok := config.(map[string]any)
 	if !ok {
 		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid config"}
 	}
 
-	accessToken, ok := cfg["access_token"].(string)
+	token, ok := cfg["access_token"].(string)
 	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid token"}
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid access_token"}
+	}
+
+	device, ok := cfg["device_id"].(string)
+	if !ok {
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid device_id"}
+	}
+
+	password, ok := cfg["password"].(string)
+	if !ok {
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid password"}
+	}
+
+	username, ok := cfg["username"].(string)
+	if !ok {
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid username"}
 	}
 
 	homeserver, ok := cfg["homeserver"].(string)
@@ -52,17 +79,86 @@ func New(config any) (lightning.Plugin, error) {
 		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid homeserver"}
 	}
 
+	recoveryKey, ok := cfg["recovery_key"].(string)
+	if !ok {
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid recovery_key"}
+	}
+
 	mxid, ok := cfg["mxid"].(string)
 	if !ok {
 		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid mxid"}
 	}
 
-	client, err := mautrix.NewClient(homeserver, id.UserID(mxid), accessToken)
+	random, ok := cfg["random"].(string)
+	if !ok {
+		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid random"}
+	}
+
+	client, err := mautrix.NewClient(homeserver, id.UserID(mxid), token)
 	if err != nil {
 		return nil, fmt.Errorf("matrix: failed to create client: %w", err)
 	}
 
 	client.UserAgent = "lightning/" + lightning.VERSION
+
+	if token == "" || device == "" || mxid == "" {
+		resp, err := client.Login(context.Background(), &mautrix.ReqLogin{
+			Type:             mautrix.AuthTypePassword,
+			Identifier:       mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: username},
+			Password:         password,
+			StoreCredentials: true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("matrix: failed to login: %w", err)
+		}
+
+		device = resp.DeviceID.String()
+		token = resp.AccessToken
+		mxid = resp.UserID.String()
+
+		slog.Info("please set the following in your config:", "device_id", device, "access_token", token, "mxid", mxid)
+	}
+
+	helper, err := cryptohelper.NewCryptoHelper(
+		client,
+		[]byte(random),
+		crypto.NewMemoryStore(func() error { return nil }),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup crypto helper: %w", err)
+	}
+
+	err = helper.Init(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to init crypto helper: %w", err)
+	}
+
+	client.Crypto = helper
+
+	keyID, keyData, err := helper.Machine().SSSS.GetDefaultKeyData(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default key: %w", err)
+	}
+
+	key, err := keyData.VerifyRecoveryKey(keyID, recoveryKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify recovery key: %w", err)
+	}
+
+	err = helper.Machine().FetchCrossSigningKeysFromSSSS(context.Background(), key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch cross signing keys: %w", err)
+	}
+
+	err = helper.Machine().SignOwnDevice(context.Background(), helper.Machine().OwnIdentity())
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign own device: %w", err)
+	}
+
+	err = helper.Machine().SignOwnMasterKey(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign own master key: %w", err)
+	}
 
 	syncer, ok := client.Syncer.(*mautrix.DefaultSyncer)
 	if !ok {
