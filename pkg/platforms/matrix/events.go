@@ -2,6 +2,7 @@ package matrix
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
+	"maunium.net/go/mautrix/id"
 )
 
 func setupEvents(
@@ -67,21 +69,15 @@ func onMessageHandler(
 	msgChannel chan<- *lightning.Message,
 	editChannel chan<- *lightning.EditedMessage,
 ) mautrix.EventHandler {
-	return func(_ context.Context, evt *event.Event) {
+	return func(ctx context.Context, evt *event.Event) {
 		msg := evt.Content.AsMessage()
 
 		if evt.Sender.String() == client.UserID.String() && msg.BeeperPerMessageProfile != nil {
 			return
 		}
 
-		replyIDs := []string{}
-
-		if msg.RelatesTo != nil && msg.RelatesTo.InReplyTo != nil {
-			replyIDs = append(replyIDs, msg.RelatesTo.InReplyTo.EventID.String())
-		}
-
 		if msg.FormattedBody == "" {
-			msg.FormattedBody = msg.Body // fallback to plain text body if no formatted body
+			msg.FormattedBody = msg.Body
 		}
 
 		attachments := make([]lightning.Attachment, 0)
@@ -89,12 +85,16 @@ func onMessageHandler(
 		timestamp := time.UnixMilli(evt.Timestamp)
 
 		if msg.FileName == msg.Body {
+			url := getMXC(client, &msg.URL)
+
 			attachments = append(attachments, lightning.Attachment{
 				Name: msg.FileName,
-				URL:  msg.URL.ParseOrIgnore().String(), // TODO: mxc URI -> https URL
+				URL:  url,
 				Size: 0,
 			})
 		} else {
+			msg.RemovePerMessageProfileFallback()
+
 			content, _ = format.HTMLToMarkdownFull(nil, msg.FormattedBody)
 		}
 
@@ -105,17 +105,9 @@ func onMessageHandler(
 				ChannelID: evt.RoomID.String(),
 			},
 			Attachments: attachments,
-			// TODO: get message author information. color is also currently just white,
-			// this may be odd on revolt. there's not really a good matrix color to use here.
-			Author: &lightning.MessageAuthor{
-				ID:             evt.Sender.String(),
-				Nickname:       "",
-				Username:       "",
-				ProfilePicture: nil,
-				Color:          "#ffffff",
-			},
-			Content:   content,
-			RepliedTo: replyIDs,
+			Author:      getAuthor(ctx, client, evt, msg),
+			Content:     content,
+			RepliedTo:   getRepliedTo(msg),
 		}
 
 		if msg.NewContent != nil {
@@ -131,4 +123,81 @@ func onMessageHandler(
 			msgChannel <- &newMessage
 		}
 	}
+}
+
+func getAuthor(
+	ctx context.Context,
+	client *mautrix.Client,
+	evt *event.Event,
+	msg *event.MessageEventContent,
+) *lightning.MessageAuthor {
+	defaultProfile, err := client.GetProfile(ctx, evt.Sender)
+	if err != nil {
+		slog.Error(fmt.Errorf("matrix: failed to get default profile on message: %w", err).Error())
+
+		if msg.BeeperPerMessageProfile == nil {
+			return &lightning.MessageAuthor{
+				ID:             evt.Sender.String(),
+				Nickname:       evt.Sender.String(),
+				Username:       evt.Sender.String(),
+				ProfilePicture: nil,
+				Color:          "#ffffff",
+			}
+		}
+	}
+
+	var defaultPic *string
+
+	if err == nil {
+		if !defaultProfile.AvatarURL.IsEmpty() {
+			cu := defaultProfile.AvatarURL.CUString()
+			url := getMXC(client, &cu)
+			defaultPic = &url
+		}
+	}
+
+	if msg.BeeperPerMessageProfile != nil {
+		var profile *string
+
+		if msg.BeeperPerMessageProfile.AvatarURL != nil && *msg.BeeperPerMessageProfile.AvatarURL != "" {
+			url := getMXC(client, msg.BeeperPerMessageProfile.AvatarURL)
+			profile = &url
+		} else if *msg.BeeperPerMessageProfile.AvatarURL == "" && !defaultProfile.AvatarURL.IsEmpty() {
+			profile = defaultPic
+		}
+
+		return &lightning.MessageAuthor{
+			ID:             evt.Sender.String(),
+			Nickname:       msg.BeeperPerMessageProfile.Displayname,
+			Username:       defaultProfile.DisplayName,
+			ProfilePicture: profile,
+			Color:          "#ffffff",
+		}
+	}
+
+	return &lightning.MessageAuthor{
+		ID:             evt.Sender.String(),
+		Nickname:       defaultProfile.DisplayName,
+		Username:       defaultProfile.DisplayName,
+		ProfilePicture: defaultPic,
+		Color:          "#ffffff",
+	}
+}
+
+func getRepliedTo(msg *event.MessageEventContent) []string {
+	replyIDs := []string{}
+
+	if msg.RelatesTo != nil && msg.RelatesTo.InReplyTo != nil {
+		replyIDs = append(replyIDs, msg.RelatesTo.InReplyTo.EventID.String())
+	}
+
+	return replyIDs
+}
+
+func getMXC(client *mautrix.Client, file *id.ContentURIString) string {
+	return client.HomeserverURL.JoinPath(
+		"_matrix/media/r0/download",
+		file.ParseOrIgnore().Homeserver,
+		file.ParseOrIgnore().FileID,
+	).String()
 }

@@ -15,14 +15,12 @@ package matrix
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -35,6 +33,9 @@ import (
 //		"homeserver": "",  // a string with your Matrix homeserver URL
 //		"mxid": "",        // a string with your Matrix bot's user ID
 //	}
+//
+// TODO: setup encryption or something based on
+// https://chrastecky.dev/programming/creating-a-simple-encrypted-matrix-bot-in-go
 func New(config any) (lightning.Plugin, error) {
 	cfg, ok := config.(map[string]any)
 	if !ok {
@@ -73,14 +74,17 @@ func New(config any) (lightning.Plugin, error) {
 
 	setupEvents(syncer, client, msgChannel, editChannel)
 
-	return &matrixPlugin{client, syncer, cache.New[string, string](cache.DefaultTTL), msgChannel, editChannel}, nil
+	return &matrixPlugin{
+		client, syncer, cache.New[string, id.ContentURIString](cache.DefaultTTL),
+		msgChannel, editChannel,
+	}, nil
 }
 
 type matrixPlugin struct {
 	client *mautrix.Client
 	syncer *mautrix.DefaultSyncer
 
-	mxcCache *cache.Expiring[string, string]
+	mxcCache *cache.Expiring[string, id.ContentURIString]
 
 	msgChannel  chan *lightning.Message
 	editChannel chan *lightning.EditedMessage
@@ -99,55 +103,36 @@ func (p *matrixPlugin) SendCommandResponse(
 }
 
 func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
-	msg := format.RenderMarkdown(message.Content, true, false)
+	ids := make([]string, 0, len(message.Attachments)+1)
 
-	var url *id.ContentURIString
+	for _, msg := range p.getOutgoing(message, nil, opts) {
+		resp, err := p.client.SendMessageEvent(
+			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
+		)
+		if err != nil {
+			return nil, handleError(err, "failed to send matrix message",
+				map[string]any{"channel": message.ChannelID, "content": message.Content})
+		}
 
-	if message.Author.ProfilePicture != nil {
-		if cached, ok := p.mxcCache.Get(*message.Author.ProfilePicture); ok {
-			curl := id.ContentURIString(cached)
-			url = &curl
-		} else {
-			resp, err := p.client.UploadLink(context.Background(), *message.Author.ProfilePicture)
-			if err == nil {
-				curl := resp.ContentURI.CUString()
-				url = &curl
+		ids = append(ids, string(resp.EventID))
+	}
 
-				p.mxcCache.Set(*message.Author.ProfilePicture, resp.ContentURI.String())
-			}
+	return ids, nil
+}
+
+func (p *matrixPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
+	for idx, msg := range p.getOutgoing(message, ids, opts) {
+		msg.RelatesTo.SetReplace(id.EventID(ids[idx]))
+
+		_, err := p.client.SendMessageEvent(
+			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
+		)
+		if err != nil {
+			return handleError(err, "failed to edit matrix message",
+				map[string]any{"channel": message.ChannelID, "content": message.Content})
 		}
 	}
 
-	msg.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{
-		ID:          message.Author.ID,
-		Displayname: message.Author.Nickname,
-		AvatarURL:   url,
-		HasFallback: false,
-	}
-
-	if opts != nil && !opts.AllowEveryonePings {
-		msg.Body = strings.ReplaceAll(msg.Body, "@room", "@\u200Broom")
-		msg.FormattedBody = strings.ReplaceAll(msg.FormattedBody, "@room", "@\u200Broom")
-	}
-
-	msg.AddPerMessageProfileFallback()
-
-	resp, err := p.client.SendMessageEvent(
-		context.Background(),
-		id.RoomID(message.ChannelID),
-		event.EventMessage,
-		msg,
-		mautrix.ReqSendEvent{},
-	)
-	if err != nil {
-		return nil, handleError(err, "failed to send matrix message",
-			map[string]any{"channel": message.ChannelID, "content": message.Content})
-	}
-
-	return []string{resp.EventID.String()}, nil
-}
-
-func (*matrixPlugin) EditMessage(_ *lightning.Message, _ []string, _ *lightning.SendOptions) error {
 	return nil
 }
 
