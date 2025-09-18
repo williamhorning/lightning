@@ -29,7 +29,6 @@ func (e matrixError) Unwrap() error {
 	return e.err
 }
 
-// TODO: handle errors better
 func handleError(err error, msg string, extra map[string]any) error {
 	slog.Error("matrix error: "+msg, "err", err, "extra", extra)
 
