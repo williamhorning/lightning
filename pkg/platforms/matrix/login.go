@@ -32,7 +32,7 @@ func setupClient(cfg matrixConfig) (*mautrix.Client, error) {
 	client.UserAgent = "lightning/" + lightning.VERSION
 
 	if cfg.accessToken == "" || cfg.deviceID == "" || cfg.mxid == "" {
-		resp, err := client.Login(context.Background(), &mautrix.ReqLogin{
+		_, err = client.Login(context.Background(), &mautrix.ReqLogin{
 			Type:             mautrix.AuthTypePassword,
 			Identifier:       mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: cfg.username},
 			Password:         cfg.password,
@@ -42,9 +42,9 @@ func setupClient(cfg matrixConfig) (*mautrix.Client, error) {
 			return nil, fmt.Errorf("matrix: failed to login: %w", err)
 		}
 
-		cfg.deviceID = resp.DeviceID.String()
-		cfg.accessToken = resp.AccessToken
-		cfg.mxid = resp.UserID.String()
+		cfg.deviceID = client.DeviceID.String()
+		cfg.accessToken = client.AccessToken
+		cfg.mxid = client.UserID.String()
 
 		slog.Info("please set the following in your config:", "device_id", cfg.deviceID,
 			"access_token", cfg.accessToken, "mxid", cfg.mxid)
@@ -66,30 +66,38 @@ func setupClient(cfg matrixConfig) (*mautrix.Client, error) {
 
 	client.Crypto = helper
 
+	if err = setupKeys(cfg, helper); err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func setupKeys(cfg matrixConfig, helper *cryptohelper.CryptoHelper) error {
 	keyID, keyData, err := helper.Machine().SSSS.GetDefaultKeyData(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get default key: %w", err)
+		return fmt.Errorf("failed to get default key: %w", err)
 	}
 
 	key, err := keyData.VerifyRecoveryKey(keyID, cfg.recoveryKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify recovery key: %w", err)
+		return fmt.Errorf("failed to verify recovery key: %w", err)
 	}
 
 	err = helper.Machine().FetchCrossSigningKeysFromSSSS(context.Background(), key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch cross signing keys: %w", err)
+		return fmt.Errorf("failed to fetch cross signing keys: %w", err)
 	}
 
 	err = helper.Machine().SignOwnDevice(context.Background(), helper.Machine().OwnIdentity())
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign own device: %w", err)
+		return fmt.Errorf("failed to sign own device: %w", err)
 	}
 
 	err = helper.Machine().SignOwnMasterKey(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign own master key: %w", err)
+		return fmt.Errorf("failed to sign own master key: %w", err)
 	}
 
-	return client, nil
+	return nil
 }
