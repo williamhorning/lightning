@@ -11,12 +11,12 @@ import (
 
 // Config is the configuration for the bridge bot.
 type Config struct {
-	Author         *lightning.MessageAuthor `toml:"author,omitempty"`
-	DatabaseConfig data.DatabaseConfig      `toml:"database"`
-	Plugins        map[string]any           `toml:"plugins"`
-	CommandPrefix  string                   `toml:"prefix,omitempty"`
-	ErrorURL       string                   `toml:"error_url"`
-	LogLevel       int                      `toml:"log_level"`
+	Author         *lightning.MessageAuthor     `toml:"author,omitempty"`
+	DatabaseConfig data.DatabaseConfig          `toml:"database"`
+	Plugins        map[string]map[string]string `toml:"plugins"`
+	CommandPrefix  string                       `toml:"prefix,omitempty"`
+	ErrorURL       string                       `toml:"error_url"`
+	LogLevel       int                          `toml:"log_level"`
 }
 
 // GetConfig loads the configuration from the given file.

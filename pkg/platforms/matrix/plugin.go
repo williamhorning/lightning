@@ -7,7 +7,7 @@
 //
 //	bot.AddPluginType("matrix", matrix.New)
 //
-//	bot.UsePluginType("matrix", map[string]any{
+//	bot.UsePluginType("matrix", map[string]string{
 //		// ...
 //	})
 package matrix
@@ -27,7 +27,7 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]any{
+//	map[string]string{
 //		"access_token": "", // a string with your Matrix bot's token.
 //						    // note: this should be set after initial login
 //		"device_id": "", // a string with your Matrix bot's device ID.
@@ -44,13 +44,8 @@ import (
 //		"username": "", // a string with your Matrix bot username
 //					    // note: this MUST be set
 //	}
-func New(config any) (lightning.Plugin, error) {
-	cfg, ok := config.(matrixConfig)
-	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "matrix", Message: "invalid config"}
-	}
-
-	client, err := setupClient(cfg)
+func New(config map[string]string) (lightning.Plugin, error) {
+	client, err := setupClient(config)
 	if err != nil {
 		return nil, err
 	}
@@ -65,20 +60,15 @@ func New(config any) (lightning.Plugin, error) {
 
 	setupEvents(syncer, client, msgChannel, editChannel)
 
-	return &matrixPlugin{
-		client, syncer, cache.New[string, id.ContentURIString](cache.DefaultTTL),
-		msgChannel, editChannel,
-	}, nil
+	return &matrixPlugin{client: client, syncer: syncer, msgChannel: msgChannel, editChannel: editChannel}, nil
 }
 
 type matrixPlugin struct {
-	client *mautrix.Client
-	syncer *mautrix.DefaultSyncer
-
-	mxcCache *cache.Expiring[string, id.ContentURIString]
-
+	client      *mautrix.Client
+	syncer      *mautrix.DefaultSyncer
 	msgChannel  chan *lightning.Message
 	editChannel chan *lightning.EditedMessage
+	mxcCache    cache.Expiring[string, id.ContentURIString]
 }
 
 func (*matrixPlugin) SetupChannel(_ string) (any, error) {

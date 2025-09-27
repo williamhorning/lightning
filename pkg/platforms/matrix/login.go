@@ -12,47 +12,35 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-type matrixConfig struct {
-	accessToken string
-	deviceID    string
-	homeserver  string
-	mxid        string
-	password    string
-	random      string
-	recoveryKey string
-	username    string
-}
-
-func setupClient(cfg matrixConfig) (*mautrix.Client, error) {
-	client, err := mautrix.NewClient(cfg.homeserver, id.UserID(cfg.mxid), cfg.accessToken)
+func setupClient(cfg map[string]string) (*mautrix.Client, error) {
+	client, err := mautrix.NewClient(cfg["homeserver"], id.UserID(cfg["mxid"]), cfg["access_token"])
 	if err != nil {
 		return nil, fmt.Errorf("matrix: failed to create client: %w", err)
 	}
 
 	client.UserAgent = "lightning/" + lightning.VERSION
 
-	if cfg.accessToken == "" || cfg.deviceID == "" || cfg.mxid == "" {
+	if cfg["access_token"] == "" || cfg["device_id"] == "" || cfg["mxid"] == "" {
 		_, err = client.Login(context.Background(), &mautrix.ReqLogin{
 			Type:             mautrix.AuthTypePassword,
-			Identifier:       mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: cfg.username},
-			Password:         cfg.password,
+			Identifier:       mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: cfg["username"]},
+			Password:         cfg["password"],
 			StoreCredentials: true,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("matrix: failed to login: %w", err)
 		}
 
-		cfg.deviceID = client.DeviceID.String()
-		cfg.accessToken = client.AccessToken
-		cfg.mxid = client.UserID.String()
+		cfg["device_id"] = client.DeviceID.String()
+		cfg["access_token"] = client.AccessToken
+		cfg["mxid"] = client.UserID.String()
 
-		slog.Info("please set the following in your config:", "device_id", cfg.deviceID,
-			"access_token", cfg.accessToken, "mxid", cfg.mxid)
+		slog.Info("please set the following in your config:", "cfg", cfg)
 	}
 
 	helper, err := cryptohelper.NewCryptoHelper(
 		client,
-		[]byte(cfg.random),
+		[]byte(cfg["random"]),
 		crypto.NewMemoryStore(func() error { return nil }),
 	)
 	if err != nil {
@@ -73,13 +61,13 @@ func setupClient(cfg matrixConfig) (*mautrix.Client, error) {
 	return client, nil
 }
 
-func setupKeys(cfg matrixConfig, helper *cryptohelper.CryptoHelper) error {
+func setupKeys(cfg map[string]string, helper *cryptohelper.CryptoHelper) error {
 	keyID, keyData, err := helper.Machine().SSSS.GetDefaultKeyData(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get default key: %w", err)
 	}
 
-	key, err := keyData.VerifyRecoveryKey(keyID, cfg.recoveryKey)
+	key, err := keyData.VerifyRecoveryKey(keyID, cfg["recovery_key"])
 	if err != nil {
 		return fmt.Errorf("failed to verify recovery key: %w", err)
 	}

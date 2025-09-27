@@ -1,17 +1,15 @@
 package revolt
 
 import (
-	"errors"
-	"fmt"
 	"strconv"
 
+	"github.com/williamhorning/lightning/internal/rvapi"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 type revoltPermissionsError struct {
-	msg         string
-	permissions uint
-	expected    uint
+	permissions rvapi.Permission
+	expected    rvapi.Permission
 }
 
 func (*revoltPermissionsError) Disable() *lightning.ChannelDisabled {
@@ -21,7 +19,7 @@ func (*revoltPermissionsError) Disable() *lightning.ChannelDisabled {
 func (e *revoltPermissionsError) Error() string {
 	return "insufficient permissions in Revolt (have " +
 		strconv.FormatUint(uint64(e.permissions), 10) + ", want " +
-		strconv.FormatUint(uint64(e.expected), 10) + ")" + e.msg + " channel, please check them"
+		strconv.FormatUint(uint64(e.expected), 10) + "), please check them"
 }
 
 type revoltStatusError struct {
@@ -31,21 +29,9 @@ type revoltStatusError struct {
 }
 
 func (e *revoltStatusError) Disable() *lightning.ChannelDisabled {
-	return &lightning.ChannelDisabled{Read: false, Write: e.code == 403 || (e.code == 404 && !e.edit)}
+	return &lightning.ChannelDisabled{Read: false, Write: e.code == 401 || e.code == 403 || (e.code == 404 && !e.edit)}
 }
 
 func (e *revoltStatusError) Error() string {
-	return strconv.Itoa(e.code) + ": " + e.msg
-}
-
-func getRevoltError(err error, extra map[string]any, message string) error {
-	if errors.Is(err, &revoltPermissionsError{}) {
-		return err
-	}
-
-	if errors.Is(err, &revoltStatusError{}) {
-		return fmt.Errorf("revolt: status error: %w\n\textra: %#+v", err, extra)
-	}
-
-	return fmt.Errorf("revolt: %s: %w\n\textra: %#+v", message, err, extra)
+	return "revolt status code " + strconv.Itoa(e.code) + ": " + e.msg
 }

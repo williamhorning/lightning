@@ -17,10 +17,7 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-const (
-	assetCacheTTL   = 24 * time.Hour
-	defaultCacheTTL = 30 * time.Second
-)
+const assetCacheTTL = 24 * time.Hour
 
 var (
 	attachmentRegex = regexp.MustCompile(`!\[.*?\]\(https:\/\/cdn\.gldcdn\.com\/ContentMedia(GenericFiles)?\/.*\)`)

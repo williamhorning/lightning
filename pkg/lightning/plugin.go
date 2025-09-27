@@ -1,7 +1,7 @@
 package lightning
 
 // PluginConstructor makes a [Plugin] with the specified config.
-type PluginConstructor func(config any) (Plugin, error)
+type PluginConstructor func(config map[string]string) (Plugin, error)
 
 // A Plugin provides methods used by [Bot] to allow bots to not worry
 // about platform specifics, as each Plugin handles that.
@@ -37,7 +37,7 @@ func (b *Bot) AddPluginType(name string, constructor PluginConstructor) error {
 // It only returns an error if a plugin already exists *or* if the plugin type is
 // not found. If you pass an empty string to instanceName, it will default to
 // typeName, but that value must be unique.
-func (b *Bot) UsePluginType(typeName, instanceName string, config any) error {
+func (b *Bot) UsePluginType(typeName, instanceName string, config map[string]string) error {
 	if instanceName == "" {
 		instanceName = typeName
 	}

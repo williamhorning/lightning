@@ -7,7 +7,7 @@
 //
 //	bot.AddPluginType("discord", discord.New)
 //
-//	bot.UsePluginType("discord", "", map[string]any{
+//	bot.UsePluginType("discord", "", map[string]string{
 //		// ...
 //	})
 package discord
@@ -28,23 +28,13 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]any{
+//	map[string]string{
 //		"token": "", // a string with your Discord bot token
 //	}
 //
 // Note that you MUST enable the Message Content intent for the plugin to work.
-func New(config any) (lightning.Plugin, error) {
-	cfg, ok := config.(map[string]any)
-	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "discord", Message: "invalid config"}
-	}
-
-	token, ok := cfg["token"].(string)
-	if !ok || token == "" {
-		return nil, lightning.PluginConfigError{Plugin: "discord", Message: "invalid token"}
-	}
-
-	discord, err := discordgo.New("Bot " + token)
+func New(cfg map[string]string) (lightning.Plugin, error) {
+	discord, err := discordgo.New("Bot " + cfg["token"])
 	if err != nil {
 		return nil, fmt.Errorf("discord: failed to create session: %w", err)
 	}
@@ -74,13 +64,12 @@ func New(config any) (lightning.Plugin, error) {
 	slog.Info("discord: ready!", "username", app.Name, "servers", len(discord.State.Guilds),
 		"invite", "https://discord.com/oauth2/authorize?client_id="+app.ID+"&scope=bot&permissions=8")
 
-	return &discordPlugin{cfg, discord, cache.New[string, bool](cache.DefaultTTL)}, nil
+	return &discordPlugin{discord: discord}, nil
 }
 
 type discordPlugin struct {
-	config       map[string]any
 	discord      *discordgo.Session
-	webhookCache *cache.Expiring[string, bool]
+	webhookCache cache.Expiring[string, bool]
 }
 
 func (p *discordPlugin) SetupChannel(channel string) (any, error) {

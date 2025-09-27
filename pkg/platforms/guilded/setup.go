@@ -50,6 +50,8 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 		return nil, &guildedWebhookTokenNilError{channel}
 	}
 
+	p.webhookIDsCache.Set(webhookData.Webhook.ID, true)
+
 	return map[string]string{"id": webhookData.Webhook.ID, "token": *webhookData.Webhook.Token}, nil
 }
 

@@ -6,11 +6,10 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
-func (p *telegramPlugin) startProxy() {
+func (p *telegramPlugin) startProxy(cfg map[string]string) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		path := strings.TrimPrefix(request.URL.Path, "/telegram")
 		url := p.telegram.FileURL(p.telegram.Token, path, nil)
@@ -46,13 +45,13 @@ func (p *telegramPlugin) startProxy() {
 		}
 	})
 
-	addr := ":" + strconv.FormatInt(p.cfg.proxyPort, 10)
-
-	server := &http.Server{Addr: addr, Handler: nil, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout}
+	server := &http.Server{
+		Addr: ":" + cfg["proxy_port"], Handler: nil, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout,
+	}
 
 	if err := server.ListenAndServe(); err != nil {
 		panic(fmt.Errorf("telegram: failed to start file proxy: %w", err))
 	}
 
-	slog.Info("telegram: file proxy available", "url", p.cfg.proxyURL, "port", p.cfg.proxyPort)
+	slog.Info("telegram: file proxy available", "url", cfg["proxy_url"], "port", cfg["proxy_port"])
 }

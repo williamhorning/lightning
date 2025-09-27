@@ -7,7 +7,7 @@
 //
 //	bot.AddPluginType("guilded", guilded.New)
 //
-//	bot.UsePluginType("guilded", "", map[string]any{
+//	bot.UsePluginType("guilded", "", map[string]string{
 //		// ...
 //	})
 package guilded
@@ -24,35 +24,27 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]any{
+//	map[string]string{
 //		"token": "", // a string with your Guilded bot token
 //	}
-func New(config any) (lightning.Plugin, error) {
-	cfg, ok := config.(map[string]any)
+func New(cfg map[string]string) (lightning.Plugin, error) {
+	plugin := &guildedPlugin{socket: &session{
+		ready:          make(chan *guildedWelcomeMessage, 100),
+		messageDeleted: make(chan *guildedChatMessageDeleted, 1000),
+		messageCreated: make(chan *guildedChatMessageCreated, 1000),
+		messageUpdated: make(chan *guildedChatMessageUpdated, 1000),
+		token:          cfg["token"],
+	}, token: cfg["token"]}
 
-	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "guilded", Message: "invalid config"}
-	}
+	plugin.assetsCache.TTL = assetCacheTTL
 
-	token, ok := cfg["token"].(string)
+	go func() {
+		for msg := range plugin.socket.ready {
+			slog.Info("guilded: ready!", "username", msg.User.Name)
+		}
+	}()
 
-	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "guilded", Message: "invalid token"}
-	}
-
-	socket := guildedNewSocketManager(token)
-	plugin := &guildedPlugin{
-		socket, cache.New[string, lightning.Attachment](assetCacheTTL),
-		cache.New[string, guildedServerMember](defaultCacheTTL),
-		cache.New[string, guildedWebhook](defaultCacheTTL),
-		cache.New[string, bool](defaultCacheTTL), token,
-	}
-
-	socket.OnReady(func(msg *guildedWelcomeMessage) {
-		slog.Info("guilded: ready!", "username", msg.User.Name)
-	})
-
-	if err := socket.Connect(); err != nil {
+	if err := plugin.socket.connect(); err != nil {
 		return nil, fmt.Errorf("guilded: failed to connect to socket: %w", err)
 	}
 
@@ -60,12 +52,12 @@ func New(config any) (lightning.Plugin, error) {
 }
 
 type guildedPlugin struct {
-	socket          *guildedSocketManager
-	assetsCache     *cache.Expiring[string, lightning.Attachment]
-	membersCache    *cache.Expiring[string, guildedServerMember]
-	webhooksCache   *cache.Expiring[string, guildedWebhook]
-	webhookIDsCache *cache.Expiring[string, bool]
+	socket          *session
 	token           string
+	assetsCache     cache.Expiring[string, lightning.Attachment]
+	membersCache    cache.Expiring[string, guildedServerMember]
+	webhooksCache   cache.Expiring[string, guildedWebhook]
+	webhookIDsCache cache.Expiring[string, bool]
 }
 
 func (*guildedPlugin) EditMessage(_ *lightning.Message, _ []string, _ *lightning.SendOptions) error {
@@ -95,11 +87,13 @@ func (*guildedPlugin) SetupCommands(_ map[string]*lightning.Command) error {
 func (p *guildedPlugin) ListenMessages() <-chan *lightning.Message {
 	channel := make(chan *lightning.Message, 1000)
 
-	p.socket.OnMessageCreated(func(msg *guildedChatMessageCreated) {
-		if message := p.getIncomingMessage(&msg.Message); message != nil {
-			channel <- message
+	go func() {
+		for msg := range p.socket.messageCreated {
+			if message := p.getIncomingMessage(&msg.Message); message != nil {
+				channel <- message
+			}
 		}
-	})
+	}()
 
 	return channel
 }
@@ -107,11 +101,13 @@ func (p *guildedPlugin) ListenMessages() <-chan *lightning.Message {
 func (p *guildedPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	channel := make(chan *lightning.EditedMessage, 1000)
 
-	p.socket.OnMessageUpdated(func(msg *guildedChatMessageUpdated) {
-		if message := p.getIncomingMessage(&msg.Message); message != nil {
-			channel <- &lightning.EditedMessage{Message: message, Edited: msg.Message.UpdatedAt}
+	go func() {
+		for msg := range p.socket.messageUpdated {
+			if message := p.getIncomingMessage(&msg.Message); message != nil {
+				channel <- &lightning.EditedMessage{Message: message, Edited: msg.Message.UpdatedAt}
+			}
 		}
-	})
+	}()
 
 	return channel
 }
@@ -119,11 +115,13 @@ func (p *guildedPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 func (p *guildedPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	channel := make(chan *lightning.BaseMessage, 1000)
 
-	p.socket.OnMessageDeleted(func(msg *guildedChatMessageDeleted) {
-		channel <- &lightning.BaseMessage{
-			EventID: msg.Message.ID, ChannelID: msg.Message.ChannelID, Time: &msg.DeletedAt,
+	go func() {
+		for msg := range p.socket.messageDeleted {
+			channel <- &lightning.BaseMessage{
+				EventID: msg.Message.ID, ChannelID: msg.Message.ChannelID, Time: &msg.DeletedAt,
+			}
 		}
-	})
+	}()
 
 	return channel
 }

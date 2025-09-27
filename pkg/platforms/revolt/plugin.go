@@ -7,7 +7,7 @@
 //
 //	bot.AddPluginType("revolt", revolt.New)
 //
-//	bot.UsePluginType("revolt", "", map[string]any{
+//	bot.UsePluginType("revolt", "", map[string]string{
 //		// ...
 //	})
 package revolt
@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/williamhorning/lightning/internal/rvapi"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -24,36 +25,31 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]any{
+//	map[string]string{
 //		"token": "", // a string with your Revolt bot token
 //	}
-func New(config any) (lightning.Plugin, error) {
-	cfg, ok := config.(map[string]any)
-	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "revolt", Message: "invalid config"}
-	}
-
-	token, ok := cfg["token"].(string)
-	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "revolt", Message: "invalid token"}
-	}
-
-	cache := newRevoltCache()
-	socket := revoltNewSocketManager(token)
-	plugin := &revoltPlugin{cache, nil, socket, token}
-	plugin.self = plugin.getUser("@me")
+func New(cfg map[string]string) (lightning.Plugin, error) {
+	plugin := &revoltPlugin{session: &rvapi.Session{
+		MessageDeleted: make(chan *rvapi.MessageDeleteEvent, 1000),
+		MessageCreated: make(chan *rvapi.MessageEvent, 1000),
+		MessageUpdated: make(chan *rvapi.MessageUpdateEvent, 1000),
+		Ready:          make(chan *rvapi.ReadyEvent, 100),
+		Token:          cfg["token"],
+	}}
+	plugin.self = plugin.session.User("@me")
 
 	if plugin.self == nil {
 		return nil, lightning.PluginConfigError{Plugin: "revolt", Message: "failed to get self user"}
 	}
 
-	socket.OnReady(func(ready *revoltEventReady) {
-		plugin.setCache(ready)
-		slog.Info("revolt: ready!", "username", plugin.self.Username, "servers", len(ready.Servers))
-		slog.Info("revolt: invite me at https://app.revolt.chat/invite/" + plugin.self.ID)
-	})
+	go func() {
+		for ready := range plugin.session.Ready {
+			slog.Info("revolt: ready!", "username", plugin.self.Username, "servers", len(ready.Servers))
+			slog.Info("revolt: invite me at https://app.revolt.chat/invite/" + plugin.self.ID)
+		}
+	}()
 
-	if err := socket.Connect(); err != nil {
+	if err := plugin.session.Connect(); err != nil {
 		return nil, fmt.Errorf("revolt: failed to connect to socket: %w", err)
 	}
 
@@ -61,12 +57,34 @@ func New(config any) (lightning.Plugin, error) {
 }
 
 type revoltPlugin struct {
-	revoltCache
+	self    *rvapi.User
+	session *rvapi.Session
+}
 
-	self   *revoltUser
-	socket *revoltSocketManager
+const correctPermissionValue = rvapi.PermissionManageCustomization | rvapi.PermissionChangeNickname |
+	rvapi.PermissionChangeAvatar | rvapi.PermissionViewChannel | rvapi.PermissionReadMessageHistory |
+	rvapi.PermissionSendMessage | rvapi.PermissionManageMessages | rvapi.PermissionInviteOthers |
+	rvapi.PermissionSendEmbeds | rvapi.PermissionUploadFiles | rvapi.PermissionMasquerade |
+	rvapi.PermissionReact
 
-	token string
+func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
+	channelData := p.session.Channel(channel)
+	needed := correctPermissionValue
+
+	// TODO: why do group dms not work despite being fine in theory?
+	if channelData.ChannelType == rvapi.ChannelTypeGroup {
+		needed &= ^rvapi.PermissionManageCustomization
+		needed &= ^rvapi.PermissionChangeNickname
+		needed &= ^rvapi.PermissionChangeAvatar
+	}
+
+	permissions := p.session.GetPermissions(p.self, channelData)
+
+	if permissions&needed == needed {
+		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
+	}
+
+	return nil, &revoltPermissionsError{permissions, needed}
 }
 
 func (p *revoltPlugin) SendCommandResponse(
@@ -74,9 +92,10 @@ func (p *revoltPlugin) SendCommandResponse(
 	opts *lightning.SendOptions,
 	user string,
 ) ([]string, error) {
-	channel := p.getDMChannel(user)
-	if channel == nil {
-		return nil, &revoltStatusError{"failed to get DM channel for user", 0, false}
+	var channel rvapi.Channel
+
+	if err := rvapi.Get(p.session, "/users/"+user+"/dm", &channel); err != nil {
+		return nil, fmt.Errorf("revolt: failed to get dm channel: %w", err)
 	}
 
 	message.ChannelID = channel.ID
@@ -93,15 +112,15 @@ func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 		msg.Attachments = msg.Attachments[:5]
 	}
 
-	res, err := sendRevoltMessage(p.token, message.ChannelID, msg)
+	res, err := p.revoltSendMessage(message.ChannelID, msg)
 	if err != nil {
-		return nil, getRevoltError(err, map[string]any{"msg": msg}, "Failed to send message to Revolt")
+		return nil, err
 	}
 
 	ids := []string{res}
 
 	if len(leftover) > 0 {
-		res, err := sendRevoltMessage(p.token, message.ChannelID, revoltMessageSend{
+		res, err := p.revoltSendMessage(message.ChannelID, rvapi.DataMessageSend{
 			Attachments: leftover,
 			Masquerade:  msg.Masquerade,
 			Replies:     msg.Replies,
@@ -116,26 +135,6 @@ func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 	return ids, nil
 }
 
-func (p *revoltPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
-	message.Attachments = nil
-
-	err := editRevoltMessage(p.token, message.ChannelID, ids[0],
-		p.getOutgoing(message, opts).toEdit())
-	if err != nil {
-		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to edit message on Revolt")
-	}
-
-	return nil
-}
-
-func (p *revoltPlugin) DeleteMessage(channel string, ids []string) error {
-	if err := bulkDeleteRevoltMessages(p.token, channel, revoltChannelMessageBulkDeleteData{IDs: ids}); err != nil {
-		return getRevoltError(err, map[string]any{"ids": ids}, "Failed to delete messages on Revolt")
-	}
-
-	return nil
-}
-
 func (*revoltPlugin) SetupCommands(_ map[string]*lightning.Command) error {
 	return nil
 }
@@ -143,11 +142,13 @@ func (*revoltPlugin) SetupCommands(_ map[string]*lightning.Command) error {
 func (p *revoltPlugin) ListenMessages() <-chan *lightning.Message {
 	channel := make(chan *lightning.Message, 1000)
 
-	p.socket.OnMessageCreated(func(m *revoltEventMessage) {
-		if msg := p.getIncomingMessage(m.revoltMessage); msg != nil {
-			channel <- msg
+	go func() {
+		for m := range p.session.MessageCreated {
+			if msg := p.getIncomingMessage(m.Message); msg != nil {
+				channel <- msg
+			}
 		}
-	})
+	}()
 
 	return channel
 }
@@ -155,14 +156,16 @@ func (p *revoltPlugin) ListenMessages() <-chan *lightning.Message {
 func (p *revoltPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	channel := make(chan *lightning.EditedMessage, 1000)
 
-	p.socket.OnMessageUpdated(func(m *revoltEventMessageUpdate) {
-		if msg := p.getIncomingMessage(m.Data); msg != nil {
-			channel <- &lightning.EditedMessage{
-				Message: msg,
-				Edited:  &m.Data.Edited,
+	go func() {
+		for m := range p.session.MessageUpdated {
+			if msg := p.getIncomingMessage(m.Data); msg != nil {
+				channel <- &lightning.EditedMessage{
+					Message: msg,
+					Edited:  &m.Data.Edited,
+				}
 			}
 		}
-	})
+	}()
 
 	return channel
 }
@@ -170,14 +173,16 @@ func (p *revoltPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 func (p *revoltPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	channel := make(chan *lightning.BaseMessage, 1000)
 
-	p.socket.OnMessageDeleted(func(m *revoltEventMessageDelete) {
-		timestamp := time.Now()
-		channel <- &lightning.BaseMessage{
-			EventID:   m.ID,
-			ChannelID: m.Channel,
-			Time:      &timestamp,
+	go func() {
+		for m := range p.session.MessageDeleted {
+			timestamp := time.Now()
+			channel <- &lightning.BaseMessage{
+				EventID:   m.ID,
+				ChannelID: m.Channel,
+				Time:      &timestamp,
+			}
 		}
-	})
+	}()
 
 	return channel
 }

@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -60,195 +61,103 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 	return resp, nil
 }
 
-type guildedSocketManager struct {
-	conn                  *websocket.Conn
-	done                  chan struct{}
-	readyHandler          func(*guildedWelcomeMessage)
-	messageCreatedHandler func(*guildedChatMessageCreated)
-	messageUpdatedHandler func(*guildedChatMessageUpdated)
-	messageDeletedHandler func(*guildedChatMessageDeleted)
-	Token                 string
-	mu                    sync.RWMutex
-	Alive                 bool
-	reconnecting          bool
+type session struct {
+	conn           *websocket.Conn
+	ready          chan *guildedWelcomeMessage
+	messageDeleted chan *guildedChatMessageDeleted
+	messageCreated chan *guildedChatMessageCreated
+	messageUpdated chan *guildedChatMessageUpdated
+	token          string
+	connected      atomic.Bool
 }
 
-func guildedNewSocketManager(token string) *guildedSocketManager {
-	return &guildedSocketManager{
-		Token: token,
-		done:  make(chan struct{}),
-	}
-}
-
-func (s *guildedSocketManager) OnReady(handler func(*guildedWelcomeMessage)) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.readyHandler = handler
-}
-
-func (s *guildedSocketManager) OnMessageCreated(handler func(*guildedChatMessageCreated)) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.messageCreatedHandler = handler
-}
-
-func (s *guildedSocketManager) OnMessageUpdated(handler func(*guildedChatMessageUpdated)) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.messageUpdatedHandler = handler
-}
-
-func (s *guildedSocketManager) OnMessageDeleted(handler func(*guildedChatMessageDeleted)) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.messageDeletedHandler = handler
-}
-
-func (s *guildedSocketManager) Connect() error {
-	s.mu.Lock()
-
-	if s.Alive || s.reconnecting {
-		s.mu.Unlock()
-
+func (s *session) connect() error {
+	if s.connected.Load() {
 		return nil
 	}
 
-	s.reconnecting = true
-	s.mu.Unlock()
-
-	err := s.connectWebsocket()
-
-	s.mu.Lock()
-	s.reconnecting = false
-	s.mu.Unlock()
-
-	return err
-}
-
-func (s *guildedSocketManager) connectWebsocket() error {
-	header := http.Header{}
-	header.Set("Authorization", "Bearer "+s.Token)
-	header.Set("User-Agent", "lightning/"+lightning.VERSION)
-	header["x-guilded-bot-api-use-official-markdown"] = []string{"true"}
-
-	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
-
-	var err error
-
-	var resp *http.Response
-
-	s.conn, resp, err = dialer.Dial("wss://www.guilded.gg/websocket/v1", header)
+	conn, resp, err := websocket.DefaultDialer.Dial(
+		"wss://www.guilded.gg/websocket/v1",
+		map[string][]string{
+			"Authorization": {"Bearer " + s.token},
+			"User-Agent":    {"lightning" + lightning.VERSION},
+			"x-guilded-bot-api-use-official-markdown": {"true"},
+		},
+	)
 	if err != nil {
-		wrapped := fmt.Errorf("guilded: failed to dial WebSocket: %w", err)
-
-		slog.Error(wrapped.Error(), "response", resp)
-
-		return wrapped
+		return fmt.Errorf("guilded: failed to dial: %w", err)
 	}
 
-	err = resp.Body.Close()
-	if err != nil {
-		slog.Warn(fmt.Errorf("guilded: failed to close websocket request body: %w", err).Error())
+	if err = resp.Body.Close(); err != nil {
+		log.Printf("guilded: failed to close body: %v\n", err)
 	}
 
-	s.mu.Lock()
-	s.Alive = true
-	s.done = make(chan struct{})
-	s.mu.Unlock()
+	s.conn = conn
+	s.connected.Swap(true)
 
-	go s.readMessages()
+	go readMessages(s)
 
 	return nil
 }
 
-func (s *guildedSocketManager) readMessages() {
-	defer func() {
-		s.mu.Lock()
-
-		s.Alive = false
-		if s.conn != nil {
-			if err := s.conn.Close(); err != nil {
-				slog.Warn("guilded: failed to close WebSocket connection when reading messages")
-			}
-
-			s.conn = nil
-		}
-
-		close(s.done)
-		s.mu.Unlock()
-
-		go s.handleReconnect()
-	}()
-
-	for {
-		s.mu.RLock()
-
-		if !s.Alive {
-			s.mu.RUnlock()
-
-			return
-		}
-
-		conn := s.conn
-		s.mu.RUnlock()
-
-		if conn == nil {
-			return
-		}
-
-		_, message, err := conn.ReadMessage()
+func readMessages(session *session) {
+	for session.connected.Load() && session.conn != nil {
+		_, message, err := session.conn.ReadMessage()
 		if err != nil {
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				slog.Error(fmt.Errorf("guilded: error reading from socket: %w", err).Error())
-			} else {
-				slog.Debug("guilded: socket closed normally")
+				log.Printf("guilded: error reading socket: %v\n", err)
 			}
 
-			return
+			break
 		}
 
-		var data guildedSocketEventEnvelope
-		if err := json.Unmarshal(message, &data); err != nil {
-			slog.Error(fmt.Errorf("guilded: error parsing WebSocket message: %w", err).Error(), "msg", string(message))
-
-			continue
-		}
-
-		s.handleEvent(data)
+		handleEvent(session, message)
 	}
+
+	session.connected.Store(false)
+
+	if session.conn != nil {
+		if err := session.conn.Close(); err != nil {
+			log.Printf("guilded: failed to close connection: %v\n", err)
+		}
+
+		session.conn = nil
+	}
+
+	go handleReconnect(session.connect)
 }
 
-func (s *guildedSocketManager) handleReconnect() {
-	attempts := 0
+func handleReconnect(connect func() error) {
+	attempt := 0
 	backoff := 100 * time.Millisecond
-	maxBackoff := 2 * time.Second
 
 	for {
-		attempts++
+		attempt++
 
-		slog.Info("guilded: attempting to reconnect to WebSocket", "attempt", attempts, "backoff", backoff)
 		time.Sleep(backoff)
 
-		err := s.Connect()
-		if err == nil {
-			slog.Info("guilded: WebSocket reconnection successful")
-
+		if connect() == nil {
 			return
 		}
 
-		backoff = min(time.Duration(float64(backoff)*1.5), maxBackoff)
-		slog.Error(fmt.Errorf("guilded: failed to reconnect to WebSocket: %w", err).Error(),
-			"attempt", attempts, "backoff", backoff)
+		backoff = min(time.Duration(float64(backoff)*1.5), time.Second)
+
+		log.Printf("guilded: attempting reconnect #%d after %s\n", attempt, backoff.String())
 	}
 }
 
-func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
+func handleEvent(session *session, message []byte) {
+	var data guildedSocketEventEnvelope
+	if err := json.Unmarshal(message, &data); err != nil {
+		log.Printf("guilded: failed unmarshaling event wrapper: %v\n\tdata: %s\n", err, string(message))
+
+		return
+	}
+
 	if data.Op == 1 {
-		s.handleReadyEvent(data)
+		handleGenericEvent(&data, session.ready)
+
+		return
 	}
 
 	if data.T == nil {
@@ -257,71 +166,22 @@ func (s *guildedSocketManager) handleEvent(data guildedSocketEventEnvelope) {
 
 	switch *data.T {
 	case "ChatMessageCreated":
-		s.handleMessageCreatedEvent(data)
+		handleGenericEvent(&data, session.messageCreated)
 	case "ChatMessageUpdated":
-		s.handleMessageUpdatedEvent(data)
+		handleGenericEvent(&data, session.messageUpdated)
 	case "ChatMessageDeleted":
-		s.handleMessageDeletedEvent(data)
+		handleGenericEvent(&data, session.messageDeleted)
 	default:
 	}
 }
 
-func (s *guildedSocketManager) handleReadyEvent(data guildedSocketEventEnvelope) {
-	if s.readyHandler == nil {
-		return
-	}
-
-	var welcome guildedWelcomeMessage
-	if err := json.Unmarshal(data.D, &welcome); err != nil {
-		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ready data: %w", err).Error(), "data", data.D)
+func handleGenericEvent[T any](data *guildedSocketEventEnvelope, channel chan *T) {
+	var decoded T
+	if err := json.Unmarshal(data.D, &decoded); err != nil {
+		log.Printf("guilded: failed unmarshaling event: %v\n\tdata: %s\n", err, string(data.D))
 
 		return
 	}
 
-	go s.readyHandler(&welcome)
-}
-
-func (s *guildedSocketManager) handleMessageCreatedEvent(data guildedSocketEventEnvelope) {
-	if s.messageCreatedHandler == nil {
-		return
-	}
-
-	var msg guildedChatMessageCreated
-	if err := json.Unmarshal(data.D, &msg); err != nil {
-		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ChatMessageCreated data: %w", err).Error(), "data", data.D)
-
-		return
-	}
-
-	go s.messageCreatedHandler(&msg)
-}
-
-func (s *guildedSocketManager) handleMessageUpdatedEvent(data guildedSocketEventEnvelope) {
-	if s.messageUpdatedHandler == nil {
-		return
-	}
-
-	var msg guildedChatMessageUpdated
-	if err := json.Unmarshal(data.D, &msg); err != nil {
-		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ChatMessageUpdated data: %w", err).Error(), "data", data.D)
-
-		return
-	}
-
-	go s.messageUpdatedHandler(&msg)
-}
-
-func (s *guildedSocketManager) handleMessageDeletedEvent(data guildedSocketEventEnvelope) {
-	if s.messageDeletedHandler == nil {
-		return
-	}
-
-	var msg guildedChatMessageDeleted
-	if err := json.Unmarshal(data.D, &msg); err != nil {
-		slog.Warn(fmt.Errorf("guilded: failed to unmarshal ChatMessageDeleted data: %w", err).Error(), "data", data.D)
-
-		return
-	}
-
-	go s.messageDeletedHandler(&msg)
+	channel <- &decoded
 }

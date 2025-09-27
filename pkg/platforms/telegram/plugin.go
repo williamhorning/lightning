@@ -11,7 +11,7 @@
 //
 //	bot.AddPluginType("telegram", telegram.New)
 //
-//	bot.UsePluginType("telegram", "", map[string]any{
+//	bot.UsePluginType("telegram", "", map[string]string{
 //		// ...
 //	})
 package telegram
@@ -35,21 +35,16 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]any{
+//	map[string]string{
 //		"token": "", // a string with your Telegram bot token. You can get this from BotFather
-//		"proxy_port": 0, // the port to use for the built-in Telegram file proxy
+//		"proxy_port": "0", // the port to use for the built-in Telegram file proxy
 //		"proxy_url": "", // the publicly accessible url of the Telegram file proxy
 //	}
 //
 // Note that you must have a working file proxy at `proxy_url`, otherwise files will not
 // work with other plugins.
-func New(config any) (lightning.Plugin, error) {
-	cfg, err := getTelegramConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	telegram, err := gotgbot.NewBot(cfg.token, &gotgbot.BotOpts{BotClient: newRetrier()})
+func New(config map[string]string) (lightning.Plugin, error) {
+	telegram, err := gotgbot.NewBot(config["token"], &gotgbot.BotOpts{BotClient: newRetrier()})
 	if err != nil {
 		return nil, fmt.Errorf("telegram: failed to create bot: %w", err)
 	}
@@ -68,7 +63,7 @@ func New(config any) (lightning.Plugin, error) {
 			return true
 		},
 		Response: func(b *gotgbot.Bot, ctx *ext.Context) error {
-			msg := getMessage(b, ctx, cfg.proxyURL)
+			msg := getMessage(b, ctx, config["proxy_url"])
 			if ctx.EditedMessage != nil {
 				time := time.UnixMilli(ctx.EditedMessage.GetDate() * 1000)
 				edits <- &lightning.EditedMessage{
@@ -99,9 +94,9 @@ func New(config any) (lightning.Plugin, error) {
 
 	slog.Info("telegram: ready! invite me at https://t.me/" + telegram.Username)
 
-	plugin := &telegramPlugin{commands, messages, edits, dispatch, &cfg, telegram, updater}
+	plugin := &telegramPlugin{commands, messages, edits, dispatch, telegram, updater}
 
-	go plugin.startProxy()
+	go plugin.startProxy(config)
 
 	return plugin, nil
 }
@@ -111,7 +106,6 @@ type telegramPlugin struct {
 	messageChannel chan *lightning.Message
 	editChannel    chan *lightning.EditedMessage
 	dispatch       *ext.Dispatcher
-	cfg            *telegramConfig
 	telegram       *gotgbot.Bot
 	updater        *ext.Updater
 }
