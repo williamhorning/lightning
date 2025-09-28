@@ -71,7 +71,6 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 	channelData := p.session.Channel(channel)
 	needed := correctPermissionValue
 
-	// TODO: why do group dms not work despite being fine in theory?
 	if channelData.ChannelType == rvapi.ChannelTypeGroup {
 		needed &= ^rvapi.PermissionManageCustomization
 		needed &= ^rvapi.PermissionChangeNickname
