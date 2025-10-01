@@ -83,7 +83,7 @@ func (session *Session) Server(svr string) *Server {
 
 	var server Server
 
-	if Get(session, "/custom/emoji/"+svr, &server) != nil {
+	if Get(session, "/servers/"+svr, &server) != nil {
 		return nil
 	}
 

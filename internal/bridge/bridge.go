@@ -4,7 +4,7 @@ package bridge
 import (
 	"errors"
 	"fmt"
-	"log/slog"
+	"log"
 	"sync"
 
 	"github.com/williamhorning/lightning/internal/data"
@@ -12,10 +12,9 @@ import (
 )
 
 func handleBridgeMessage(bot *lightning.Bot, database data.Database, event data.EventType, dat any) error {
-	base, err := getBase(dat)
-	if err != nil {
-		return err
-	}
+	base := getBase(dat)
+
+	var err error
 
 	var bridge data.Bridge
 
@@ -47,8 +46,6 @@ func handleBridgeMessage(bot *lightning.Bot, database data.Database, event data.
 	}
 
 	if bridge.GetChannelDisabled(base.ChannelID).Read {
-		slog.Debug("bridge: channel is subscribed, skipping", "channel", base.ChannelID)
-
 		return nil
 	}
 
@@ -58,27 +55,27 @@ func handleBridgeMessage(bot *lightning.Bot, database data.Database, event data.
 	return setDatabase(database, event, base, &bridge, messages)
 }
 
-func getBase(dat any) (lightning.BaseMessage, error) {
+func getBase(dat any) lightning.BaseMessage {
 	switch msg := dat.(type) {
 	case lightning.EditedMessage:
-		return msg.Message.BaseMessage, nil
+		return msg.Message.BaseMessage
 	case lightning.Message:
-		return msg.BaseMessage, nil
+		return msg.BaseMessage
 	case lightning.BaseMessage:
-		return msg, nil
+		return msg
 	default:
-		return lightning.BaseMessage{}, unsupportedTypeError{dat}
+		return lightning.BaseMessage{}
 	}
 }
 
-func getMessage(dat any) (lightning.Message, error) {
+func getMessage(dat any) lightning.Message {
 	switch msg := dat.(type) {
 	case lightning.EditedMessage:
-		return *msg.Message, nil
+		return *msg.Message
 	case lightning.Message:
-		return msg, nil
+		return msg
 	default:
-		return lightning.Message{}, unsupportedTypeError{dat}
+		return lightning.Message{}
 	}
 }
 
@@ -101,7 +98,6 @@ func setDatabase(
 			return fmt.Errorf("setDatabase failed: %w", err)
 		}
 	default:
-		return unsupportedTypeError{event}
 	}
 
 	return nil
@@ -164,7 +160,7 @@ func handleChannel(
 ) *data.ChannelMessage {
 	defer func(channel *data.BridgeChannel) {
 		if r := recover(); r != nil {
-			slog.Error("bridge: panic in handling", "recover", r, "channel", channel.ID)
+			log.Printf("bridge: panic in handling %s: %#+v", channel.ID, r)
 		}
 	}(channel)
 
@@ -176,14 +172,7 @@ func handleChannel(
 
 	switch event {
 	case data.TypeCreate, data.TypeEdit:
-		newMessage, msgErr := getMessage(dat)
-		if msgErr != nil {
-			slog.Warn(fmt.Errorf("unsupported message type for bridge channel: %w", msgErr).Error(),
-				"channel", channel.ID, "event", event)
-
-			return nil
-		}
-
+		newMessage := getMessage(dat)
 		newMessage.ChannelID = channel.ID
 		newMessage.RepliedTo = repliedTo.GetChannelMessageIDs(channel.ID)
 
@@ -207,14 +196,15 @@ func handleChannel(
 }
 
 func getRepliedToMessage(database data.Database, dat any) *data.BridgeMessageCollection {
-	msg, err := getMessage(dat)
-	if err != nil || len(msg.RepliedTo) == 0 {
+	msg := getMessage(dat)
+
+	if len(msg.RepliedTo) == 0 {
 		return nil
 	}
 
 	repliedTo, err := database.GetMessage(msg.RepliedTo[0])
 	if err != nil {
-		slog.Warn(fmt.Errorf("failed to get replied to message: %w", err).Error(), "replied_to", msg.RepliedTo[0])
+		log.Printf("bridge: failed to get replied_to for %s: %v\n", msg.RepliedTo[0], err)
 
 		return nil
 	}
@@ -223,11 +213,7 @@ func getRepliedToMessage(database data.Database, dat any) *data.BridgeMessageCol
 }
 
 func handleError(
-	database data.Database,
-	err error,
-	channel *data.BridgeChannel,
-	bridge *data.Bridge,
-	event data.EventType,
+	database data.Database, err error, channel *data.BridgeChannel, bridge *data.Bridge, event data.EventType,
 ) {
 	var disabled lightning.ChannelDisabled
 
@@ -238,8 +224,7 @@ func handleError(
 		}
 	}
 
-	slog.Error(fmt.Errorf("error handling bridge message: %w", err).Error(),
-		"channel", channel.ID, "bridge", bridge.ID, "event", event, "disable", disabled)
+	log.Printf("bridge: error in channel %s in bridge %s on %s: %v\n", channel.ID, bridge.ID, event, err)
 
 	if !disabled.Read && !disabled.Write {
 		return
@@ -253,10 +238,10 @@ func handleError(
 		}
 	}
 
-	slog.Warn(disableChannelError{bridge.ID, channel.ID}.Error(), "event", event, "disable", disabled)
+	log.Printf("bridge: disabling channel %s in bridge %s on %s\n\tdisable: %#+v\n",
+		bridge.ID, channel.ID, event, disabled)
 
 	if err := database.CreateBridge(*bridge); err != nil {
-		slog.Warn(fmt.Errorf("bridge: failed to disable channel: %w", err).Error(),
-			"channel", channel.ID, "bridge", bridge.ID)
+		log.Printf("bridge: failed to disable %s in bridge %s: %v\n", channel.ID, bridge.ID, err)
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-// SendMessage returns a message ID after sending a message on Revolt.
 func (p *revoltPlugin) revoltSendMessage(channel string, message rvapi.DataMessageSend) (string, error) {
 	payload, err := json.Marshal(message)
 	if err != nil {
@@ -25,7 +24,7 @@ func (p *revoltPlugin) revoltSendMessage(channel string, message rvapi.DataMessa
 
 	defer func() {
 		if err := resp.Close(); err != nil {
-			log.Printf("revolt: failed to close send body: %v", err)
+			log.Printf("revolt: failed to close send body: %v\n", err)
 		}
 	}()
 
@@ -59,7 +58,7 @@ func (p *revoltPlugin) EditMessage(message *lightning.Message, ids []string, opt
 	}
 
 	if err := resp.Close(); err != nil {
-		log.Printf("revolt: failed to close edit body: %v", err)
+		log.Printf("revolt: failed to close edit body: %v\n", err)
 	}
 
 	if code != http.StatusOK {
@@ -84,7 +83,7 @@ func (p *revoltPlugin) DeleteMessage(channel string, ids []string) error {
 
 	defer func() {
 		if err := resp.Close(); err != nil {
-			log.Printf("revolt: failed to close deletion body: %v", err)
+			log.Printf("revolt: failed to close deletion body: %v\n", err)
 		}
 	}()
 

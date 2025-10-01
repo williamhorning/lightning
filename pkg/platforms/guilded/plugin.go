@@ -14,7 +14,7 @@ package guilded
 
 import (
 	"fmt"
-	"log/slog"
+	"log"
 
 	"github.com/williamhorning/lightning/internal/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -40,7 +40,7 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 
 	go func() {
 		for msg := range plugin.socket.ready {
-			slog.Info("guilded: ready!", "username", msg.User.Name)
+			log.Printf("guilded: ready as %s!\n", msg.User.Name)
 		}
 	}()
 
@@ -69,7 +69,7 @@ func (p *guildedPlugin) DeleteMessage(channel string, ids []string) error {
 		resp, err := guildedMakeRequest(p.token, "DELETE", "/channels/"+channel+"/messages/"+msgID, nil)
 
 		if resp.Body.Close() != nil {
-			slog.Warn("guilded: failed to close request body when deleting message")
+			log.Println("guilded: failed to close request body when deleting message")
 		}
 
 		if err != nil {

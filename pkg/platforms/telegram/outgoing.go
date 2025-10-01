@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/williamhorning/lightning/internal/tgmd"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -23,10 +24,10 @@ func parseContent(message *lightning.Message, opts *lightning.SendOptions) strin
 	content := ""
 
 	if opts != nil {
-		content += getMarkdownV2(message.Author.Nickname) + " » "
+		content += tgmd.GetMarkdownV2(message.Author.Nickname) + " » "
 	}
 
-	mdV2 := getMarkdownV2(strings.ReplaceAll(message.Content, "\n", "\n\n"))
+	mdV2 := tgmd.GetMarkdownV2(strings.ReplaceAll(message.Content, "\n", "\n\n"))
 
 	if len(mdV2) > 0 &&
 		slices.Contains(
@@ -38,7 +39,7 @@ func parseContent(message *lightning.Message, opts *lightning.SendOptions) strin
 	content += mdV2
 
 	for _, embed := range message.Embeds {
-		content += getMarkdownV2(embed.ToMarkdown())
+		content += tgmd.GetMarkdownV2(embed.ToMarkdown())
 	}
 
 	return content

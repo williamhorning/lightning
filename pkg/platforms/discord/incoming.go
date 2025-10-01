@@ -8,51 +8,39 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *discordPlugin) getLightningMessage(message *discordgo.Message) *lightning.Message {
-	if message.Type != discordgo.MessageTypeDefault &&
-		message.Type != discordgo.MessageTypeReply &&
-		message.Type != discordgo.MessageTypeChatInputCommand &&
-		message.Type != discordgo.MessageTypeContextMenuCommand {
+func (p *discordPlugin) getLightningMessage(msg *discordgo.Message) *lightning.Message {
+	if msg.Type != discordgo.MessageTypeDefault &&
+		msg.Type != discordgo.MessageTypeReply &&
+		msg.Type != discordgo.MessageTypeChatInputCommand &&
+		msg.Type != discordgo.MessageTypeContextMenuCommand {
 		return nil
 	}
 
-	if exists, _ := p.webhookCache.Get(message.WebhookID); exists {
+	if exists, _ := p.webhookCache.Get(msg.WebhookID); exists {
 		return nil
 	}
 
-	msg := &lightning.Message{
-		BaseMessage: lightning.BaseMessage{
-			EventID:   message.ID,
-			ChannelID: message.ChannelID,
-			Time:      &message.Timestamp,
-		},
-		Attachments: getLightningAttachments(message.Attachments, message.StickerItems),
-		Author:      getLightningAuthor(p.discord, message),
-		Content:     getLightningForward(p.discord, message) + getLightningContent(p.discord, message),
-		Embeds:      getLightningEmbeds(message.Embeds),
-		RepliedTo:   getLightningReplies(message),
+	message := &lightning.Message{
+		BaseMessage: lightning.BaseMessage{EventID: msg.ID, ChannelID: msg.ChannelID, Time: &msg.Timestamp},
+		Attachments: getLightningAttachments(msg.Attachments, msg.StickerItems),
+		Author:      getLightningAuthor(p.discord, msg),
+		Content:     getLightningForward(p.discord, msg) + getLightningContent(p.discord, msg),
+		Embeds:      getLightningEmbeds(msg.Embeds),
+		RepliedTo:   getLightningReplies(msg),
 	}
 
-	msg.Content = replaceIncomingEmoji(msg)
+	message.Content = replaceIncomingEmoji(message)
 
-	return msg
+	return message
 }
 
 func getLightningAttachments(
 	attachments []*discordgo.MessageAttachment,
 	stickers []*discordgo.StickerItem,
 ) []lightning.Attachment {
-	if len(attachments) == 0 && len(stickers) == 0 {
-		return nil
-	}
-
-	result := make([]lightning.Attachment, 0)
+	result := make([]lightning.Attachment, 0, len(attachments)+len(stickers))
 	for _, a := range attachments {
-		result = append(result, lightning.Attachment{
-			URL:  a.URL,
-			Name: a.Filename,
-			Size: int64(a.Size),
-		})
+		result = append(result, lightning.Attachment{URL: a.URL, Name: a.Filename, Size: int64(a.Size)})
 	}
 
 	for _, sticker := range stickers {
@@ -68,11 +56,7 @@ func getLightningAttachments(
 		default:
 		}
 
-		result = append(result, lightning.Attachment{
-			URL:  stickerURL + "?size=160",
-			Name: sticker.Name,
-			Size: 0, // size information isn't available for stickers?
-		})
+		result = append(result, lightning.Attachment{URL: stickerURL + "?size=160", Name: sticker.Name, Size: 0})
 	}
 
 	return result
@@ -191,26 +175,14 @@ func getLightningEmbeds(embeds []*discordgo.MessageEmbed) []lightning.Embed {
 	result := make([]lightning.Embed, 0, len(embeds))
 	for _, embed := range embeds {
 		lightningEmbed := lightning.Embed{
-			Author:    getLightningEmbedAuthor(embed),
-			Fields:    getLightningEmbedFields(embed),
-			Footer:    getLightningFooter(embed),
-			Timestamp: getLightningEmbedTime(embed),
-		}
-
-		if embed.Title != "" {
-			lightningEmbed.Title = &embed.Title
-		}
-
-		if embed.URL != "" {
-			lightningEmbed.URL = &embed.URL
-		}
-
-		if embed.Color != 0 {
-			lightningEmbed.Color = &embed.Color
-		}
-
-		if embed.Description != "" {
-			lightningEmbed.Description = &embed.Description
+			Author:      getLightningEmbedAuthor(embed),
+			Fields:      getLightningEmbedFields(embed),
+			Footer:      getLightningFooter(embed),
+			Timestamp:   toPtr(embed.Timestamp),
+			Title:       toPtr(embed.Title),
+			URL:         toPtr(embed.URL),
+			Description: toPtr(embed.Description),
+			Color:       toPtr(embed.Color),
 		}
 
 		if embed.Image != nil && embed.Image.URL != "" {
@@ -225,6 +197,16 @@ func getLightningEmbeds(embeds []*discordgo.MessageEmbed) []lightning.Embed {
 	}
 
 	return result
+}
+
+func toPtr[T comparable](val T) *T {
+	var t T
+
+	if val == t {
+		return nil
+	}
+
+	return &val
 }
 
 func getLightningFooter(embed *discordgo.MessageEmbed) *lightning.EmbedFooter {
@@ -258,28 +240,16 @@ func getLightningEmbedAuthor(embed *discordgo.MessageEmbed) *lightning.EmbedAuth
 }
 
 func getLightningEmbedFields(embed *discordgo.MessageEmbed) []lightning.EmbedField {
-	if len(embed.Fields) > 0 {
-		fields := make([]lightning.EmbedField, len(embed.Fields))
-		for i, field := range embed.Fields {
-			fields[i] = lightning.EmbedField{
-				Name:   field.Name,
-				Value:  field.Value,
-				Inline: field.Inline,
-			}
+	fields := make([]lightning.EmbedField, len(embed.Fields))
+	for i, field := range embed.Fields {
+		fields[i] = lightning.EmbedField{
+			Name:   field.Name,
+			Value:  field.Value,
+			Inline: field.Inline,
 		}
-
-		return fields
 	}
 
-	return nil
-}
-
-func getLightningEmbedTime(embed *discordgo.MessageEmbed) *string {
-	if embed.Timestamp != "" {
-		return &embed.Timestamp
-	}
-
-	return nil
+	return fields
 }
 
 func getLightningReplies(message *discordgo.Message) []string {

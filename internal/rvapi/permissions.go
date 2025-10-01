@@ -58,7 +58,6 @@ func calculateUserPermissions(session *Session, self *User, channel *Channel) Pe
 
 func calculateServerPermissions(session *Session, channel *Channel, user *User) Permission {
 	server := session.Server(*channel.Server)
-
 	if server == nil {
 		return 0
 	}
@@ -68,7 +67,6 @@ func calculateServerPermissions(session *Session, channel *Channel, user *User) 
 	}
 
 	member := session.Member(*channel.Server, user.ID)
-
 	if member == nil {
 		return 0
 	}

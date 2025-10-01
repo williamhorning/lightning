@@ -1,8 +1,6 @@
 package discord
 
 import (
-	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -10,7 +8,7 @@ import (
 )
 
 func getDiscordCommandOptions(arguments *lightning.Command) []*discordgo.ApplicationCommandOption {
-	options := make([]*discordgo.ApplicationCommandOption, 0)
+	options := make([]*discordgo.ApplicationCommandOption, 0, len(arguments.Arguments)+len(arguments.Subcommands))
 
 	for _, arg := range arguments.Arguments {
 		options = append(options, &discordgo.ApplicationCommandOption{
@@ -34,7 +32,7 @@ func getDiscordCommandOptions(arguments *lightning.Command) []*discordgo.Applica
 }
 
 func getDiscordCommand(command map[string]*lightning.Command) []*discordgo.ApplicationCommand {
-	commands := make([]*discordgo.ApplicationCommand, 0)
+	commands := make([]*discordgo.ApplicationCommand, 0, len(command))
 
 	for _, cmd := range command {
 		commands = append(commands, &discordgo.ApplicationCommand{
@@ -74,9 +72,6 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 
 	timestamp, err := discordgo.SnowflakeTimestamp(interaction.ID)
 	if err != nil {
-		slog.Warn(fmt.Errorf("discord: failed to parse interaction timestamp: %w", err).Error(), "id", interaction.ID)
-		slog.Warn("discord: using current time as fallback for interaction timestamp")
-
 		timestamp = time.Now()
 	}
 
@@ -96,12 +91,14 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 					flags = discordgo.MessageFlagsEphemeral
 				}
 
-				msg := getOutgoingMessage(session, message, nil).Interaction()
-
-				msg.Flags = flags
+				msg := getOutgoingMessage(session, message, nil)
 
 				return session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource, Data: msg,
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						AllowedMentions: msg.allowedMentions, Components: msg.components, Content: msg.content,
+						Embeds: msg.embeds, Flags: flags,
+					},
 				})
 			},
 		},

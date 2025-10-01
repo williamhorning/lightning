@@ -2,56 +2,32 @@ package telegram
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
-	"maps"
+	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 )
 
-func (p *telegramPlugin) startProxy(cfg map[string]string) {
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		path := strings.TrimPrefix(request.URL.Path, "/telegram")
-		url := p.telegram.FileURL(p.telegram.Token, path, nil)
-
-		req, err := http.NewRequestWithContext(request.Context(), request.Method, url, nil)
-		if err != nil {
-			http.Error(writer, "Failed to create request", http.StatusInternalServerError)
-			slog.Warn(fmt.Errorf("telegram: failed to create request: %w", err).Error())
-
-			return
-		}
-
-		req.Header = request.Header.Clone()
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			http.Error(writer, "Failed to fetch file from Telegram", http.StatusInternalServerError)
-			slog.Warn(fmt.Errorf("telegram: failed to fetch file: %w", err).Error())
-
-			return
-		}
-
-		maps.Copy(writer.Header(), resp.Header)
-		writer.WriteHeader(resp.StatusCode)
-
-		if _, err = io.CopyBuffer(writer, resp.Body, nil); err != nil {
-			http.Error(writer, "Failed to write response", http.StatusInternalServerError)
-			slog.Warn(fmt.Errorf("telegram: failed to write response: %w", err).Error())
-		}
-
-		if err = resp.Body.Close(); err != nil {
-			slog.Warn(fmt.Errorf("telegram: failed to close body: %w", err).Error())
-		}
-	})
+func startProxy(cfg map[string]string) {
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL = &url.URL{
+				Scheme: "https",
+				Host:   "api.telegram.org",
+				Path:   "/file/bot" + cfg["token"] + "/" + strings.TrimPrefix(req.URL.Path, "/telegram"),
+			}
+			req.Host = "api.telegram.org"
+		},
+	}
 
 	server := &http.Server{
-		Addr: ":" + cfg["proxy_port"], Handler: nil, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout,
+		Addr: ":" + cfg["proxy_port"], Handler: proxy, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout,
 	}
 
 	if err := server.ListenAndServe(); err != nil {
 		panic(fmt.Errorf("telegram: failed to start file proxy: %w", err))
 	}
 
-	slog.Info("telegram: file proxy available", "url", cfg["proxy_url"], "port", cfg["proxy_port"])
+	log.Printf("telegram file proxy (port %s) available at %s\n", cfg["proxy_port"], cfg["proxy_url"])
 }

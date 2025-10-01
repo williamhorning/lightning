@@ -188,15 +188,12 @@ func setEmbedMedia(revoltEmbed *rvapi.SendableEmbed, embed lightning.Embed) {
 }
 
 func getOutgoingReplies(replyIDs []string) []rvapi.ReplyIntent {
-	if len(replyIDs) == 0 {
-		return nil
-	}
-
 	replies := make([]rvapi.ReplyIntent, len(replyIDs))
 	for i, id := range replyIDs {
 		replies[i] = rvapi.ReplyIntent{
-			ID:      id,
-			Mention: false,
+			ID:              id,
+			Mention:         false,
+			FailIfNotExists: false,
 		}
 	}
 

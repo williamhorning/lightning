@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
+	"log"
 	"net/http"
 	"path"
 	"regexp"
@@ -94,7 +94,7 @@ func getContentLength(url string) int64 {
 		return 0.0
 	}
 
-	contentLength := headResp.Header.Get("Content-Length")
+	contentLength := headResp.Header["Content-Length"][0]
 	size := int64(0)
 
 	if contentLength != "" {
@@ -105,7 +105,7 @@ func getContentLength(url string) int64 {
 	}
 
 	if err = headResp.Body.Close(); err != nil {
-		slog.Warn("guilded: failed to close request body when getting content length")
+		log.Println("guilded: failed to close request body when getting content length")
 	}
 
 	return size
@@ -131,7 +131,7 @@ func getSignature(url, token string) *guildedURLSignatureResponse {
 
 	err = resp.Body.Close()
 	if err != nil {
-		slog.Warn("guilded: failed to close request body when getting signature")
+		log.Println("guilded: failed to close request body when getting signature")
 	}
 
 	var signatureResp guildedURLSignatureResponse
@@ -214,7 +214,7 @@ func (p *guildedPlugin) getMemberAuthor(msg *guildedChatMessage) (lightning.Mess
 	key := *msg.ServerID + "/" + msg.CreatedBy
 
 	if cached, exists := p.membersCache.Get(key); exists {
-		return cached.toAuthor(), nil
+		return getMemberAuthorData(&cached), nil
 	}
 
 	endpoint := "/servers/" + *msg.ServerID + "/members/" + msg.CreatedBy
@@ -231,14 +231,29 @@ func (p *guildedPlugin) getMemberAuthor(msg *guildedChatMessage) (lightning.Mess
 
 	p.membersCache.Set(key, memberResp.Member)
 
-	return memberResp.Member.toAuthor(), nil
+	return getMemberAuthorData(&memberResp.Member), nil
+}
+
+func getMemberAuthorData(member *guildedServerMember) lightning.MessageAuthor {
+	nickname := member.User.Name
+
+	if member.Nickname != nil {
+		nickname = *member.Nickname
+	}
+
+	return lightning.MessageAuthor{
+		Nickname:       nickname,
+		Username:       member.User.Name,
+		ID:             member.User.ID,
+		ProfilePicture: member.User.Avatar,
+	}
 }
 
 func (p *guildedPlugin) getWebhookAuthor(msg *guildedChatMessage) (lightning.MessageAuthor, error) {
 	key := *msg.ServerID + "/" + *msg.CreatedByWebhookID
 
 	if cached, exists := p.webhooksCache.Get(key); exists {
-		return cached.toAuthor(), nil
+		return getWebhookAuthorData(&cached), nil
 	}
 
 	endpoint := "/servers/" + *msg.ServerID + "/webhooks/" + *msg.CreatedByWebhookID
@@ -255,7 +270,16 @@ func (p *guildedPlugin) getWebhookAuthor(msg *guildedChatMessage) (lightning.Mes
 
 	p.webhooksCache.Set(key, webhookResp.Webhook)
 
-	return webhookResp.Webhook.toAuthor(), nil
+	return getWebhookAuthorData(&webhookResp.Webhook), nil
+}
+
+func getWebhookAuthorData(wh *guildedWebhook) lightning.MessageAuthor {
+	return lightning.MessageAuthor{
+		Nickname:       wh.Name,
+		Username:       wh.Name,
+		ID:             wh.ID,
+		ProfilePicture: wh.Avatar,
+	}
 }
 
 func parseResponse(resp *http.Response, result any) error {
@@ -265,7 +289,7 @@ func parseResponse(resp *http.Response, result any) error {
 	}
 
 	if resp.Body.Close() != nil {
-		slog.Warn("guilded: failed to close request body")
+		log.Println("guilded: failed to close request body")
 	}
 
 	if err := json.Unmarshal(body, result); err != nil {

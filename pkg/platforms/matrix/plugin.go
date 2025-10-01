@@ -103,7 +103,8 @@ func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 
 func (p *matrixPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
 	for idx, msg := range p.getOutgoing(message, ids, opts) {
-		msg.RelatesTo.SetReplace(id.EventID(ids[idx]))
+		msg.RelatesTo.Type = "m.replace"
+		msg.RelatesTo.EventID = id.EventID(ids[idx])
 
 		_, err := p.client.SendMessageEvent(
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
@@ -150,8 +151,8 @@ func (p *matrixPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 
 		channel <- &lightning.BaseMessage{
 			Time:      &timestamp,
-			EventID:   evt.Content.AsRedaction().Redacts.String(),
-			ChannelID: evt.RoomID.String(),
+			EventID:   string(evt.Content.AsRedaction().Redacts),
+			ChannelID: string(evt.RoomID),
 		}
 	})
 

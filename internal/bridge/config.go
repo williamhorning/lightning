@@ -1,8 +1,7 @@
 package bridge
 
 import (
-	"fmt"
-	"log/slog"
+	"log"
 
 	"github.com/BurntSushi/toml"
 	"github.com/williamhorning/lightning/internal/data"
@@ -24,7 +23,7 @@ func GetConfig(file string) (Config, bool) {
 	var config Config
 
 	if _, err := toml.DecodeFile(file, &config); err != nil {
-		slog.Error(fmt.Errorf("error loading config: %w", err).Error())
+		log.Printf("bridge: error loading config: %v\n", err)
 
 		return config, false
 	}

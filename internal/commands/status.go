@@ -26,7 +26,7 @@ func bridgeStatus(database data.Database) *lightning.Command {
 			status := "Channels:\n\n"
 
 			for i, channel := range bridge.Channels {
-				status += strconv.Itoa(i+1) + ". `" + channel.ID + "`"
+				status += strconv.FormatInt(int64(i+1), 10) + ". `" + channel.ID + "`"
 
 				if channel.Disabled.Read {
 					status += " (subscribed)"

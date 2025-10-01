@@ -21,6 +21,16 @@ type User struct {
 	Online        bool               `json:"online"`
 }
 
+// CDN file.
+type CDNFile struct {
+	Metadata    Metadata `json:"metadata"`
+	ID          string   `json:"id"`
+	Tag         string   `json:"tag"`
+	Filename    string   `json:"filename"`
+	ContentType string   `json:"content_type"`
+	Size        int      `json:"size"`
+}
+
 // File.
 type File struct {
 	Metadata    Metadata `json:"metadata"`

@@ -3,7 +3,6 @@ package revolt
 import (
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -240,7 +239,7 @@ func getLightningEmbeds(embeds []rvapi.Embed) []lightning.Embed {
 		}
 
 		if embed.Colour != nil {
-			if colorInt, err := strconv.ParseInt(strings.TrimPrefix(*embed.Colour, "#"), 16, 32); err == nil {
+			if colorInt, err := strconv.ParseInt((*embed.Colour)[1:], 16, 32); err == nil {
 				colorVal := int(colorInt)
 				lightningEmbed.Color = &colorVal
 			}

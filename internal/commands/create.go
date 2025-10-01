@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"log/slog"
+	"log"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/williamhorning/lightning/internal/data"
@@ -40,7 +40,7 @@ func bridgeCreate(database data.Database) *lightning.Command {
 				bridge.Channels = []data.BridgeChannel{}
 
 				if err = database.CreateBridge(bridge); err != nil {
-					slog.Error("failed to remove bridge after failed response", "err", err) // at least log the error
+					log.Printf("failed to remove bridge after failed command response: %v\n", err)
 				}
 			}
 		},

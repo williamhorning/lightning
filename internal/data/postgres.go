@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
+	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -26,7 +26,7 @@ func newPostgresDatabase(conn string) (Database, error) {
 
 	if err := pgdb.setupDatabase(); err != nil {
 		if closeErr := pgdb.db.Close(); closeErr != nil {
-			slog.Error(fmt.Errorf("failed to close database connection: %w", closeErr).Error())
+			log.Printf("data: failed to close connection: %v\n", err)
 		}
 
 		return nil, fmt.Errorf("failed to setup schema: %w", err)
@@ -98,7 +98,7 @@ func (p *postgresDatabase) GetBridge(brID string) (Bridge, error) {
 
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Warn(fmt.Errorf("failed to close rows: %w", err).Error())
+			log.Printf("data: failed to close rows: %v\n", err)
 		}
 	}()
 
@@ -198,7 +198,7 @@ func (p *postgresDatabase) setupDatabase() error {
 
 	if version != "0.8.1" {
 		if version == "0.8.0" {
-			slog.Warn("bridge: migration from 0.8.0 to 0.8.1 isn't supported. use 0.8.0-beta.8 to migrate")
+			log.Println("data: migration from 0.8.0 to 0.8.1 isn't supported. use 0.8.0-beta.8 to migrate")
 		}
 
 		return UnsupportedDatabaseTypeError{}
@@ -223,7 +223,7 @@ func (p *postgresDatabase) withTx(txnfn func(*sql.Tx) error) error {
 
 	defer func() {
 		if err := txn.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-			slog.Warn(fmt.Errorf("txn rollback failed: %w", err).Error())
+			log.Printf("data: txn rollback failed: %v\n", err)
 		}
 	}()
 

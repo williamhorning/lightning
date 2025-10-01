@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -25,56 +24,14 @@ const (
 )
 
 type discordOutgoingMessage struct {
-	AllowedMentions *discordgo.MessageAllowedMentions
-	Reference       *discordgo.MessageReference
-	AvatarURL       string
-	Content         string
-	Username        string
-	Components      []discordgo.MessageComponent
-	Embeds          []*discordgo.MessageEmbed
-	Files           []*discordgo.File
-}
-
-func (o *discordOutgoingMessage) Webhook() *discordgo.WebhookParams {
-	return &discordgo.WebhookParams{
-		AllowedMentions: o.AllowedMentions,
-		AvatarURL:       o.AvatarURL,
-		Components:      o.Components,
-		Content:         o.Content,
-		Embeds:          o.Embeds,
-		Files:           o.Files,
-		Username:        o.Username,
-	}
-}
-
-func (o *discordOutgoingMessage) WebhookEdit() *discordgo.WebhookEdit {
-	return &discordgo.WebhookEdit{
-		AllowedMentions: o.AllowedMentions,
-		Content:         &o.Content,
-		Components:      &o.Components,
-		Embeds:          &o.Embeds,
-		Files:           o.Files,
-	}
-}
-
-func (o *discordOutgoingMessage) Message() *discordgo.MessageSend {
-	return &discordgo.MessageSend{
-		AllowedMentions: o.AllowedMentions,
-		Components:      o.Components,
-		Content:         o.Content,
-		Embeds:          o.Embeds,
-		Files:           o.Files,
-		Reference:       o.Reference,
-	}
-}
-
-func (o *discordOutgoingMessage) Interaction() *discordgo.InteractionResponseData {
-	return &discordgo.InteractionResponseData{
-		AllowedMentions: o.AllowedMentions,
-		Components:      o.Components,
-		Content:         o.Content,
-		Embeds:          o.Embeds,
-	}
+	allowedMentions *discordgo.MessageAllowedMentions
+	reference       *discordgo.MessageReference
+	avatarURL       string
+	content         string
+	username        string
+	components      []discordgo.MessageComponent
+	embeds          []*discordgo.MessageEmbed
+	files           []*discordgo.File
 }
 
 type discordWebhook struct {
@@ -106,25 +63,25 @@ func getOutgoingMessage(
 	opts *lightning.SendOptions,
 ) *discordOutgoingMessage {
 	msg := discordOutgoingMessage{
-		AllowedMentions: getOutgoingMention(opts),
-		AvatarURL:       getOutgoingProfile(message),
-		Content:         getOutgoingContent(session, message),
-		Embeds:          getOutgoingEmbeds(message),
-		Files:           getOutgoingFiles(session, message),
+		allowedMentions: getOutgoingMention(opts),
+		avatarURL:       getOutgoingProfile(message),
+		content:         getOutgoingContent(session, message),
+		embeds:          getOutgoingEmbeds(message),
+		files:           getOutgoingFiles(session, message),
 	}
 
 	if message.Author != nil {
-		msg.Username = message.Author.Nickname
+		msg.username = message.Author.Nickname
 	}
 
 	if opts != nil {
-		msg.Components = getOutgoingComponents(session, message)
+		msg.components = getOutgoingComponents(session, message)
 	} else {
-		msg.Reference = getOutgoingReference(message)
+		msg.reference = getOutgoingReference(message)
 	}
 
-	if msg.Content == "" && len(msg.Embeds) == 0 && len(msg.Files) == 0 {
-		msg.Content = "_ _"
+	if msg.content == "" && len(msg.embeds) == 0 && len(msg.files) == 0 {
+		msg.content = "_ _"
 	}
 
 	return &msg
@@ -399,11 +356,7 @@ func (c *cancelableReadCloser) Close() error {
 	c.cancel()
 
 	if err != nil {
-		wrapped := fmt.Errorf("discord: failed closing cancelable read closer: %w", err)
-
-		slog.Error(wrapped.Error())
-
-		return wrapped
+		return fmt.Errorf("discord: failed closing cancelable read closer: %w", err)
 	}
 
 	return nil

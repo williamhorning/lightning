@@ -1,8 +1,7 @@
 package bridge
 
 import (
-	"fmt"
-	"log/slog"
+	"log"
 
 	"github.com/williamhorning/lightning/internal/commands"
 	"github.com/williamhorning/lightning/internal/data"
@@ -11,30 +10,28 @@ import (
 
 // Setup the bridge system with the given database.
 func Setup(bot *lightning.Bot, author *lightning.MessageAuthor, database data.Database) {
-	slog.Info("bridge: setting up")
-
 	if err := bot.AddCommand(
 		commands.BridgeCommand(database), commands.HelpCommand(author.Nickname), commands.PingCommand()); err != nil {
-		slog.Error(fmt.Errorf("bridge: failed to add commands: %w", err).Error())
+		log.Printf("bridge: failed to add commands: %v\n", err)
 	}
 
 	bot.AddHandler(func(_ *lightning.Bot, event *lightning.Message) {
 		if err := handleBridgeMessage(bot, database, "create", *event); err != nil {
-			slog.Error(fmt.Errorf("bridge: creation failed: %w\n\tevent: %s", err, event.EventID).Error())
+			log.Printf("bridge: creation failed: %v\n\tevent: %s\n", err, event.EventID)
 		}
 	})
 
 	bot.AddHandler(func(_ *lightning.Bot, event *lightning.EditedMessage) {
 		if err := handleBridgeMessage(bot, database, "edit", *event); err != nil {
-			slog.Error(fmt.Errorf("bridge: editing failed: %w\n\tevent: %s", err, event.Message.EventID).Error())
+			log.Printf("bridge: editing failed: %v\n\tevent: %s\n", err, event.Message.EventID)
 		}
 	})
 
 	bot.AddHandler(func(_ *lightning.Bot, event *lightning.DeletedMessage) {
 		if err := handleBridgeMessage(bot, database, "delete", *event); err != nil {
-			slog.Error(fmt.Errorf("bridge: deletion failed: %w\n\tevent: %s", err, event.EventID).Error())
+			log.Printf("bridge: deletion failed: %v\n\tevent: %s\n", err, event.EventID)
 		}
 	})
 
-	slog.Info("bridge: set up!")
+	log.Println("bridge: set up!")
 }

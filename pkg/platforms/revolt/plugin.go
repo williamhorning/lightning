@@ -14,7 +14,7 @@ package revolt
 
 import (
 	"fmt"
-	"log/slog"
+	"log"
 	"time"
 
 	"github.com/williamhorning/lightning/internal/rvapi"
@@ -44,8 +44,8 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 
 	go func() {
 		for ready := range plugin.session.Ready {
-			slog.Info("revolt: ready!", "username", plugin.self.Username, "servers", len(ready.Servers))
-			slog.Info("revolt: invite me at https://app.revolt.chat/invite/" + plugin.self.ID)
+			log.Printf("revolt: ready as %s in %d servers!\n", plugin.self.Username, len(ready.Servers))
+			log.Printf("revolt: https://app.revolt.chat/invite/%s\n", plugin.self.ID)
 		}
 	}()
 
@@ -125,7 +125,7 @@ func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 			Replies:     msg.Replies,
 		})
 		if err != nil {
-			slog.Warn(fmt.Errorf("revolt: failed to send leftover attachments: %w", err).Error(), "leftover", leftover)
+			log.Printf("failed to send leftover attachments: %v\n\tleftover: %#+v\n", err, leftover)
 		} else {
 			ids = append(ids, res)
 		}

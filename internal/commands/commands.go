@@ -1,20 +1,19 @@
 package commands
 
 import (
-	"fmt"
-	"log/slog"
+	"log"
 	"time"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func sendErr(err error, msg string, opts *lightning.CommandOptions) {
-	slog.Error(fmt.Errorf("command error: %w", err).Error())
+	log.Printf("command error: %v\n", err)
 
 	if err = opts.Reply(getMessage("something went wrong :(", "uh oh! looks like you got struck by an error: "+
 		msg+"\n\n```\n"+err.Error()+"\n```\nif you think this is a bug, or need more help, see the "+
 		"[docs](https://williamhorning.eu.org/lightning/bridge)"), false); err != nil {
-		slog.Error(fmt.Errorf("failed to send error message: %w", err).Error())
+		log.Printf("failed to reply with error to command: %v\n", err)
 	}
 }
 

@@ -3,7 +3,7 @@ package matrix
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"log"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
@@ -31,11 +31,11 @@ func setupClient(cfg map[string]string) (*mautrix.Client, error) {
 			return nil, fmt.Errorf("matrix: failed to login: %w", err)
 		}
 
-		cfg["device_id"] = client.DeviceID.String()
+		cfg["device_id"] = string(client.DeviceID)
 		cfg["access_token"] = client.AccessToken
-		cfg["mxid"] = client.UserID.String()
+		cfg["mxid"] = string(client.UserID)
 
-		slog.Info("please set the following in your config:", "cfg", cfg)
+		log.Printf("matrix: please set the following in your config: %#+v\n", cfg)
 	}
 
 	helper, err := cryptohelper.NewCryptoHelper(

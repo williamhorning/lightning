@@ -3,7 +3,7 @@ package matrix
 import (
 	"errors"
 	"fmt"
-	"log/slog"
+	"log"
 	"net/http"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -30,7 +30,7 @@ func (e matrixError) Unwrap() error {
 }
 
 func handleError(err error, msg string, extra map[string]any) error {
-	slog.Error("matrix error: "+msg, "err", err, "extra", extra)
+	log.Printf("matrix: %s: %v\n\textra: %#+v\n", msg, err, extra)
 
 	var httpErr *mautrix.HTTPError
 	if !errors.As(err, &httpErr) {

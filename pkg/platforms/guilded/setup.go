@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
+	"log"
 	"net/http"
 )
 
@@ -34,7 +34,7 @@ func (p *guildedPlugin) SetupChannel(channel string) (any, error) {
 		}
 
 		if resp.Body.Close() != nil {
-			slog.Warn("guilded: failed to close request body when making webhook")
+			log.Println("guilded: failed to close request body when making webhook")
 		}
 
 		return nil, &guildedStatusError{"failed to create webhook", string(body), resp.StatusCode, false}
@@ -67,7 +67,7 @@ func getChannel(token, channel string) (*guildedServerChannel, error) {
 	}
 
 	if resp.Body.Close() != nil {
-		slog.Warn("guilded: failed to close request body when getting channel")
+		log.Println("guilded: failed to close request body when getting channel")
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {

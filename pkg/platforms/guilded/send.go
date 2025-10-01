@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
+	"log"
 	"net/http"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -53,7 +53,7 @@ func (p *guildedPlugin) apiSendMessage(message *lightning.Message, reader io.Rea
 	}
 
 	if resp.Body.Close() != nil {
-		slog.Warn("guilded: failed to close request body when sending message")
+		log.Println("guilded: failed to close request body when sending message")
 	}
 
 	return []string{msg.Message.ID}, nil
@@ -95,7 +95,7 @@ func (p *guildedPlugin) sendWebhookMessage(
 			err, message.ChannelID, message)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header["Content-Type"] = []string{"application/json"}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -113,7 +113,7 @@ func (p *guildedPlugin) sendWebhookMessage(
 	}
 
 	if resp.Body.Close() != nil {
-		slog.Warn("guilded: failed to close request body when sending webhook message")
+		log.Println("guilded: failed to close request body when sending webhook message")
 	}
 
 	return []string{response.ID}, nil

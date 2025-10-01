@@ -12,8 +12,8 @@ import (
 
 // Get creates a request, setting the pointer to the body, and returning encountered errors.
 func Get[T any](s *Session, path string, val *T) error {
-	body, _, err := s.Fetch(http.MethodGet, path, nil)
-	if err != nil {
+	body, code, err := s.Fetch(http.MethodGet, path, nil)
+	if err != nil || code != 200 {
 		return err
 	}
 

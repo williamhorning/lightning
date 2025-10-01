@@ -66,7 +66,7 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 
 	resp, err := p.client.UploadLink(context.Background(), url)
 	if err == nil {
-		curl := resp.ContentURI.CUString()
+		curl := id.ContentURIString("mxc://" + resp.ContentURI.Homeserver + "/" + resp.ContentURI.FileID)
 
 		return &curl
 	}

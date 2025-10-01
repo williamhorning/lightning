@@ -55,7 +55,7 @@ func (s *Session) UploadFile(tag, name string, reader io.Reader) (string, error)
 		return "", fmt.Errorf("rvapi: failed to read response: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
-	var response File
+	var response CDNFile
 	if err = json.Unmarshal(body, &response); err != nil {
 		return "", fmt.Errorf("rvapi: failed to unmarshal response: %w\n\tbody: %s", err, string(body))
 	}

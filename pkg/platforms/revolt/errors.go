@@ -33,5 +33,5 @@ func (e *revoltStatusError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *revoltStatusError) Error() string {
-	return "revolt status code " + strconv.Itoa(e.code) + ": " + e.msg
+	return "revolt status code " + strconv.FormatInt(int64(e.code), 10) + ": " + e.msg
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"log/slog"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -20,35 +19,31 @@ func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.R
 
 	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
-		wrapped := fmt.Errorf("guilded: creating request: %w\n\tendpoint: %s\n\tmethod: %s", err, endpoint, method)
-
-		slog.Error(wrapped.Error())
-
-		return nil, wrapped
+		return nil, fmt.Errorf("guilded: creating request: %w\n\tendpoint: %s\n\tmethod: %s", err, endpoint, method)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "lightning/"+lightning.VERSION)
+	req.Header["Authorization"] = []string{"Bearer " + token}
+	req.Header["Content-Type"] = []string{"application/json"}
+	req.Header["User-Agent"] = []string{"lightning/" + lightning.VERSION}
 	req.Header["x-guilded-bot-api-use-official-markdown"] = []string{"true"}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		wrapped := fmt.Errorf("guilded: making request: %w\n\tendpoint: %s\n\tmethod: %s", err, endpoint, method)
-
-		slog.Error(wrapped.Error())
-
-		return nil, wrapped
+		return nil, fmt.Errorf("guilded: making request: %w\n\tendpoint: %s\n\tmethod: %s", err, endpoint, method)
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {
-		retryAfter := resp.Header.Get("Retry-After")
+		retryAfter := resp.Header["Retry-After"]
 
-		if retryAfter == "" {
-			retryAfter = "1000"
+		if len(retryAfter) == 0 {
+			retryAfter = append(retryAfter, "1000")
 		}
 
-		retryAfterDuration, err := time.ParseDuration(retryAfter + "ms")
+		if retryAfter[0] == "" {
+			retryAfter[0] = "1000"
+		}
+
+		retryAfterDuration, err := time.ParseDuration(retryAfter[0] + "ms")
 		if err != nil {
 			retryAfterDuration = time.Second
 		}

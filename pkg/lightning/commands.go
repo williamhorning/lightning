@@ -1,8 +1,6 @@
 package lightning
 
-import (
-	"strings"
-)
+import "strings"
 
 // AddCommand takes [Command]s and registers it with the built-in
 // text command handler and any platform-specific command systems.
@@ -31,7 +29,7 @@ func (b *Bot) AddCommand(commands ...*Command) error {
 }
 
 func handleMessageCommand(bot *Bot, event *Message) {
-	if !strings.HasPrefix(event.Content, bot.prefix) {
+	if len(event.Content) <= len(bot.prefix) || event.Content[:len(bot.prefix)] != bot.prefix {
 		return
 	}
 

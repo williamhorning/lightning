@@ -2,8 +2,7 @@
 package commands
 
 import (
-	"fmt"
-	"log/slog"
+	"log"
 	"strconv"
 	"time"
 
@@ -27,7 +26,7 @@ func HelpCommand(username string) *lightning.Command {
 			)
 
 			if err := opts.Reply(msg, false); err != nil {
-				slog.Error(fmt.Errorf("failed to reply to help command: %w", err).Error())
+				log.Printf("failed to reply to help command: %v\n", err)
 			}
 		},
 	}
@@ -41,7 +40,7 @@ func PingCommand() *lightning.Command {
 		Executor: func(opts *lightning.CommandOptions) {
 			if err := opts.Reply(getMessage("Pong! 🏓 ",
 				strconv.FormatInt(time.Since(*opts.Time).Milliseconds(), 10)+"ms"), false); err != nil {
-				slog.Error(fmt.Errorf("failed to reply to ping command: %w", err).Error())
+				log.Printf("failed to reply to ping command: %v\n", err)
 			}
 		},
 	}
