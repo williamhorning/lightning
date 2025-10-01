@@ -1,4 +1,4 @@
-package revolt
+package stoat
 
 import (
 	"strconv"
@@ -7,31 +7,31 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type revoltPermissionsError struct {
+type stoatPermissionsError struct {
 	permissions rvapi.Permission
 	expected    rvapi.Permission
 }
 
-func (*revoltPermissionsError) Disable() *lightning.ChannelDisabled {
+func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: true}
 }
 
-func (e *revoltPermissionsError) Error() string {
-	return "insufficient permissions in Revolt (have " +
+func (e *stoatPermissionsError) Error() string {
+	return "insufficient permissions in Stoat (have " +
 		strconv.FormatUint(uint64(e.permissions), 10) + ", want " +
 		strconv.FormatUint(uint64(e.expected), 10) + "), please check them"
 }
 
-type revoltStatusError struct {
+type stoatStatusError struct {
 	msg  string
 	code int
 	edit bool
 }
 
-func (e *revoltStatusError) Disable() *lightning.ChannelDisabled {
+func (e *stoatStatusError) Disable() *lightning.ChannelDisabled {
 	return &lightning.ChannelDisabled{Read: false, Write: e.code == 401 || e.code == 403 || (e.code == 404 && !e.edit)}
 }
 
-func (e *revoltStatusError) Error() string {
-	return "revolt status code " + strconv.FormatInt(int64(e.code), 10) + ": " + e.msg
+func (e *stoatStatusError) Error() string {
+	return "stoat status code " + strconv.FormatInt(int64(e.code), 10) + ": " + e.msg
 }

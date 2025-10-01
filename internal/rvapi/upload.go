@@ -29,7 +29,7 @@ func (s *Session) UploadFile(tag, name string, reader io.Reader) (string, error)
 		log.Printf("rvapi: failed to close file payload: %v\n", err)
 	}
 
-	url := "https://cdn.revoltusercontent.com/" + tag
+	url := "https://cdn.stoatusercontent.com/" + tag
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, buf)
 	if err != nil {
@@ -41,7 +41,7 @@ func (s *Session) UploadFile(tag, name string, reader io.Reader) (string, error)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("revolt: failed to do request in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
+		return "", fmt.Errorf("stoat: failed to do request in upload: %w\n\tname: %s\n\ttag: %s", err, name, tag)
 	}
 
 	defer func() {

@@ -35,9 +35,9 @@ func Get[T any](s *Session, path string, val *T) error {
 	return nil
 }
 
-// Fetch returns a request body, status code, and/or possible error from the Revolt API.
+// Fetch returns a request body, status code, and/or possible error from the Stoat API.
 func (s *Session) Fetch(method, endpoint string, body io.Reader) (io.ReadCloser, int, error) {
-	url := "https://api.revolt.chat/0.8" + endpoint
+	url := "https://api.stoat.chat/0.8" + endpoint
 
 	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {

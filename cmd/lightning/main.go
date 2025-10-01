@@ -14,7 +14,7 @@ import (
 	"github.com/williamhorning/lightning/pkg/platforms/discord"
 	"github.com/williamhorning/lightning/pkg/platforms/guilded"
 	"github.com/williamhorning/lightning/pkg/platforms/matrix"
-	"github.com/williamhorning/lightning/pkg/platforms/revolt"
+	"github.com/williamhorning/lightning/pkg/platforms/stoat"
 	"github.com/williamhorning/lightning/pkg/platforms/telegram"
 )
 
@@ -38,7 +38,7 @@ func main() {
 	if err := errors.Join(
 		bot.AddPluginType("discord", discord.New),
 		bot.AddPluginType("guilded", guilded.New),
-		bot.AddPluginType("revolt", revolt.New),
+		bot.AddPluginType("stoat", stoat.New),
 		bot.AddPluginType("telegram", telegram.New),
 		bot.AddPluginType("matrix", matrix.New),
 	); err != nil {

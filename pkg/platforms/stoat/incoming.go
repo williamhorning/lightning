@@ -1,4 +1,4 @@
-package revolt
+package stoat
 
 import (
 	"regexp"
@@ -10,7 +10,7 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *revoltPlugin) getIncomingMessage(message rvapi.Message) *lightning.Message {
+func (p *stoatPlugin) getIncomingMessage(message rvapi.Message) *lightning.Message {
 	if message.Author == p.self.ID && message.Masquerade != nil {
 		return nil
 	}
@@ -65,16 +65,16 @@ func getLightningAttachment(attachments []rvapi.File) []lightning.Attachment {
 	return result
 }
 
-func (p *revoltPlugin) getLightningAuthor(
+func (p *stoatPlugin) getLightningAuthor(
 	authorID string,
 	channelID string,
 	masquerade *rvapi.Masquerade,
 ) *lightning.MessageAuthor {
 	author := lightning.MessageAuthor{
 		ID:       authorID,
-		Username: "RevoltUser",
-		Nickname: "Revolt User",
-		Color:    "#FF4654",
+		Username: "StoatUser",
+		Nickname: "Stoat User",
+		Color:    "#8C24EC",
 	}
 
 	user := p.session.User(authorID)
@@ -95,7 +95,7 @@ func (p *revoltPlugin) getLightningAuthor(
 	return applyMasquerade(author, masquerade)
 }
 
-func (p *revoltPlugin) setServerMember(author *lightning.MessageAuthor, authorID, channelID string) {
+func (p *stoatPlugin) setServerMember(author *lightning.MessageAuthor, authorID, channelID string) {
 	channel := p.session.Channel(channelID)
 	if channel == nil || channel.ChannelType != "TextChannel" || channel.Server == nil {
 		return
@@ -117,7 +117,7 @@ func (p *revoltPlugin) setServerMember(author *lightning.MessageAuthor, authorID
 }
 
 func getURL(file *rvapi.File) string {
-	return "https://cdn.revoltusercontent.com/" + file.Tag + "/" + file.ID
+	return "https://cdn.stoatusercontent.com/" + file.Tag + "/" + file.ID
 }
 
 func applyMasquerade(author lightning.MessageAuthor, masquerade *rvapi.Masquerade) *lightning.MessageAuthor {
@@ -141,20 +141,20 @@ func applyMasquerade(author lightning.MessageAuthor, masquerade *rvapi.Masquerad
 }
 
 var (
-	revoltSpoilerRegex = regexp.MustCompile(`!!(.+?)!!`)
-	spoilerRegex       = regexp.MustCompile(`\|\|(.+?)\|\|`)
-	emojiRegex         = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
-	mentionRegex       = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
-	channelRegex       = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	stoatSpoilerRegex = regexp.MustCompile(`!!(.+?)!!`)
+	spoilerRegex      = regexp.MustCompile(`\|\|(.+?)\|\|`)
+	emojiRegex        = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
+	mentionRegex      = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	channelRegex      = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
 )
 
 func replaceSpoilers(content string) string {
-	return revoltSpoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
+	return stoatSpoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
 		return "||" + match[2:len(match)-2] + "||"
 	})
 }
 
-func (p *revoltPlugin) replaceEmojis(message *lightning.Message) string {
+func (p *stoatPlugin) replaceEmojis(message *lightning.Message) string {
 	return emojiRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
 		if emojiID := extractID(match, emojiRegex); emojiID != "" {
 			emoji := p.session.Emoji(emojiID)
@@ -163,7 +163,7 @@ func (p *revoltPlugin) replaceEmojis(message *lightning.Message) string {
 				return match
 			}
 
-			url := "https://cdn.revoltusercontent.com/emojis/" + emoji.ID
+			url := "https://cdn.stoatusercontent.com/emojis/" + emoji.ID
 
 			message.Emoji = append(message.Emoji, lightning.Emoji{
 				URL:  &url,
@@ -178,7 +178,7 @@ func (p *revoltPlugin) replaceEmojis(message *lightning.Message) string {
 	})
 }
 
-func (p *revoltPlugin) replaceMentions(channelID string, content string) string {
+func (p *stoatPlugin) replaceMentions(channelID string, content string) string {
 	return mentionRegex.ReplaceAllStringFunc(content, func(match string) string {
 		userID := extractID(match, mentionRegex)
 		if userID == "" {
@@ -202,7 +202,7 @@ func (p *revoltPlugin) replaceMentions(channelID string, content string) string 
 	})
 }
 
-func (p *revoltPlugin) replaceChannels(content string) string {
+func (p *stoatPlugin) replaceChannels(content string) string {
 	return channelRegex.ReplaceAllStringFunc(content, func(match string) string {
 		chanID := extractID(match, channelRegex)
 		if chanID == "" {

@@ -1,4 +1,4 @@
-// Package rvapi implements the Revolt API
+// Package rvapi implements the Stoat API
 package rvapi
 
 import (
@@ -12,7 +12,7 @@ import (
 // version of lightning in the repo, though it may change.
 const VERSION = "0.8.0-rc.2"
 
-// Session represents the Revolt API session a bot may have.
+// Session represents the Stoat API session a bot may have.
 type Session struct {
 	MessageDeleted   chan *MessageDeleteEvent
 	conn             *websocket.Conn

@@ -9,14 +9,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Connect to the Revolt socket.
+// Connect to the Stoat socket.
 func (s *Session) Connect() error {
 	if s.connected.Load() {
 		return nil
 	}
 
 	conn, resp, err := websocket.DefaultDialer.Dial(
-		"wss://app.revolt.chat/events?version=1&format=json&token="+s.Token,
+		"wss://app.stoat.chat/events?version=1&format=json&token="+s.Token,
 		map[string][]string{"User-Agent": {"rvapi/0.8.0-rc.2"}},
 	)
 	if err != nil {

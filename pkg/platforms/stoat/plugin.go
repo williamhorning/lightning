@@ -1,16 +1,16 @@
-// Package revolt provides a [lightning.Plugin] implementation for Revolt.
-// To use Revolt support with lightning, see [New]
+// Package stoat provides a [lightning.Plugin] implementation for Stoat.
+// To use Stoat support with lightning, see [New]
 //
 //	bot := lightning.NewBot(lightning.BotOptions{
 //		// ...
 //	}
 //
-//	bot.AddPluginType("revolt", revolt.New)
+//	bot.AddPluginType("stoat", stoat.New)
 //
-//	bot.UsePluginType("revolt", "", map[string]string{
+//	bot.UsePluginType("stoat", "", map[string]string{
 //		// ...
 //	})
-package revolt
+package stoat
 
 import (
 	"fmt"
@@ -21,15 +21,15 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-// New creates a new [lightning.Plugin] that provides Revolt support for Lightning
+// New creates a new [lightning.Plugin] that provides Stoat support for Lightning
 //
 // It only takes in a map with the following structure:
 //
 //	map[string]string{
-//		"token": "", // a string with your Revolt bot token
+//		"token": "", // a string with your Stoat bot token
 //	}
 func New(cfg map[string]string) (lightning.Plugin, error) {
-	plugin := &revoltPlugin{session: &rvapi.Session{
+	plugin := &stoatPlugin{session: &rvapi.Session{
 		MessageDeleted: make(chan *rvapi.MessageDeleteEvent, 1000),
 		MessageCreated: make(chan *rvapi.MessageEvent, 1000),
 		MessageUpdated: make(chan *rvapi.MessageUpdateEvent, 1000),
@@ -39,24 +39,24 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 	plugin.self = plugin.session.User("@me")
 
 	if plugin.self == nil {
-		return nil, lightning.PluginConfigError{Plugin: "revolt", Message: "failed to get self user"}
+		return nil, lightning.PluginConfigError{Plugin: "stoat", Message: "failed to get self user"}
 	}
 
 	go func() {
 		for ready := range plugin.session.Ready {
-			log.Printf("revolt: ready as %s in %d servers!\n", plugin.self.Username, len(ready.Servers))
-			log.Printf("revolt: https://app.revolt.chat/invite/%s\n", plugin.self.ID)
+			log.Printf("stoat: ready as %s in %d servers!\n", plugin.self.Username, len(ready.Servers))
+			log.Printf("stoat: https://app.stoat.chat/invite/%s\n", plugin.self.ID)
 		}
 	}()
 
 	if err := plugin.session.Connect(); err != nil {
-		return nil, fmt.Errorf("revolt: failed to connect to socket: %w", err)
+		return nil, fmt.Errorf("stoat: failed to connect to socket: %w", err)
 	}
 
 	return plugin, nil
 }
 
-type revoltPlugin struct {
+type stoatPlugin struct {
 	self    *rvapi.User
 	session *rvapi.Session
 }
@@ -67,7 +67,7 @@ const correctPermissionValue = rvapi.PermissionManageCustomization | rvapi.Permi
 	rvapi.PermissionSendEmbeds | rvapi.PermissionUploadFiles | rvapi.PermissionMasquerade |
 	rvapi.PermissionReact
 
-func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
+func (p *stoatPlugin) SetupChannel(channel string) (any, error) {
 	channelData := p.session.Channel(channel)
 	needed := correctPermissionValue
 
@@ -83,10 +83,10 @@ func (p *revoltPlugin) SetupChannel(channel string) (any, error) {
 		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 	}
 
-	return nil, &revoltPermissionsError{permissions, needed}
+	return nil, &stoatPermissionsError{permissions, needed}
 }
 
-func (p *revoltPlugin) SendCommandResponse(
+func (p *stoatPlugin) SendCommandResponse(
 	message *lightning.Message,
 	opts *lightning.SendOptions,
 	user string,
@@ -94,7 +94,7 @@ func (p *revoltPlugin) SendCommandResponse(
 	var channel rvapi.Channel
 
 	if err := rvapi.Get(p.session, "/users/"+user+"/dm", &channel); err != nil {
-		return nil, fmt.Errorf("revolt: failed to get dm channel: %w", err)
+		return nil, fmt.Errorf("stoat: failed to get dm channel: %w", err)
 	}
 
 	message.ChannelID = channel.ID
@@ -102,7 +102,7 @@ func (p *revoltPlugin) SendCommandResponse(
 	return p.SendMessage(message, opts)
 }
 
-func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := p.getOutgoing(message, opts)
 	leftover := make([]string, 0)
 
@@ -111,7 +111,7 @@ func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 		msg.Attachments = msg.Attachments[:5]
 	}
 
-	res, err := p.revoltSendMessage(message.ChannelID, msg)
+	res, err := p.stoatSendMessage(message.ChannelID, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 	ids := []string{res}
 
 	if len(leftover) > 0 {
-		res, err := p.revoltSendMessage(message.ChannelID, rvapi.DataMessageSend{
+		res, err := p.stoatSendMessage(message.ChannelID, rvapi.DataMessageSend{
 			Attachments: leftover,
 			Masquerade:  msg.Masquerade,
 			Replies:     msg.Replies,
@@ -134,11 +134,11 @@ func (p *revoltPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 	return ids, nil
 }
 
-func (*revoltPlugin) SetupCommands(_ map[string]*lightning.Command) error {
+func (*stoatPlugin) SetupCommands(_ map[string]*lightning.Command) error {
 	return nil
 }
 
-func (p *revoltPlugin) ListenMessages() <-chan *lightning.Message {
+func (p *stoatPlugin) ListenMessages() <-chan *lightning.Message {
 	channel := make(chan *lightning.Message, 1000)
 
 	go func() {
@@ -152,7 +152,7 @@ func (p *revoltPlugin) ListenMessages() <-chan *lightning.Message {
 	return channel
 }
 
-func (p *revoltPlugin) ListenEdits() <-chan *lightning.EditedMessage {
+func (p *stoatPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	channel := make(chan *lightning.EditedMessage, 1000)
 
 	go func() {
@@ -169,7 +169,7 @@ func (p *revoltPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	return channel
 }
 
-func (p *revoltPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
+func (p *stoatPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	channel := make(chan *lightning.BaseMessage, 1000)
 
 	go func() {
@@ -186,6 +186,6 @@ func (p *revoltPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	return channel
 }
 
-func (*revoltPlugin) ListenCommands() <-chan *lightning.CommandEvent {
+func (*stoatPlugin) ListenCommands() <-chan *lightning.CommandEvent {
 	return nil
 }

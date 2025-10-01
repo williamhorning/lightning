@@ -1,4 +1,4 @@
-package revolt
+package stoat
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *revoltPlugin) getOutgoing(
+func (p *stoatPlugin) getOutgoing(
 	message *lightning.Message,
 	opts *lightning.SendOptions,
 ) rvapi.DataMessageSend {
@@ -54,7 +54,7 @@ func (p *revoltPlugin) getOutgoing(
 
 var emojiSendRegex = regexp.MustCompile(`:\w+:`)
 
-func (p *revoltPlugin) replaceOutgoingEmoji(message *lightning.Message) func(string) string {
+func (p *stoatPlugin) replaceOutgoingEmoji(message *lightning.Message) func(string) string {
 	return func(match string) string {
 		if emoji.IsEmoji(match) {
 			return match
@@ -82,7 +82,7 @@ func (p *revoltPlugin) replaceOutgoingEmoji(message *lightning.Message) func(str
 	}
 }
 
-func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment) []string {
+func (p *stoatPlugin) getOutgoingAttachments(attachments []lightning.Attachment) []string {
 	if len(attachments) == 0 {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment
 
 		err = resp.Body.Close()
 		if err != nil {
-			log.Printf("revolt: failed to close upload body: %v\n", err)
+			log.Printf("stoat: failed to close upload body: %v\n", err)
 		}
 
 		cancel()
@@ -135,7 +135,7 @@ func getOutgoingEmbeds(embeds []lightning.Embed) []rvapi.SendableEmbed {
 }
 
 func convertOutgoingEmbed(embed lightning.Embed) rvapi.SendableEmbed {
-	revoltEmbed := rvapi.SendableEmbed{
+	stoatEmbed := rvapi.SendableEmbed{
 		Title:       embed.Title,
 		Description: getEmbedDescription(embed),
 		URL:         embed.URL,
@@ -144,12 +144,12 @@ func convertOutgoingEmbed(embed lightning.Embed) rvapi.SendableEmbed {
 	if embed.Color != nil {
 		color := "#" + strconv.FormatInt(int64(*embed.Color), 16)
 
-		revoltEmbed.Colour = &color
+		stoatEmbed.Colour = &color
 	}
 
-	setEmbedMedia(&revoltEmbed, embed)
+	setEmbedMedia(&stoatEmbed, embed)
 
-	return revoltEmbed
+	return stoatEmbed
 }
 
 func getEmbedDescription(embed lightning.Embed) *string {
@@ -173,17 +173,17 @@ func getEmbedDescription(embed lightning.Embed) *string {
 	return &description
 }
 
-func setEmbedMedia(revoltEmbed *rvapi.SendableEmbed, embed lightning.Embed) {
+func setEmbedMedia(stoatEmbed *rvapi.SendableEmbed, embed lightning.Embed) {
 	if embed.Image != nil {
-		revoltEmbed.Media = &embed.Image.URL
+		stoatEmbed.Media = &embed.Image.URL
 	}
 
 	if embed.Video != nil {
-		revoltEmbed.Media = &embed.Video.URL
+		stoatEmbed.Media = &embed.Video.URL
 	}
 
 	if embed.Thumbnail != nil && len([]rune(embed.Thumbnail.URL)) > 0 && len([]rune(embed.Thumbnail.URL)) <= 128 {
-		revoltEmbed.IconURL = &embed.Thumbnail.URL
+		stoatEmbed.IconURL = &embed.Thumbnail.URL
 	}
 }
 
