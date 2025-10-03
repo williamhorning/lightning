@@ -38,7 +38,7 @@ func main() {
 	if err := errors.Join(
 		bot.AddPluginType("discord", discord.New),
 		bot.AddPluginType("guilded", guilded.New),
-		bot.AddPluginType("stoat", stoat.New),
+		bot.AddPluginType("revolt", stoat.New),
 		bot.AddPluginType("telegram", telegram.New),
 		bot.AddPluginType("matrix", matrix.New),
 	); err != nil {

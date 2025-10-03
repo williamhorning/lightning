@@ -15,8 +15,9 @@ func (s *Session) Connect() error {
 		return nil
 	}
 
+	// TODO: ???
 	conn, resp, err := websocket.DefaultDialer.Dial(
-		"wss://app.stoat.chat/events?version=1&format=json&token="+s.Token,
+		"wss://events.stoat.chat/?version=1&format=json&token="+s.Token,
 		map[string][]string{"User-Agent": {"rvapi/0.8.0-rc.2"}},
 	)
 	if err != nil {
