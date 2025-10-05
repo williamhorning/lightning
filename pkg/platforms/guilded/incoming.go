@@ -188,6 +188,7 @@ func (p *guildedPlugin) getIncomingAuthor(msg *guildedChatMessage) *lightning.Me
 		Nickname: "Guilded User",
 		Username: "GuildedUser",
 		ID:       msg.CreatedBy,
+		Color:    "#f8d64c",
 	}
 
 	if defaultAuthor.ID == "" {
@@ -246,6 +247,7 @@ func getMemberAuthorData(member *guildedServerMember) lightning.MessageAuthor {
 		Username:       member.User.Name,
 		ID:             member.User.ID,
 		ProfilePicture: member.User.Avatar,
+		Color:          "#f8d64c",
 	}
 }
 
