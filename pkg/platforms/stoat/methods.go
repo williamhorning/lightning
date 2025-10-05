@@ -12,6 +12,13 @@ import (
 )
 
 func (p *stoatPlugin) stoatSendMessage(channel string, message rvapi.DataMessageSend) (string, error) {
+	channelInstance := p.session.Channel(channel)
+
+	if channelInstance != nil && channelInstance.ChannelType != rvapi.ChannelTypeText &&
+		channelInstance.ChannelType != rvapi.ChannelTypeVoice && message.Masquerade != nil {
+		message.Masquerade.Colour = ""
+	}
+
 	payload, err := json.Marshal(message)
 	if err != nil {
 		return "", fmt.Errorf("rvapi: failed to marshal send: %w\n\tbody: %#+v", err, message)

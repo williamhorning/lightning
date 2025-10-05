@@ -17,7 +17,7 @@ func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stoatPermissionsError) Error() string {
-	return "insufficient permissions in Stoat (have " +
+	return "insufficient permissions (have " +
 		strconv.FormatUint(uint64(e.permissions), 10) + ", want " +
 		strconv.FormatUint(uint64(e.expected), 10) + "), please check them"
 }
