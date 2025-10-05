@@ -3,7 +3,7 @@ package guilded
 import (
 	"encoding/json"
 	"io"
-	"log/slog"
+	"log"
 	"regexp"
 	"strings"
 
@@ -165,7 +165,7 @@ func (p *guildedPlugin) appendReplyEmbed(embeds []guildedChatEmbed, message *lig
 	}
 
 	if resp.Body.Close() != nil {
-		slog.Warn("guilded: failed to close request body when getting reply embed")
+		log.Println("guilded: failed to close request body when getting reply embed")
 	}
 
 	var messageResp guildedChatMessageResponse

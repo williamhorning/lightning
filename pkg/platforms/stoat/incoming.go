@@ -1,18 +1,16 @@
-package revolt
+package stoat
 
 import (
-	"fmt"
-	"log/slog"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/williamhorning/lightning/internal/rvapi"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Message {
+func (p *stoatPlugin) getIncomingMessage(message rvapi.Message) *lightning.Message {
 	if message.Author == p.self.ID && message.Masquerade != nil {
 		return nil
 	}
@@ -37,15 +35,13 @@ func (p *revoltPlugin) getIncomingMessage(message revoltMessage) *lightning.Mess
 	return msg
 }
 
-func getLightningTime(message revoltMessage) *time.Time {
+func getLightningTime(message rvapi.Message) *time.Time {
 	if !message.Edited.IsZero() {
 		return &message.Edited
 	}
 
 	msgID, err := ulid.Parse(message.ID)
 	if err != nil {
-		slog.Error(fmt.Errorf("revolt: failed to parse message ID: %w\n\tmessage: %s", err, message.ID).Error())
-
 		timestamp := time.Now()
 
 		return &timestamp
@@ -56,11 +52,11 @@ func getLightningTime(message revoltMessage) *time.Time {
 	return &timestamp
 }
 
-func getLightningAttachment(attachments []*revoltAttachment) []lightning.Attachment {
+func getLightningAttachment(attachments []rvapi.File) []lightning.Attachment {
 	result := make([]lightning.Attachment, len(attachments))
 	for i, att := range attachments {
 		result[i] = lightning.Attachment{
-			URL:  getURL(att),
+			URL:  getURL(&att),
 			Name: att.Filename,
 			Size: int64(att.Size),
 		}
@@ -69,19 +65,19 @@ func getLightningAttachment(attachments []*revoltAttachment) []lightning.Attachm
 	return result
 }
 
-func (p *revoltPlugin) getLightningAuthor(
+func (p *stoatPlugin) getLightningAuthor(
 	authorID string,
 	channelID string,
-	masquerade *revoltMessageMasquerade,
+	masquerade *rvapi.Masquerade,
 ) *lightning.MessageAuthor {
 	author := lightning.MessageAuthor{
 		ID:       authorID,
-		Username: "RevoltUser",
-		Nickname: "Revolt User",
-		Color:    "#FF4654",
+		Username: "StoatUser",
+		Nickname: "Stoat User",
+		Color:    "#8C24EC",
 	}
 
-	user := p.getUser(authorID)
+	user := p.session.User(authorID)
 	if user == nil {
 		return applyMasquerade(author, masquerade)
 	}
@@ -99,13 +95,13 @@ func (p *revoltPlugin) getLightningAuthor(
 	return applyMasquerade(author, masquerade)
 }
 
-func (p *revoltPlugin) setServerMember(author *lightning.MessageAuthor, authorID, channelID string) {
-	channel := p.getChannel(channelID)
-	if channel == nil || channel.ChannelType != "TextChannel" || channel.Server == "" {
+func (p *stoatPlugin) setServerMember(author *lightning.MessageAuthor, authorID, channelID string) {
+	channel := p.session.Channel(channelID)
+	if channel == nil || channel.ChannelType != "TextChannel" || channel.Server == nil {
 		return
 	}
 
-	member := p.getMember(channel.Server, authorID)
+	member := p.session.Member(*channel.Server, authorID)
 	if member == nil {
 		return
 	}
@@ -120,11 +116,11 @@ func (p *revoltPlugin) setServerMember(author *lightning.MessageAuthor, authorID
 	}
 }
 
-func getURL(file *revoltAttachment) string {
-	return "https://cdn.revoltusercontent.com/" + file.Tag + "/" + file.ID
+func getURL(file *rvapi.File) string {
+	return "https://cdn.stoatusercontent.com/" + file.Tag + "/" + file.ID
 }
 
-func applyMasquerade(author lightning.MessageAuthor, masquerade *revoltMessageMasquerade) *lightning.MessageAuthor {
+func applyMasquerade(author lightning.MessageAuthor, masquerade *rvapi.Masquerade) *lightning.MessageAuthor {
 	if masquerade == nil {
 		return &author
 	}
@@ -133,8 +129,8 @@ func applyMasquerade(author lightning.MessageAuthor, masquerade *revoltMessageMa
 		author.Nickname = masquerade.Name
 	}
 
-	if masquerade.Color != "" {
-		author.Color = masquerade.Color
+	if masquerade.Colour != "" {
+		author.Color = masquerade.Colour
 	}
 
 	if masquerade.Avatar != "" {
@@ -145,55 +141,58 @@ func applyMasquerade(author lightning.MessageAuthor, masquerade *revoltMessageMa
 }
 
 var (
-	revoltSpoilerRegex = regexp.MustCompile(`!!(.+?)!!`)
-	spoilerRegex       = regexp.MustCompile(`\|\|(.+?)\|\|`)
-	emojiRegex         = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
-	mentionRegex       = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
-	channelRegex       = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	stoatSpoilerRegex = regexp.MustCompile(`!!(.+?)!!`)
+	spoilerRegex      = regexp.MustCompile(`\|\|(.+?)\|\|`)
+	emojiRegex        = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
+	mentionRegex      = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	channelRegex      = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
 )
 
 func replaceSpoilers(content string) string {
-	return revoltSpoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
+	return stoatSpoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
 		return "||" + match[2:len(match)-2] + "||"
 	})
 }
 
-func (p *revoltPlugin) replaceEmojis(message *lightning.Message) string {
+func (p *stoatPlugin) replaceEmojis(message *lightning.Message) string {
 	return emojiRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
 		if emojiID := extractID(match, emojiRegex); emojiID != "" {
-			emoji := p.getEmoji(emojiID)
-			if emoji != nil {
-				url := "https://cdn.revoltusercontent.com/emojis/" + emoji.ID
+			emoji := p.session.Emoji(emojiID)
 
-				message.Emoji = append(message.Emoji, lightning.Emoji{
-					URL:  &url,
-					ID:   emoji.ID,
-					Name: emoji.Name,
-				})
-
-				return ":" + emoji.Name + ":"
+			if emoji == nil {
+				return match
 			}
+
+			url := "https://cdn.stoatusercontent.com/emojis/" + emoji.ID
+
+			message.Emoji = append(message.Emoji, lightning.Emoji{
+				URL:  &url,
+				ID:   emoji.ID,
+				Name: emoji.Name,
+			})
+
+			return ":" + emoji.Name + ":"
 		}
 
 		return match
 	})
 }
 
-func (p *revoltPlugin) replaceMentions(channelID string, content string) string {
+func (p *stoatPlugin) replaceMentions(channelID string, content string) string {
 	return mentionRegex.ReplaceAllStringFunc(content, func(match string) string {
 		userID := extractID(match, mentionRegex)
 		if userID == "" {
 			return match
 		}
 
-		user := p.getUser(userID)
+		user := p.session.User(userID)
 		if user == nil {
 			return "@" + userID
 		}
 
-		channel := p.getChannel(channelID)
-		if channel != nil && channel.Server != "" {
-			member := p.getMember(channel.Server, userID)
+		channel := p.session.Channel(channelID)
+		if channel != nil && channel.Server != nil {
+			member := p.session.Member(*channel.Server, userID)
 			if member != nil && member.Nickname != nil {
 				return "@" + *member.Nickname
 			}
@@ -203,14 +202,14 @@ func (p *revoltPlugin) replaceMentions(channelID string, content string) string 
 	})
 }
 
-func (p *revoltPlugin) replaceChannels(content string) string {
+func (p *stoatPlugin) replaceChannels(content string) string {
 	return channelRegex.ReplaceAllStringFunc(content, func(match string) string {
 		chanID := extractID(match, channelRegex)
 		if chanID == "" {
 			return match
 		}
 
-		channel := p.getChannel(chanID)
+		channel := p.session.Channel(chanID)
 		if channel == nil {
 			return "#" + chanID
 		}
@@ -228,35 +227,26 @@ func extractID(match string, re *regexp.Regexp) string {
 	return matches[1]
 }
 
-func getLightningEmbeds(embeds []*revoltMessageEmbed) []lightning.Embed {
+func getLightningEmbeds(embeds []rvapi.Embed) []lightning.Embed {
 	result := make([]lightning.Embed, 0)
 	for _, embed := range embeds {
 		lightningEmbed := lightning.Embed{
-			Image: getEmbedImage(embed),
-			Video: getEmbedVideo(embed),
+			Title:       embed.Title,
+			Description: embed.Description,
+			URL:         embed.URL,
+			Image:       getEmbedImage(&embed),
+			Video:       getEmbedVideo(&embed),
 		}
 
-		if embed.Title != "" {
-			lightningEmbed.Title = &embed.Title
-		}
-
-		if embed.Description != "" {
-			lightningEmbed.Description = &embed.Description
-		}
-
-		if embed.URL != "" {
-			lightningEmbed.URL = &embed.URL
-		}
-
-		if embed.Color != "" {
-			if colorInt, err := strconv.ParseInt(strings.TrimPrefix(embed.Color, "#"), 16, 32); err == nil {
+		if embed.Colour != nil {
+			if colorInt, err := strconv.ParseInt((*embed.Colour)[1:], 16, 32); err == nil {
 				colorVal := int(colorInt)
 				lightningEmbed.Color = &colorVal
 			}
 		}
 
-		if embed.IconURL != "" {
-			lightningEmbed.Thumbnail = &lightning.Media{URL: embed.IconURL}
+		if embed.IconURL != nil {
+			lightningEmbed.Thumbnail = &lightning.Media{URL: *embed.IconURL}
 		}
 
 		result = append(result, lightningEmbed)
@@ -265,25 +255,17 @@ func getLightningEmbeds(embeds []*revoltMessageEmbed) []lightning.Embed {
 	return result
 }
 
-func getEmbedImage(embed *revoltMessageEmbed) *lightning.Media {
+func getEmbedImage(embed *rvapi.Embed) *lightning.Media {
 	if embed.Image != nil && embed.Image.URL != "" {
-		return &lightning.Media{
-			URL:    embed.Image.URL,
-			Width:  embed.Image.Width,
-			Height: embed.Image.Height,
-		}
+		return &lightning.Media{URL: embed.Image.URL, Width: embed.Image.Width, Height: embed.Image.Height}
 	}
 
 	return nil
 }
 
-func getEmbedVideo(embed *revoltMessageEmbed) *lightning.Media {
+func getEmbedVideo(embed *rvapi.Embed) *lightning.Media {
 	if embed.Video != nil && embed.Video.URL != "" {
-		return &lightning.Media{
-			URL:    embed.Video.URL,
-			Width:  embed.Video.Width,
-			Height: embed.Video.Height,
-		}
+		return &lightning.Media{URL: embed.Video.URL, Width: embed.Video.Width, Height: embed.Video.Height}
 	}
 
 	return nil

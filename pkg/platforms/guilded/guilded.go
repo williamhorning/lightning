@@ -3,8 +3,6 @@ package guilded
 import (
 	"encoding/json"
 	"time"
-
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 type guildedChatEmbedAuthor struct {
@@ -120,21 +118,6 @@ type guildedServerMember struct {
 	RoleIDs  []int       `json:"roleIds"`
 }
 
-func (sm *guildedServerMember) toAuthor() lightning.MessageAuthor {
-	nickname := sm.User.Name
-
-	if sm.Nickname != nil {
-		nickname = *sm.Nickname
-	}
-
-	return lightning.MessageAuthor{
-		Nickname:       nickname,
-		Username:       sm.User.Name,
-		ID:             sm.User.ID,
-		ProfilePicture: sm.User.Avatar,
-	}
-}
-
 type guildedServerMemberResponse struct {
 	Member guildedServerMember `json:"member"`
 }
@@ -176,15 +159,6 @@ type guildedWebhook struct {
 	Token  *string `json:"token,omitempty"`
 	ID     string  `json:"id"`
 	Name   string  `json:"name"`
-}
-
-func (wh *guildedWebhook) toAuthor() lightning.MessageAuthor {
-	return lightning.MessageAuthor{
-		Nickname:       wh.Name,
-		Username:       wh.Name,
-		ID:             wh.ID,
-		ProfilePicture: wh.Avatar,
-	}
 }
 
 type guildedWebhookResponse struct {

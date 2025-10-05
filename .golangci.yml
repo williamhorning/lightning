@@ -1,4 +1,5 @@
 version: "2"
+run: { build-tags: [goolm] }
 linters: {
   default: all,
   disable: [depguard, exhaustruct, mnd, noinlineerr, tagliatelle, wsl],

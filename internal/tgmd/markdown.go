@@ -1,4 +1,5 @@
-package telegram
+// Package tgmd handles Telegram markdown.
+package tgmd
 
 import (
 	"strconv"
@@ -9,7 +10,8 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-func getMarkdownV2(input string) string {
+// GetMarkdownV2 takes in CommonMark-like Markdown and turns it into Telegram's MarkdownV2.
+func GetMarkdownV2(input string) string {
 	md := goldmark.New()
 	reader := text.NewReader([]byte(input))
 	result := nodeToTelegram(md.Parser().Parse(reader), reader.Source())
@@ -141,7 +143,7 @@ func handleListNode(node *ast.List, source []byte) string {
 		prefix := "\\- "
 
 		if node.IsOrdered() {
-			prefix = strconv.Itoa(index) + "\\. "
+			prefix = strconv.FormatInt(int64(index), 10) + "\\. "
 		}
 
 		res += prefix

@@ -11,7 +11,7 @@
 //
 //	bot.AddPluginType("telegram", telegram.New)
 //
-//	bot.UsePluginType("telegram", "", map[string]any{
+//	bot.UsePluginType("telegram", "", map[string]string{
 //		// ...
 //	})
 package telegram
@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -35,26 +35,20 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]any{
+//	map[string]string{
 //		"token": "", // a string with your Telegram bot token. You can get this from BotFather
-//		"proxy_port": 0, // the port to use for the built-in Telegram file proxy
+//		"proxy_port": "0", // the port to use for the built-in Telegram file proxy
 //		"proxy_url": "", // the publicly accessible url of the Telegram file proxy
 //	}
 //
 // Note that you must have a working file proxy at `proxy_url`, otherwise files will not
 // work with other plugins.
-func New(config any) (lightning.Plugin, error) {
-	cfg, err := getTelegramConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	telegram, err := gotgbot.NewBot(cfg.token, &gotgbot.BotOpts{BotClient: newRetrier()})
+func New(config map[string]string) (lightning.Plugin, error) {
+	telegram, err := gotgbot.NewBot(config["token"], &gotgbot.BotOpts{BotClient: newRetrier()})
 	if err != nil {
 		return nil, fmt.Errorf("telegram: failed to create bot: %w", err)
 	}
 
-	commands := make(chan *lightning.CommandEvent, 1000)
 	messages := make(chan *lightning.Message, 1000)
 	edits := make(chan *lightning.EditedMessage, 1000)
 
@@ -68,7 +62,7 @@ func New(config any) (lightning.Plugin, error) {
 			return true
 		},
 		Response: func(b *gotgbot.Bot, ctx *ext.Context) error {
-			msg := getMessage(b, ctx, cfg.proxyURL)
+			msg := getMessage(b, ctx, config["proxy_url"])
 			if ctx.EditedMessage != nil {
 				time := time.UnixMilli(ctx.EditedMessage.GetDate() * 1000)
 				edits <- &lightning.EditedMessage{
@@ -86,7 +80,7 @@ func New(config any) (lightning.Plugin, error) {
 	updater := ext.NewUpdater(dispatch, &ext.UpdaterOpts{
 		UnhandledErrFunc: func(err error) {
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-				slog.Error(fmt.Errorf("telegram: unhandled error in dispatcher: %w", err).Error())
+				log.Printf("telegram: unhandled error in dispatcher: %v\n", err)
 			}
 		},
 	})
@@ -97,21 +91,19 @@ func New(config any) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("telegram: failed to start polling: %w", err)
 	}
 
-	slog.Info("telegram: ready! invite me at https://t.me/" + telegram.Username)
+	log.Printf("telegram: ready! invite me at https://t.me/%s\n", telegram.Username)
 
-	plugin := &telegramPlugin{commands, messages, edits, dispatch, &cfg, telegram, updater}
+	plugin := &telegramPlugin{messages, edits, dispatch, telegram, updater}
 
-	go plugin.startProxy()
+	go startProxy(config)
 
 	return plugin, nil
 }
 
 type telegramPlugin struct {
-	commandChannel chan *lightning.CommandEvent
 	messageChannel chan *lightning.Message
 	editChannel    chan *lightning.EditedMessage
 	dispatch       *ext.Dispatcher
-	cfg            *telegramConfig
 	telegram       *gotgbot.Bot
 	updater        *ext.Updater
 }
@@ -234,31 +226,8 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 	return fmt.Errorf("telegram: failed to delete message: %w\n\tchannel: %s\n\tmessage: %#+v", err, channelID, ids)
 }
 
-func (p *telegramPlugin) SetupCommands(commands map[string]*lightning.Command) error {
-	if help, exists := commands["help"]; exists {
-		commands["start"] = help
-	}
-
-	cmds := make([]gotgbot.BotCommand, 0, len(commands))
-
-	for telegramName, cmd := range commands {
-		cmds = append(cmds, gotgbot.BotCommand{
-			Command:     telegramName,
-			Description: cmd.Description,
-		})
-
-		handler := handlers.NewCommand(telegramName, func(b *gotgbot.Bot, ctx *ext.Context) error {
-			p.commandChannel <- getCommand(cmd.Name, b, ctx)
-
-			return nil
-		})
-		handler.SetAllowChannel(true)
-		p.dispatch.AddHandler(handler)
-	}
-
-	_, err := p.telegram.SetMyCommands(cmds, nil)
-
-	return fmt.Errorf("telegram: failed to set commands: %w", err)
+func (*telegramPlugin) SetupCommands(_ map[string]*lightning.Command) error {
+	return nil
 }
 
 func (p *telegramPlugin) ListenMessages() <-chan *lightning.Message {
@@ -273,6 +242,6 @@ func (*telegramPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	return nil
 }
 
-func (p *telegramPlugin) ListenCommands() <-chan *lightning.CommandEvent {
-	return p.commandChannel
+func (*telegramPlugin) ListenCommands() <-chan *lightning.CommandEvent {
+	return nil
 }

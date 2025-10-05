@@ -1,9 +1,8 @@
-package revolt
+package stoat
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -11,14 +10,20 @@ import (
 	"time"
 
 	"github.com/williamhorning/lightning/internal/emoji"
+	"github.com/williamhorning/lightning/internal/rvapi"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *revoltPlugin) getOutgoing(
+func (p *stoatPlugin) getOutgoing(
 	message *lightning.Message,
 	opts *lightning.SendOptions,
-) revoltMessageSend {
-	content := p.getOutgoingContent(message)
+) rvapi.DataMessageSend {
+	content := spoilerRegex.ReplaceAllStringFunc(
+		emojiSendRegex.ReplaceAllStringFunc(message.Content, p.replaceOutgoingEmoji(message)),
+		func(match string) string {
+			return "!!" + match[2:len(match)-2] + "!!"
+		},
+	)
 
 	if opts != nil && !opts.AllowEveryonePings {
 		content = strings.ReplaceAll(content, "@everyone", "@\u2800everyone")
@@ -29,7 +34,7 @@ func (p *revoltPlugin) getOutgoing(
 		content = string([]rune(content)[:1997]) + "..." // split the message?
 	}
 
-	msg := revoltMessageSend{
+	msg := rvapi.DataMessageSend{
 		Attachments: p.getOutgoingAttachments(message.Attachments),
 		Content:     content,
 		Embeds:      getOutgoingEmbeds(message.Embeds),
@@ -49,15 +54,7 @@ func (p *revoltPlugin) getOutgoing(
 
 var emojiSendRegex = regexp.MustCompile(`:\w+:`)
 
-func (p *revoltPlugin) getOutgoingContent(message *lightning.Message) string {
-	message.Content = emojiSendRegex.ReplaceAllStringFunc(message.Content, p.replaceOutgoingEmoji(message))
-
-	return spoilerRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
-		return "!!" + match[2:len(match)-2] + "!!"
-	})
-}
-
-func (p *revoltPlugin) replaceOutgoingEmoji(message *lightning.Message) func(string) string {
+func (p *stoatPlugin) replaceOutgoingEmoji(message *lightning.Message) func(string) string {
 	return func(match string) string {
 		if emoji.IsEmoji(match) {
 			return match
@@ -65,11 +62,13 @@ func (p *revoltPlugin) replaceOutgoingEmoji(message *lightning.Message) func(str
 
 		name := strings.ReplaceAll(match, ":", "")
 
-		channel := p.getChannel(message.ChannelID)
+		channel := p.session.Channel(message.ChannelID)
 
-		if channel != nil && channel.ChannelType == revoltChannelTypeText {
-			if emoji, ok := p.emojiNameCache.Get(channel.Server + "-" + name); ok {
-				return ":" + emoji.ID + ":"
+		if channel != nil && channel.ChannelType == rvapi.ChannelTypeText && channel.Server != nil {
+			for _, emoji := range p.session.ServerEmoji(*channel.Server) {
+				if emoji.Name == name {
+					return ":" + emoji.ID + ":"
+				}
 			}
 		}
 
@@ -83,7 +82,7 @@ func (p *revoltPlugin) replaceOutgoingEmoji(message *lightning.Message) func(str
 	}
 }
 
-func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment) []string {
+func (p *stoatPlugin) getOutgoingAttachments(attachments []lightning.Attachment) []string {
 	if len(attachments) == 0 {
 		return nil
 	}
@@ -107,16 +106,16 @@ func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment
 			continue
 		}
 
-		file, err := p.uploadFile("attachments", attachment.Name, resp.Body)
+		file, err := p.session.UploadFile("attachments", attachment.Name, resp.Body)
 		if err == nil {
 			attachmentIDs = append(attachmentIDs, file)
 		} else {
-			slog.Warn(err.Error())
+			log.Printf("%v\n", err)
 		}
 
 		err = resp.Body.Close()
 		if err != nil {
-			slog.Warn(fmt.Errorf("revolt: failed to close body: %w", err).Error())
+			log.Printf("stoat: failed to close upload body: %v\n", err)
 		}
 
 		cancel()
@@ -125,8 +124,8 @@ func (p *revoltPlugin) getOutgoingAttachments(attachments []lightning.Attachment
 	return attachmentIDs
 }
 
-func getOutgoingEmbeds(embeds []lightning.Embed) []*revoltMessageEmbed {
-	result := make([]*revoltMessageEmbed, 0, len(embeds))
+func getOutgoingEmbeds(embeds []lightning.Embed) []rvapi.SendableEmbed {
+	result := make([]rvapi.SendableEmbed, 0, len(embeds))
 
 	for _, embed := range embeds {
 		result = append(result, convertOutgoingEmbed(embed))
@@ -135,36 +134,32 @@ func getOutgoingEmbeds(embeds []lightning.Embed) []*revoltMessageEmbed {
 	return result
 }
 
-func convertOutgoingEmbed(embed lightning.Embed) *revoltMessageEmbed {
-	revoltEmbed := &revoltMessageEmbed{
+func convertOutgoingEmbed(embed lightning.Embed) rvapi.SendableEmbed {
+	stoatEmbed := rvapi.SendableEmbed{
+		Title:       embed.Title,
 		Description: getEmbedDescription(embed),
-	}
-
-	if embed.Title != nil {
-		revoltEmbed.Title = *embed.Title
-	}
-
-	if embed.URL != nil {
-		revoltEmbed.URL = *embed.URL
+		URL:         embed.URL,
 	}
 
 	if embed.Color != nil {
-		revoltEmbed.Color = "#" + strconv.FormatInt(int64(*embed.Color), 16)
+		color := "#" + strconv.FormatInt(int64(*embed.Color), 16)
+
+		stoatEmbed.Colour = &color
 	}
 
-	setEmbedMedia(revoltEmbed, embed)
+	setEmbedMedia(&stoatEmbed, embed)
 
-	return revoltEmbed
+	return stoatEmbed
 }
 
-func getEmbedDescription(embed lightning.Embed) string {
+func getEmbedDescription(embed lightning.Embed) *string {
 	description := ""
 	if embed.Description != nil {
 		description = *embed.Description
 	}
 
 	if len(embed.Fields) == 0 {
-		return description
+		return &description
 	}
 
 	for _, field := range embed.Fields {
@@ -175,65 +170,52 @@ func getEmbedDescription(embed lightning.Embed) string {
 		description += "**" + field.Name + "**\n" + field.Value
 	}
 
-	return description
+	return &description
 }
 
-func setEmbedMedia(revoltEmbed *revoltMessageEmbed, embed lightning.Embed) {
+func setEmbedMedia(stoatEmbed *rvapi.SendableEmbed, embed lightning.Embed) {
 	if embed.Image != nil {
-		revoltEmbed.Image = &revoltMessageEmbedImage{
-			URL:    embed.Image.URL,
-			Width:  embed.Image.Width,
-			Height: embed.Image.Height,
-		}
+		stoatEmbed.Media = &embed.Image.URL
 	}
 
 	if embed.Video != nil {
-		revoltEmbed.Video = &revoltMessageEmbedVideo{
-			URL:    embed.Video.URL,
-			Width:  embed.Video.Width,
-			Height: embed.Video.Height,
-		}
+		stoatEmbed.Media = &embed.Video.URL
 	}
 
 	if embed.Thumbnail != nil && len([]rune(embed.Thumbnail.URL)) > 0 && len([]rune(embed.Thumbnail.URL)) <= 128 {
-		revoltEmbed.IconURL = embed.Thumbnail.URL
+		stoatEmbed.IconURL = &embed.Thumbnail.URL
 	}
 }
 
-func getOutgoingReplies(replyIDs []string) []*revoltMessageReplies {
-	if len(replyIDs) == 0 {
-		return nil
-	}
-
-	replies := make([]*revoltMessageReplies, len(replyIDs))
+func getOutgoingReplies(replyIDs []string) []rvapi.ReplyIntent {
+	replies := make([]rvapi.ReplyIntent, len(replyIDs))
 	for i, id := range replyIDs {
-		replies[i] = &revoltMessageReplies{
-			ID:      id,
-			Mention: false,
+		replies[i] = rvapi.ReplyIntent{
+			ID:              id,
+			Mention:         false,
+			FailIfNotExists: false,
 		}
 	}
 
 	return replies
 }
 
-func getOutgoingMasquerade(author *lightning.MessageAuthor) *revoltMessageMasquerade {
+func getOutgoingMasquerade(author *lightning.MessageAuthor) *rvapi.Masquerade {
 	avatar := ""
 	if author.ProfilePicture != nil && len([]rune(*author.ProfilePicture)) > 1 &&
 		len([]rune(*author.ProfilePicture)) <= 256 {
 		avatar = *author.ProfilePicture
 	}
 
-	return &revoltMessageMasquerade{
-		Color: author.Color,
-		Name: func() string {
-			runes := []rune(author.Nickname)
+	nickname := author.Nickname
 
-			if len(runes) > 32 {
-				return string(runes[:32])
-			}
+	if len([]rune(nickname)) > 32 {
+		nickname = string([]rune(nickname))[:32]
+	}
 
-			return author.Nickname
-		}(),
+	return &rvapi.Masquerade{
+		Colour: author.Color,
+		Name:   nickname,
 		Avatar: avatar,
 	}
 }

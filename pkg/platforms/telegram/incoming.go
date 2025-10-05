@@ -1,10 +1,7 @@
 package telegram
 
 import (
-	"fmt"
-	"mime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -19,35 +16,6 @@ func getBase(ctx *ext.Context) *lightning.BaseMessage {
 		EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
 		ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
 		Time:      &timestamp,
-	}
-}
-
-func getCommand(cmdName string, bot *gotgbot.Bot, ctx *ext.Context) *lightning.CommandEvent {
-	if cmdName == "start" {
-		cmdName = "help"
-	}
-
-	fullText := ctx.EffectiveMessage.Text
-	args := []string{}
-
-	if spaceIndex := strings.Index(fullText, " "); spaceIndex != -1 {
-		args = strings.Fields(fullText[spaceIndex+1:])
-	}
-
-	return &lightning.CommandEvent{
-		CommandOptions: &lightning.CommandOptions{
-			BaseMessage: getBase(ctx),
-			Prefix:      "/",
-			Reply: func(message *lightning.Message, _ bool) error {
-				_, err := ctx.EffectiveMessage.Reply(bot, parseContent(message, nil), &gotgbot.SendMessageOpts{
-					ParseMode: gotgbot.ParseModeMarkdownV2,
-				})
-
-				return fmt.Errorf("telegram: failed to reply to command: %w\n\tname:%s", err, cmdName)
-			},
-		},
-		Command: cmdName,
-		Options: args,
 	}
 }
 
@@ -89,42 +57,40 @@ func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.
 
 func addAttachment(bot *gotgbot.Bot, ctx *ext.Context, msg *lightning.Message, proxyPath string) {
 	if newChatPhoto := ctx.EffectiveMessage.NewChatPhoto; len(newChatPhoto) > 0 {
-		handleAttachment(bot, newChatPhoto[0].FileId, "chat_photo.jpg",
-			newChatPhoto[0].FileSize, "image/jpeg", msg, proxyPath)
+		handleAttachment(bot, newChatPhoto[0].FileId, "chat_photo.jpg", newChatPhoto[0].FileSize, msg, proxyPath)
 	}
 
 	if doc := ctx.EffectiveMessage.Document; doc != nil {
-		handleAttachment(bot, doc.FileId, doc.FileName, doc.FileSize, doc.MimeType, msg, proxyPath)
+		handleAttachment(bot, doc.FileId, doc.FileName, doc.FileSize, msg, proxyPath)
 	}
 
 	if anim := ctx.EffectiveMessage.Animation; anim != nil {
-		handleAttachment(bot, anim.FileId, anim.FileName, anim.FileSize, anim.MimeType, msg, proxyPath)
+		handleAttachment(bot, anim.FileId, anim.FileName, anim.FileSize, msg, proxyPath)
 	}
 
 	if audio := ctx.EffectiveMessage.Audio; audio != nil {
-		handleAttachment(bot, audio.FileId, audio.FileName, audio.FileSize, audio.MimeType, msg, proxyPath)
+		handleAttachment(bot, audio.FileId, audio.FileName, audio.FileSize, msg, proxyPath)
 	}
 
 	if photos := ctx.EffectiveMessage.Photo; len(photos) > 0 {
-		handleAttachment(bot, photos[0].FileId, photos[0].FileId+".jpg",
-			photos[0].FileSize, "image/jpeg", msg, proxyPath)
+		handleAttachment(bot, photos[len(photos)-1].FileId, photos[0].FileId+".jpg", photos[0].FileSize, msg, proxyPath)
 	}
 
 	if sticker := ctx.EffectiveMessage.Sticker; sticker != nil {
 		extension := getStickerExtension(sticker)
-		handleAttachment(bot, sticker.FileId, sticker.SetName+extension, sticker.FileSize, "", msg, proxyPath)
+		handleAttachment(bot, sticker.FileId, sticker.SetName+extension, sticker.FileSize, msg, proxyPath)
 	}
 
 	if video := ctx.EffectiveMessage.Video; video != nil {
-		handleAttachment(bot, video.FileId, video.FileName, video.FileSize, video.MimeType, msg, proxyPath)
+		handleAttachment(bot, video.FileId, video.FileName, video.FileSize, msg, proxyPath)
 	}
 
 	if vnote := ctx.EffectiveMessage.VideoNote; vnote != nil {
-		handleAttachment(bot, vnote.FileId, "video_note.mp4", vnote.FileSize, "video/mp4", msg, proxyPath)
+		handleAttachment(bot, vnote.FileId, "video_note.mp4", vnote.FileSize, msg, proxyPath)
 	}
 
 	if voice := ctx.EffectiveMessage.Voice; voice != nil {
-		handleAttachment(bot, voice.FileId, "voice.ogg", voice.FileSize, "audio/ogg", msg, proxyPath)
+		handleAttachment(bot, voice.FileId, "voice.ogg", voice.FileSize, msg, proxyPath)
 	}
 }
 
@@ -138,25 +104,10 @@ func getStickerExtension(sticker *gotgbot.Sticker) string {
 	return ".webp"
 }
 
-func handleAttachment(
-	bot *gotgbot.Bot,
-	fileID, name string,
-	size int64,
-	mimeType string,
-	msg *lightning.Message,
-	proxyPath string,
-) {
-	extension := ""
-
-	if mimeType != "" {
-		if exts, err := mime.ExtensionsByType(mimeType); err == nil && len(exts) > 0 {
-			extension = exts[0]
-		}
-	}
-
+func handleAttachment(bot *gotgbot.Bot, fileID, name string, size int64, msg *lightning.Message, proxyPath string) {
 	if f, err := bot.GetFile(fileID, nil); err == nil {
 		msg.Attachments = append(msg.Attachments, lightning.Attachment{
-			URL:  proxyPath + f.FilePath + extension,
+			URL:  proxyPath + f.FilePath,
 			Name: name,
 			Size: size,
 		})

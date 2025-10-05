@@ -1,8 +1,6 @@
 package lightning
 
-import (
-	"strings"
-)
+import "strings"
 
 // AddCommand takes [Command]s and registers it with the built-in
 // text command handler and any platform-specific command systems.
@@ -31,11 +29,11 @@ func (b *Bot) AddCommand(commands ...*Command) error {
 }
 
 func handleMessageCommand(bot *Bot, event *Message) {
-	if !strings.HasPrefix(event.Content, bot.prefix) {
+	if len(event.Content) <= len(bot.prefix) || event.Content[:len(bot.prefix)] != bot.prefix {
 		return
 	}
 
-	args := strings.Fields(strings.TrimPrefix(event.Content, bot.prefix))
+	args := strings.Fields(event.Content[len(bot.prefix):])
 	if len(args) == 0 {
 		args = []string{"help"}
 	}
@@ -81,35 +79,22 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 		command = bot.commands["help"]
 	}
 
-	for _, arg := range event.Options {
-		if len(command.Subcommands) > 0 && event.Subcommand == nil {
-			event.Subcommand = &arg
+	for _, cmd := range command.Subcommands {
+		if len(event.Options) != 0 && event.Options[0] == cmd.Name {
+			event.Subcommand = &cmd.Name
+			command = cmd
 			event.Options = event.Options[1:]
-		}
-	}
-
-	for _, subcommand := range command.Subcommands {
-		if event.Subcommand != nil && subcommand.Name == *event.Subcommand {
-			command = subcommand
 
 			break
 		}
 	}
 
-	handleCommandOptions(command, event)
-
-	command.Executor(event.CommandOptions)
-}
-
-func handleCommandOptions(command *Command, event *CommandEvent) {
 	for _, arg := range command.Arguments {
-		if event.Arguments[arg.Name] != "" {
-			continue
-		}
-
-		if len(event.Options) > 0 {
+		if event.Arguments[arg.Name] == "" && len(event.Options) > 0 {
 			event.Arguments[arg.Name] = event.Options[0]
 			event.Options = event.Options[1:]
 		}
 	}
+
+	command.Executor(event.CommandOptions)
 }

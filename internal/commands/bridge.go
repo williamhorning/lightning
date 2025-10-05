@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"log/slog"
+	"log"
 
 	"github.com/williamhorning/lightning/internal/data"
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -24,7 +24,7 @@ func BridgeCommand(database data.Database) *lightning.Command {
 					"- `toggle <setting>`: Toggle a setting for the bridge that this channel is part of.\n"+
 					"- `status`: Get the status of the bridge that this channel is part of.\n\n"+
 					"Available settings are: `allow_everyone`."), false); err != nil {
-				slog.Error(fmt.Errorf("failed to send bridge command reply: %w", err).Error())
+				log.Printf("failed to reply to bridge command: %v\n", err)
 			}
 		},
 		Subcommands: []*lightning.Command{

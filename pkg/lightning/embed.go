@@ -8,92 +8,55 @@ func (embed *Embed) ToMarkdown() string {
 		return ""
 	}
 
-	return formatTitle(embed) + formatTimestamp(embed) + formatAuthor(embed) + formatDescription(embed) +
-		formatImage(embed) + formatThumbnail(embed) + formatVideo(embed) + formatFields(embed) + formatFooter(embed)
-}
+	str := ""
 
-func formatTitle(embed *Embed) string {
-	if embed.Title == nil {
-		return ""
+	if embed.Title != nil && embed.URL != nil {
+		str += "[" + *embed.Title + "](" + *embed.URL + ")"
+	} else if embed.Title != nil {
+		str += *embed.Title
 	}
 
-	if embed.URL != nil {
-		return "[" + *embed.Title + "](" + *embed.URL + ")"
+	if embed.Timestamp != nil {
+		str += " (" + *embed.Timestamp + ")"
 	}
 
-	return *embed.Title
-}
+	str += "\n\n"
 
-func formatTimestamp(embed *Embed) string {
-	if embed.Timestamp == nil {
-		return "\n\n"
+	if embed.Author != nil && embed.Author.URL != nil {
+		str += "[" + embed.Author.Name + "](" + *embed.Author.URL + ")\n\n"
+	} else if embed.Author != nil {
+		str += embed.Author.Name + "\n\n"
 	}
 
-	return " (" + *embed.Timestamp + ")\n\n"
-}
-
-func formatAuthor(embed *Embed) string {
-	if embed.Author == nil {
-		return ""
+	if embed.Description != nil {
+		str += *embed.Description + "\n\n"
 	}
 
-	if embed.Author.URL != nil {
-		return "[" + embed.Author.Name + "](" + *embed.Author.URL + ")\n\n"
-	}
+	str += formatMedia(embed.Image) + formatMedia(embed.Thumbnail) + formatMedia(embed.Video) + formatFooter(embed)
 
-	return embed.Author.Name + "\n\n"
-}
-
-func formatDescription(embed *Embed) string {
-	if embed.Description == nil {
-		return ""
-	}
-
-	return *embed.Description + "\n\n"
-}
-
-func formatImage(embed *Embed) string {
-	if embed.Image == nil {
-		return ""
-	}
-
-	return "![](" + embed.Image.URL + ")\n\n"
-}
-
-func formatThumbnail(embed *Embed) string {
-	if embed.Thumbnail == nil {
-		return ""
-	}
-
-	return "![](" + embed.Thumbnail.URL + ")\n\n"
-}
-
-func formatVideo(embed *Embed) string {
-	if embed.Video == nil {
-		return ""
-	}
-
-	return embed.Video.URL + "\n\n"
-}
-
-func formatFields(embed *Embed) string {
-	content := ""
-
-	for _, field := range embed.Fields {
-		content += "**" + field.Name + "**\n" + field.Value + "\n\n"
-	}
-
-	return content
+	return str
 }
 
 func formatFooter(embed *Embed) string {
-	if embed.Footer == nil {
+	str := ""
+
+	for _, field := range embed.Fields {
+		str += "**" + field.Name + "**\n" + field.Value + "\n\n"
+	}
+
+	if embed.Footer != nil && embed.Footer.IconURL != nil {
+		str += "[" + embed.Footer.Text + "](" + *embed.Footer.IconURL + ")\n"
+	} else if embed.Footer != nil {
+		str += embed.Footer.Text + "\n"
+	}
+
+	return str
+}
+
+func formatMedia(media *Media) string {
+	if media == nil {
 		return ""
 	}
 
-	if embed.Footer.IconURL != nil {
-		return "[" + embed.Footer.Text + "](" + *embed.Footer.IconURL + ")\n"
-	}
-
-	return embed.Footer.Text + "\n"
+	return "![](" + media.URL + ")\n\n"
 }

@@ -1,0 +1,102 @@
+package stoat
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/williamhorning/lightning/internal/rvapi"
+	"github.com/williamhorning/lightning/pkg/lightning"
+)
+
+func (p *stoatPlugin) stoatSendMessage(channel string, message rvapi.DataMessageSend) (string, error) {
+	channelInstance := p.session.Channel(channel)
+
+	if channelInstance != nil && channelInstance.ChannelType != rvapi.ChannelTypeText &&
+		channelInstance.ChannelType != rvapi.ChannelTypeVoice && message.Masquerade != nil {
+		message.Masquerade.Colour = ""
+	}
+
+	payload, err := json.Marshal(message)
+	if err != nil {
+		return "", fmt.Errorf("rvapi: failed to marshal send: %w\n\tbody: %#+v", err, message)
+	}
+
+	resp, code, err := p.session.Fetch(http.MethodPost, "/channels/"+channel+"/messages", bytes.NewBuffer(payload))
+	if err != nil {
+		return "", fmt.Errorf("stoat: error making send message request: %w", err)
+	}
+
+	defer func() {
+		if err := resp.Close(); err != nil {
+			log.Printf("stoat: failed to close send body: %v\n", err)
+		}
+	}()
+
+	if code != http.StatusOK {
+		return "", &stoatStatusError{"failed to send stoat message", code, false}
+	}
+
+	var response rvapi.Message
+	if err := json.NewDecoder(resp).Decode(&response); err != nil {
+		return "", fmt.Errorf("stoat: failed to decode %d response: %w", code, err)
+	}
+
+	return response.ID, nil
+}
+
+func (p *stoatPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
+	message.Attachments = nil
+	outgoing := p.getOutgoing(message, opts)
+	data := rvapi.DataEditMessage{Content: outgoing.Content, Embeds: outgoing.Embeds}
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("stoat: failed to marshal edit: %w\n\tbody: %#+v", err, data)
+	}
+
+	resp, code, err := p.session.Fetch(
+		http.MethodPatch, "/channels/"+message.ChannelID+"/messages/"+ids[0], bytes.NewBuffer(payload),
+	)
+	if err != nil {
+		return fmt.Errorf("stoat: error making edit request: %w", err)
+	}
+
+	if err := resp.Close(); err != nil {
+		log.Printf("stoat: failed to close edit body: %v\n", err)
+	}
+
+	if code != http.StatusOK {
+		return &stoatStatusError{"failed to edit stoat message", code, true}
+	}
+
+	return nil
+}
+
+func (p *stoatPlugin) DeleteMessage(channel string, ids []string) error {
+	payload, err := json.Marshal(&rvapi.OptionsBulkDelete{IDs: ids})
+	if err != nil {
+		return fmt.Errorf("stoat: failed to marshal deletion: %w", err)
+	}
+
+	resp, code, err := p.session.Fetch(
+		http.MethodDelete, "/channels/"+channel+"/messages/bulk", bytes.NewBuffer(payload),
+	)
+	if err != nil {
+		return fmt.Errorf("stoat: error making deletion request: %w", err)
+	}
+
+	defer func() {
+		if err := resp.Close(); err != nil {
+			log.Printf("stoat: failed to close deletion body: %v\n", err)
+		}
+	}()
+
+	if code != http.StatusNoContent {
+		return &stoatStatusError{"failed to delete stoat messages\n\tbody: " + string(payload), code, true}
+	}
+
+	return nil
+}

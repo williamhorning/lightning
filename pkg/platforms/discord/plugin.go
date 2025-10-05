@@ -7,16 +7,14 @@
 //
 //	bot.AddPluginType("discord", discord.New)
 //
-//	bot.UsePluginType("discord", "", map[string]any{
+//	bot.UsePluginType("discord", "", map[string]string{
 //		// ...
 //	})
 package discord
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
-	"strings"
+	"log"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -28,23 +26,13 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]any{
+//	map[string]string{
 //		"token": "", // a string with your Discord bot token
 //	}
 //
 // Note that you MUST enable the Message Content intent for the plugin to work.
-func New(config any) (lightning.Plugin, error) {
-	cfg, ok := config.(map[string]any)
-	if !ok {
-		return nil, lightning.PluginConfigError{Plugin: "discord", Message: "invalid config"}
-	}
-
-	token, ok := cfg["token"].(string)
-	if !ok || token == "" {
-		return nil, lightning.PluginConfigError{Plugin: "discord", Message: "invalid token"}
-	}
-
-	discord, err := discordgo.New("Bot " + token)
+func New(cfg map[string]string) (lightning.Plugin, error) {
+	discord, err := discordgo.New("Bot " + cfg["token"])
 	if err != nil {
 		return nil, fmt.Errorf("discord: failed to create session: %w", err)
 	}
@@ -54,13 +42,6 @@ func New(config any) (lightning.Plugin, error) {
 	discord.ShouldReconnectOnError = true
 	discord.LogLevel = 1
 	discord.UserAgent = "lightning/" + lightning.VERSION + " DiscordGo/" + discordgo.VERSION
-	discordgo.Logger = func(msgL, _ int, format string, args ...any) {
-		if strings.Contains(format, "unknown event") {
-			return
-		}
-
-		slog.Log(context.Background(), slog.Level(msgL), "discordgo: "+fmt.Sprintf(format, args...))
-	}
 
 	if err = discord.Open(); err != nil {
 		return nil, fmt.Errorf("discord: failed to open session: %w", err)
@@ -71,16 +52,15 @@ func New(config any) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("discord: failed to get application info: %w", err)
 	}
 
-	slog.Info("discord: ready!", "username", app.Name, "servers", len(discord.State.Guilds),
-		"invite", "https://discord.com/oauth2/authorize?client_id="+app.ID+"&scope=bot&permissions=8")
+	log.Printf("discord: ready as %s in %d servers\n", app.Name, len(discord.State.Guilds))
+	log.Printf("discord: https://discord.com/oauth2/authorize?client_id=%s&scope=bot&permissions=8\n", app.ID)
 
-	return &discordPlugin{cfg, discord, cache.New[string, bool](cache.DefaultTTL)}, nil
+	return &discordPlugin{discord: discord}, nil
 }
 
 type discordPlugin struct {
-	config       map[string]any
 	discord      *discordgo.Session
-	webhookCache *cache.Expiring[string, bool]
+	webhookCache cache.Expiring[string, bool]
 }
 
 func (p *discordPlugin) SetupChannel(channel string) (any, error) {
@@ -116,7 +96,10 @@ func (p *discordPlugin) SendMessage(message *lightning.Message, opts *lightning.
 			return nil, err
 		}
 
-		res, err := p.discord.WebhookExecute(webhook.ID, webhook.Token, true, msg.Webhook())
+		res, err := p.discord.WebhookExecute(webhook.ID, webhook.Token, true, &discordgo.WebhookParams{
+			AllowedMentions: msg.allowedMentions, AvatarURL: msg.avatarURL, Components: msg.components,
+			Content: msg.content, Embeds: msg.embeds, Files: msg.files, Username: msg.username,
+		})
 		if err != nil {
 			return nil, getError(err, map[string]any{"msg": msg}, "Failed to send message to Discord via webhook")
 		}
@@ -124,7 +107,10 @@ func (p *discordPlugin) SendMessage(message *lightning.Message, opts *lightning.
 		return []string{res.ID}, nil
 	}
 
-	res, err := p.discord.ChannelMessageSendComplex(message.ChannelID, msg.Message())
+	res, err := p.discord.ChannelMessageSendComplex(message.ChannelID, &discordgo.MessageSend{
+		AllowedMentions: msg.allowedMentions, Components: msg.components, Content: msg.content, Embeds: msg.embeds,
+		Files: msg.files, Reference: msg.reference,
+	})
 	if err == nil {
 		return []string{res.ID}, nil
 	}
@@ -142,12 +128,12 @@ func (p *discordPlugin) EditMessage(message *lightning.Message, ids []string, op
 		return nil
 	}
 
-	_, err = p.discord.WebhookMessageEdit(
-		webhook.ID,
-		webhook.Token,
-		ids[0],
-		getOutgoingMessage(p.discord, message, opts).WebhookEdit(),
-	)
+	msg := getOutgoingMessage(p.discord, message, opts)
+
+	_, err = p.discord.WebhookMessageEdit(webhook.ID, webhook.Token, ids[0], &discordgo.WebhookEdit{
+		AllowedMentions: msg.allowedMentions, Content: &msg.content, Components: &msg.components, Embeds: &msg.embeds,
+		Files: msg.files,
+	})
 	if err == nil {
 		return nil
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 type discordInvalidWebhookError struct {
-	ChannelID string
+	channelID string
 }
 
 func (discordInvalidWebhookError) Disable() *lightning.ChannelDisabled {
@@ -18,17 +18,17 @@ func (discordInvalidWebhookError) Disable() *lightning.ChannelDisabled {
 }
 
 func (err discordInvalidWebhookError) Error() string {
-	return "invalid webhook data for Discord channel: " + err.ChannelID
+	return "invalid webhook data for Discord channel: " + err.channelID
 }
 
 type discordAPIError struct {
 	extra   map[string]any
-	Message string
-	Code    int
+	message string
+	code    int
 }
 
 func (e discordAPIError) Disable() *lightning.ChannelDisabled {
-	switch e.Code {
+	switch e.code {
 	case discordgo.ErrCodeUnknownChannel:
 		return &lightning.ChannelDisabled{Read: true, Write: true}
 	case discordgo.ErrCodeMaximumNumberOfWebhooksReached,
@@ -42,8 +42,8 @@ func (e discordAPIError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e discordAPIError) Error() string {
-	return "Discord API Error " + strconv.Itoa(e.Code) + ": " +
-		fmt.Sprintf("%#+v, disable %#+v", e.extra, e.Disable()) + ": " + e.Message
+	return "Discord API Error " + strconv.Itoa(e.code) + ": " +
+		fmt.Sprintf("%#+v, disable %#+v", e.extra, e.Disable()) + ": " + e.message
 }
 
 func getError(err error, extra map[string]any, message string) error {

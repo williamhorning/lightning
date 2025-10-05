@@ -1,8 +1,7 @@
 package bridge
 
 import (
-	"fmt"
-	"log/slog"
+	"log"
 
 	"github.com/BurntSushi/toml"
 	"github.com/williamhorning/lightning/internal/data"
@@ -11,12 +10,12 @@ import (
 
 // Config is the configuration for the bridge bot.
 type Config struct {
-	Author         *lightning.MessageAuthor `toml:"author,omitempty"`
-	DatabaseConfig data.DatabaseConfig      `toml:"database"`
-	Plugins        map[string]any           `toml:"plugins"`
-	CommandPrefix  string                   `toml:"prefix,omitempty"`
-	ErrorURL       string                   `toml:"error_url"`
-	LogLevel       int                      `toml:"log_level"`
+	Author         *lightning.MessageAuthor     `toml:"author,omitempty"`
+	DatabaseConfig data.DatabaseConfig          `toml:"database"`
+	Plugins        map[string]map[string]string `toml:"plugins"`
+	CommandPrefix  string                       `toml:"prefix,omitempty"`
+	ErrorURL       string                       `toml:"error_url"`
+	LogLevel       int                          `toml:"log_level"`
 }
 
 // GetConfig loads the configuration from the given file.
@@ -24,7 +23,7 @@ func GetConfig(file string) (Config, bool) {
 	var config Config
 
 	if _, err := toml.DecodeFile(file, &config); err != nil {
-		slog.Error(fmt.Errorf("error loading config: %w", err).Error())
+		log.Printf("bridge: error loading config: %v\n", err)
 
 		return config, false
 	}
