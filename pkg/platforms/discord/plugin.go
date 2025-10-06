@@ -27,11 +27,21 @@ import (
 // It only takes in a map with the following structure:
 //
 //	map[string]string{
-//		"token": "", // a string with your Discord bot token
+//		"base_url": "", // optional, allows you to specify a non-Discord API implementation
+//		"cdn_url": "", // optional, allows you to specify a non-Discord CDN implementation
+//		"token": "", // REQUIRED, a string with your bot token
 //	}
 //
 // Note that you MUST enable the Message Content intent for the plugin to work.
 func New(cfg map[string]string) (lightning.Plugin, error) {
+	if base, ok := cfg["base_url"]; ok {
+		setBaseURL(base)
+	}
+
+	if cdn, ok := cfg["cdn_url"]; ok {
+		setCDNURL(cdn)
+	}
+
 	discord, err := discordgo.New("Bot " + cfg["token"])
 	if err != nil {
 		return nil, fmt.Errorf("discord: failed to create session: %w", err)
@@ -40,6 +50,7 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 	discord.Identify.Intents = 16813601
 	discord.StateEnabled = true
 	discord.ShouldReconnectOnError = true
+	discord.Debug = true
 	discord.LogLevel = 1
 	discord.UserAgent = "lightning/" + lightning.VERSION + " DiscordGo/" + discordgo.VERSION
 
