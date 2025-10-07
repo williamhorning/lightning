@@ -37,10 +37,11 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("discord: failed to create session: %w", err)
 	}
 
-	discord.Identify.Intents = 16813601
+	discord.Identify.Intents = discordgo.IntentGuilds | discordgo.IntentGuildPresences |
+		discordgo.IntentDirectMessages | discordgo.IntentMessageContent | discordgo.IntentGuildMessagePolls
 	discord.StateEnabled = true
 	discord.ShouldReconnectOnError = true
-	discord.LogLevel = 1
+	discord.LogLevel = discordgo.LogError
 	discord.UserAgent = "lightning/" + lightning.VERSION + " DiscordGo/" + discordgo.VERSION
 
 	if err = discord.Open(); err != nil {
