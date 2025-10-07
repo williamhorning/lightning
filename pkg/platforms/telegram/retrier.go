@@ -4,15 +4,33 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 const defaultTimeout = gotgbot.DefaultTimeout * 2
+
+type telegramAPIError struct {
+	err  error
+	code int
+}
+
+func (e *telegramAPIError) Disable() *lightning.ChannelDisabled {
+	return &lightning.ChannelDisabled{Read: false, Write: e.code == 401 || e.code == 403}
+}
+
+func (e *telegramAPIError) Error() string {
+	return "error making telegram request (" + strconv.FormatInt(int64(e.code), 10) + "): " + e.err.Error()
+}
+
+func (e *telegramAPIError) Unwrap() error {
+	return e.err
+}
 
 type retrier struct {
 	baseClient *gotgbot.BaseBotClient
@@ -43,7 +61,7 @@ func (r *retrier) RequestWithContext(
 
 	telegramError := &gotgbot.TelegramError{}
 	if !errors.As(err, &telegramError) || telegramError.Code != 429 {
-		return resp, fmt.Errorf("error making request in retrier: %w", err)
+		return resp, &telegramAPIError{telegramError, telegramError.Code}
 	}
 
 	time.Sleep(time.Second * time.Duration(telegramError.ResponseParams.RetryAfter))
