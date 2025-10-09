@@ -41,7 +41,7 @@ func (p *stoatPlugin) getOutgoing(
 		Replies:     getOutgoingReplies(message.RepliedTo),
 	}
 
-	if content == "" && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
+	if len(content) == 0 && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
 		msg.Content = "\u200B"
 	}
 

@@ -15,6 +15,7 @@ package stoat
 import (
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/williamhorning/lightning/internal/rvapi"
@@ -118,9 +119,21 @@ func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.Se
 
 	ids := []string{res}
 
-	if len(leftover) > 0 {
+	if len(leftover) == 0 {
+		return ids, nil
+	}
+
+	chunks := make([][]string, 0, int(math.Ceil(float64(len(leftover))/5)))
+
+	for i := 0; i < len(leftover); i += 5 {
+		end := min(i+5, len(leftover))
+
+		chunks = append(chunks, leftover[i:end])
+	}
+
+	for _, chunk := range chunks {
 		res, err := p.stoatSendMessage(message.ChannelID, rvapi.DataMessageSend{
-			Attachments: leftover,
+			Attachments: chunk,
 			Masquerade:  msg.Masquerade,
 			Replies:     msg.Replies,
 		})
