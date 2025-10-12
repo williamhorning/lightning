@@ -10,7 +10,7 @@ import (
 
 // VERSION is the version of the rvapi library. Currently, it's the same as the
 // version of lightning in the repo, though it may change.
-const VERSION = "0.8.0-rc.3"
+const VERSION = "0.8.0-rc.4"
 
 // Session represents the Stoat API session a bot may have.
 type Session struct {
