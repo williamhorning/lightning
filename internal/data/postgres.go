@@ -149,8 +149,7 @@ func (p *postgresDatabase) GetMessage(msgID string) (BridgeMessageCollection, er
 		data    sql.NullString
 	)
 
-	err := p.db.QueryRowContext(context.Background(),
-		selectMessageCollectionQuery, msgID).
+	err := p.db.QueryRowContext(context.Background(), selectMessageCollectionQuery, msgID).
 		Scan(&message.ID, &message.BridgeID, &data)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return BridgeMessageCollection{}, fmt.Errorf("failed to query message: %w", err)
@@ -196,15 +195,20 @@ func (p *postgresDatabase) setupDatabase() error {
 		return fmt.Errorf("failed to get db version: %w", err)
 	}
 
-	if version != "0.8.1" {
-		if version == "0.8.0" {
-			log.Println("data: migration from 0.8.0 to 0.8.1 isn't supported. use 0.8.0-beta.8 to migrate")
+	switch version {
+	case "0.8.2":
+		return nil
+	case "0.8.1":
+		if err = p.exec(`UPDATE lightning SET value='0.8.2' WHERE prop='db_data_version';`); err != nil {
+			return fmt.Errorf("error setting db data version to the latest: %w", err)
 		}
+
+		return nil
+	default:
+		log.Println("migration from databases from before v0.8.0-beta.8 are not supported.")
 
 		return UnsupportedDatabaseTypeError{}
 	}
-
-	return nil
 }
 
 func (p *postgresDatabase) exec(query string, args ...any) error {

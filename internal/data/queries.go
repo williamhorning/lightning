@@ -24,53 +24,41 @@ const (
 		CREATE TABLE IF NOT EXISTS lightning (
 			prop  TEXT PRIMARY KEY,
 			value TEXT NOT NULL
-		);`
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_bridge_channels_channel_id ON bridge_channels (channel_id);
+		CREATE INDEX IF NOT EXISTS idx_bridge_channels_bridge_id ON bridge_channels (bridge_id);
+		CREATE INDEX IF NOT EXISTS idx_bridge_messages_bridge_id ON bridge_messages (bridge_id);
+		CREATE INDEX IF NOT EXISTS idx_bridge_messages_gin ON bridge_messages USING GIN (messages jsonb_path_ops);`
 
 	insertBridge = `
-		INSERT INTO bridges (id, settings)
-		VALUES ($1, $2)
-		ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings;`
+		INSERT INTO bridges (id, settings) VALUES ($1, $2)
+		ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings
+		WHERE bridges.settings IS DISTINCT FROM EXCLUDED.settings;`
 
-	insertChannel = `
-		INSERT INTO bridge_channels (bridge_id, channel_id, data, disabled)
-		VALUES ($1, $2, $3, $4);`
+	insertChannel = `INSERT INTO bridge_channels (bridge_id, channel_id, data, disabled) VALUES ($1, $2, $3, $4);`
 
 	insertMessage = `
 		INSERT INTO bridge_messages (id, bridge_id, messages)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (id) DO UPDATE SET
-			bridge_id = EXCLUDED.bridge_id,
-			messages = EXCLUDED.messages;`
+		ON CONFLICT (id) DO UPDATE
+		SET messages = EXCLUDED.messages, bridge_id = EXCLUDED.bridge_id
+		WHERE bridge_messages.messages IS DISTINCT FROM EXCLUDED.messages;`
 
 	selectBridgeSettingsByID = `SELECT settings FROM bridges WHERE id = $1;`
 
-	selectBridgeByChannelQuery = `
-		SELECT bridge_id FROM bridge_channels 
-		WHERE channel_id = $1;`
+	selectBridgeByChannelQuery = `SELECT bridge_id FROM bridge_channels WHERE channel_id = $1;`
 
 	selectBridgeChannelsQuery = `
-		SELECT channel_id, COALESCE(data, '{}'), disabled FROM bridge_channels 
-		WHERE bridge_id = $1;`
+		SELECT channel_id, COALESCE(data, '{}'), disabled FROM bridge_channels WHERE bridge_id = $1;`
 
 	selectMessageCollectionQuery = `
-		SELECT id, bridge_id, messages
-		FROM bridge_messages
-		WHERE EXISTS (
-			SELECT 1
-			FROM jsonb_array_elements(messages) AS m,
-				jsonb_array_elements_text(m -> 'message_ids') AS message_id
-			WHERE $1 = message_id
-		)
-		LIMIT 1;`
+		SELECT id, bridge_id, messages FROM bridge_messages
+		WHERE messages @> format('[{"message_ids":["%s"]}]', $1::text)::jsonb LIMIT 1;`
 
 	selectMessageIDQuery = `
 		SELECT id FROM bridge_messages
-		WHERE EXISTS (
-			SELECT 1 FROM jsonb_array_elements(messages) AS m,
-				jsonb_array_elements_text(m -> 'message_ids') AS message_id
-			WHERE $1 = message_id
-		)
-		LIMIT 1;`
+		WHERE messages @> format('[{"message_ids":["%s"]}]', $1::text)::jsonb LIMIT 1;`
 
 	deleteBridgeChannelsQuery = `DELETE FROM bridge_channels WHERE bridge_id = $1;`
 
@@ -78,5 +66,5 @@ const (
 
 	selectDatabaseVersionQuery = `SELECT value FROM lightning WHERE prop = 'db_data_version';`
 
-	insertDatabaseVersionQuery = `INSERT INTO lightning (prop, value) VALUES ('db_data_version', '0.8.1');`
+	insertDatabaseVersionQuery = `INSERT INTO lightning (prop, value) VALUES ('db_data_version', '0.8.2');`
 )
