@@ -79,13 +79,14 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 		command = bot.commands["help"]
 	}
 
-	for _, cmd := range command.Subcommands {
-		if len(event.Options) != 0 && event.Options[0] == cmd.Name {
-			event.Subcommand = &cmd.Name
-			command = cmd
-			event.Options = event.Options[1:]
+	if len(command.Subcommands) != 0 && len(event.Options) != 0 && event.Subcommand == nil {
+		event.Subcommand = &event.Options[0]
+		event.Options = event.Options[1:]
+	}
 
-			break
+	if event.Subcommand != nil {
+		if cmd, ok := command.Subcommands[*event.Subcommand]; ok {
+			command = cmd
 		}
 	}
 

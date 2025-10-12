@@ -44,8 +44,8 @@ type Command struct {
 	Executor    func(options *CommandOptions)
 	Name        string
 	Description string
+	Subcommands map[string]*Command
 	Arguments   []*CommandArgument
-	Subcommands []*Command
 }
 
 // CommandEvent represents an execution of a command on a platform.

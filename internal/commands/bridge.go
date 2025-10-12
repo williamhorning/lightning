@@ -27,9 +27,10 @@ func BridgeCommand(database data.Database) *lightning.Command {
 				log.Printf("failed to reply to bridge command: %v\n", err)
 			}
 		},
-		Subcommands: []*lightning.Command{
-			bridgeCreate(database), bridgeJoin(database, "join"), bridgeJoin(database, "subscribe"),
-			bridgeLeave(database), bridgeToggle(database), bridgeStatus(database),
+		Subcommands: map[string]*lightning.Command{
+			"create": bridgeCreate(database), "join": bridgeJoin(database, "join"),
+			"subscribe": bridgeJoin(database, "subscribe"), "leave": bridgeLeave(database),
+			"toggle": bridgeToggle(database), "status": bridgeStatus(database),
 		},
 	}
 }
