@@ -1,6 +1,9 @@
 FROM golang:1.25.1-alpine3.22 AS builder
 
 RUN apk update && apk add --no-cache ca-certificates
+RUN curl -O https://ssl.com/repo/certs/SSLcom-TLS-Root-2022-ECC.pem && curl -O https://ssl.com/repo/certs/SSL.com-TLS-T-ECC-R2.pem
+RUN for cert in *.pem; do cp "$cert" "/usr/local/share/ca-certificates/${cert%.pem}.crt"; done
+RUN update-ca-certificates
 
 WORKDIR /src
 COPY . .
