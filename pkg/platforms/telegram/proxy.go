@@ -10,19 +10,16 @@ import (
 )
 
 func startProxy(cfg map[string]string) {
-	proxy := &httputil.ReverseProxy{
-		Director: func(req *http.Request) {
-			req.URL = &url.URL{
-				Scheme: "https",
-				Host:   "api.telegram.org",
-				Path:   "/file/bot" + cfg["token"] + "/" + strings.TrimPrefix(req.URL.Path, "/telegram"),
-			}
-			req.Host = "api.telegram.org"
-		},
-	}
-
 	server := &http.Server{
-		Addr: ":" + cfg["proxy_port"], Handler: proxy, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout,
+		Addr: ":" + cfg["proxy_port"], Handler: &httputil.ReverseProxy{
+			Director: func(req *http.Request) {
+				req.URL = &url.URL{
+					Scheme: "https", Host: "api.telegram.org",
+					Path: "/file/bot" + cfg["token"] + "/" + strings.TrimPrefix(req.URL.Path, "/telegram"),
+				}
+				req.Host = "api.telegram.org"
+			},
+		}, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout,
 	}
 
 	if err := server.ListenAndServe(); err != nil {

@@ -9,88 +9,114 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func getBase(ctx *ext.Context) *lightning.BaseMessage {
+func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {
 	timestamp := time.UnixMilli(ctx.EffectiveMessage.Date * 1000)
 
-	return &lightning.BaseMessage{
-		EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
-		ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-		Time:      &timestamp,
-	}
-}
-
-func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {
 	msg := lightning.Message{
-		BaseMessage: *getBase(ctx),
-		Attachments: []lightning.Attachment{},
-		Author:      getLightningAuthor(bot, ctx, proxyPath),
-		Embeds:      []lightning.Embed{},
-		RepliedTo:   getLightningReply(ctx),
+		Author: &lightning.MessageAuthor{
+			ID:             strconv.FormatInt(ctx.EffectiveSender.Id(), 10),
+			Nickname:       ctx.EffectiveSender.Name(),
+			Username:       ctx.EffectiveSender.Username(),
+			ProfilePicture: getProfilePicture(bot, ctx, proxyPath),
+			Color:          "#24A1DE",
+		},
+		BaseMessage: lightning.BaseMessage{
+			EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
+			ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
+			Time:      &timestamp,
+		},
 	}
 
-	if text := ctx.EffectiveMessage.Text; text != "" {
-		msg.Content = text
-
-		return msg
+	if ctx.EffectiveMessage.ReplyToMessage != nil {
+		msg.RepliedTo = append(msg.RepliedTo, strconv.FormatInt(ctx.EffectiveMessage.ReplyToMessage.GetMessageId(), 10))
 	}
 
-	if dice := ctx.EffectiveMessage.Dice; dice != nil {
-		msg.Content = dice.Emoji + " " + strconv.FormatInt(dice.Value, 10)
-
-		return msg
-	}
-
-	if location := ctx.EffectiveMessage.Location; location != nil {
+	switch {
+	case ctx.EffectiveMessage.Text != "":
+		msg.Content = ctx.EffectiveMessage.Text
+	case ctx.EffectiveMessage.Dice != nil:
+		msg.Content = ctx.EffectiveMessage.Dice.Emoji + " " + strconv.FormatInt(ctx.EffectiveMessage.Dice.Value, 10)
+	case ctx.EffectiveMessage.Location != nil:
 		msg.Content = "https://www.openstreetmap.org/#map=18/" +
-			strconv.FormatFloat(location.Latitude, 'f', 6, 64) + "/" +
-			strconv.FormatFloat(location.Longitude, 'f', 6, 64)
+			strconv.FormatFloat(ctx.EffectiveMessage.Location.Latitude, 'f', 6, 64) + "/" +
+			strconv.FormatFloat(ctx.EffectiveMessage.Location.Longitude, 'f', 6, 64)
+	case ctx.EffectiveMessage.Caption != "" || len(ctx.EffectiveMessage.NewChatPhoto) != 0:
+		msg.Content = ctx.EffectiveMessage.Caption
 
-		return msg
+		fileID, fileName := getFileDetails(ctx)
+
+		if f, err := bot.GetFile(fileID, nil); err == nil {
+			msg.Attachments = append(msg.Attachments, lightning.Attachment{
+				URL:  proxyPath + f.FilePath,
+				Name: fileName,
+				Size: f.FileSize,
+			})
+		}
+	default:
 	}
-
-	msg.Content = ctx.EffectiveMessage.Caption
-
-	addAttachment(bot, ctx, &msg, proxyPath)
 
 	return msg
 }
 
-func addAttachment(bot *gotgbot.Bot, ctx *ext.Context, msg *lightning.Message, proxyPath string) {
-	if newChatPhoto := ctx.EffectiveMessage.NewChatPhoto; len(newChatPhoto) > 0 {
-		handleAttachment(bot, newChatPhoto[0].FileId, "chat_photo.jpg", newChatPhoto[0].FileSize, msg, proxyPath)
+func getProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) *string {
+	if ctx.EffectiveUser == nil {
+		return nil
 	}
 
-	if doc := ctx.EffectiveMessage.Document; doc != nil {
-		handleAttachment(bot, doc.FileId, doc.FileName, doc.FileSize, msg, proxyPath)
+	pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
+	if err != nil || pics.TotalCount <= 0 {
+		return nil
 	}
 
-	if anim := ctx.EffectiveMessage.Animation; anim != nil {
-		handleAttachment(bot, anim.FileId, anim.FileName, anim.FileSize, msg, proxyPath)
+	bestPhoto := getBestPhoto(pics.Photos[0])
+	if bestPhoto == nil {
+		return nil
 	}
 
-	if audio := ctx.EffectiveMessage.Audio; audio != nil {
-		handleAttachment(bot, audio.FileId, audio.FileName, audio.FileSize, msg, proxyPath)
+	if f, err := bot.GetFile(bestPhoto.FileId, nil); err == nil {
+		url := proxyPath + f.FilePath
+
+		return &url
 	}
 
-	if photos := ctx.EffectiveMessage.Photo; len(photos) > 0 {
-		handleAttachment(bot, photos[len(photos)-1].FileId, photos[0].FileId+".jpg", photos[0].FileSize, msg, proxyPath)
+	return nil
+}
+
+func getBestPhoto(size []gotgbot.PhotoSize) *gotgbot.PhotoSize {
+	var bestPhoto *gotgbot.PhotoSize
+
+	for _, photo := range size {
+		if bestPhoto == nil || photo.Width > bestPhoto.Width {
+			bestPhoto = &photo
+		}
 	}
 
-	if sticker := ctx.EffectiveMessage.Sticker; sticker != nil {
-		extension := getStickerExtension(sticker)
-		handleAttachment(bot, sticker.FileId, sticker.SetName+extension, sticker.FileSize, msg, proxyPath)
-	}
+	return bestPhoto
+}
 
-	if video := ctx.EffectiveMessage.Video; video != nil {
-		handleAttachment(bot, video.FileId, video.FileName, video.FileSize, msg, proxyPath)
-	}
-
-	if vnote := ctx.EffectiveMessage.VideoNote; vnote != nil {
-		handleAttachment(bot, vnote.FileId, "video_note.mp4", vnote.FileSize, msg, proxyPath)
-	}
-
-	if voice := ctx.EffectiveMessage.Voice; voice != nil {
-		handleAttachment(bot, voice.FileId, "voice.ogg", voice.FileSize, msg, proxyPath)
+func getFileDetails(ctx *ext.Context) (string, string) { //nolint:revive,cyclop
+	switch {
+	case len(ctx.EffectiveMessage.NewChatPhoto) != 0:
+		return getBestPhoto(ctx.EffectiveMessage.NewChatPhoto).FileId, "photo.jpg"
+	case len(ctx.EffectiveMessage.Photo) != 0:
+		return getBestPhoto(ctx.EffectiveMessage.Photo).FileId, "photo.jpg"
+	case ctx.EffectiveMessage.Document != nil:
+		return ctx.EffectiveMessage.Document.FileId, ctx.EffectiveMessage.Document.FileName
+	case ctx.EffectiveMessage.Animation != nil:
+		return ctx.EffectiveMessage.Animation.FileId, ctx.EffectiveMessage.Animation.FileName
+	case ctx.EffectiveMessage.Audio != nil:
+		return ctx.EffectiveMessage.Audio.FileId, ctx.EffectiveMessage.Audio.FileName
+	case ctx.EffectiveMessage.Sticker != nil:
+		return ctx.EffectiveMessage.Sticker.FileId, ctx.ChannelPost.Sticker.SetName +
+			getStickerExtension(ctx.ChannelPost.Sticker)
+	case ctx.EffectiveMessage.Video != nil:
+		return ctx.EffectiveMessage.Video.FileId, ctx.EffectiveMessage.Video.FileName
+	case ctx.EffectiveMessage.VideoNote != nil:
+		return ctx.EffectiveMessage.VideoNote.FileId, ctx.EffectiveMessage.VideoNote.FileId + ".mp4"
+	case ctx.EffectiveMessage.Voice != nil:
+		return ctx.EffectiveMessage.Voice.FileId, ctx.EffectiveMessage.Voice.FileId + ".ogg"
+	default:
+		return "", ""
 	}
 }
 
@@ -102,57 +128,4 @@ func getStickerExtension(sticker *gotgbot.Sticker) string {
 	}
 
 	return ".webp"
-}
-
-func handleAttachment(bot *gotgbot.Bot, fileID, name string, size int64, msg *lightning.Message, proxyPath string) {
-	if f, err := bot.GetFile(fileID, nil); err == nil {
-		msg.Attachments = append(msg.Attachments, lightning.Attachment{
-			URL:  proxyPath + f.FilePath,
-			Name: name,
-			Size: size,
-		})
-	}
-}
-
-func getLightningAuthor(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) *lightning.MessageAuthor {
-	author := lightning.MessageAuthor{
-		ID:             strconv.FormatInt(ctx.EffectiveSender.Id(), 10),
-		Nickname:       ctx.EffectiveSender.Name(),
-		Username:       ctx.EffectiveSender.Username(),
-		ProfilePicture: nil,
-		Color:          "#24A1DE",
-	}
-
-	if ctx.EffectiveUser == nil {
-		return &author
-	}
-
-	pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
-	if err == nil && pics.TotalCount > 0 {
-		var bestPhoto *gotgbot.PhotoSize
-
-		for i := range pics.Photos[0] {
-			photo := &pics.Photos[0][i]
-			if bestPhoto == nil || photo.Width > bestPhoto.Width {
-				bestPhoto = photo
-			}
-		}
-
-		if bestPhoto != nil {
-			if f, err := bot.GetFile(bestPhoto.FileId, nil); err == nil {
-				url := proxyPath + f.FilePath
-				author.ProfilePicture = &url
-			}
-		}
-	}
-
-	return &author
-}
-
-func getLightningReply(ctx *ext.Context) []string {
-	if ctx.EffectiveMessage.ReplyToMessage == nil {
-		return nil
-	}
-
-	return []string{strconv.FormatInt(ctx.EffectiveMessage.ReplyToMessage.GetMessageId(), 10)}
 }

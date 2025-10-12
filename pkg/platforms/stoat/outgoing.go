@@ -20,9 +20,7 @@ func (p *stoatPlugin) getOutgoing(
 ) rvapi.DataMessageSend {
 	content := spoilerRegex.ReplaceAllStringFunc(
 		emojiSendRegex.ReplaceAllStringFunc(message.Content, p.replaceOutgoingEmoji(message)),
-		func(match string) string {
-			return "!!" + match[2:len(match)-2] + "!!"
-		},
+		func(match string) string { return "!!" + match[2:len(match)-2] + "!!" },
 	)
 
 	if opts != nil && !opts.AllowEveryonePings {
@@ -40,6 +38,16 @@ func (p *stoatPlugin) getOutgoing(
 		Embeds:      getOutgoingEmbeds(message.Embeds),
 		Replies:     getOutgoingReplies(message.RepliedTo),
 	}
+
+	// embeds := 0
+
+	// for _, embed := range msg.Embeds {
+	// 	if embed.Description != nil {
+	// 		embeds += len(*embed.Description)
+	// 	}
+	// }
+
+	// TODO: handle combined content + embed length exceeding 2000
 
 	if len(content) == 0 && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
 		msg.Content = "\u200B"
