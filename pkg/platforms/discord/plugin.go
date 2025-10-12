@@ -37,7 +37,7 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("discord: failed to create session: %w", err)
 	}
 
-	discord.Identify.Intents = discordgo.IntentGuilds | discordgo.IntentGuildPresences |
+	discord.Identify.Intents = discordgo.IntentGuilds | discordgo.IntentGuildMessages | discordgo.IntentGuildPresences |
 		discordgo.IntentDirectMessages | discordgo.IntentMessageContent | discordgo.IntentGuildMessagePolls
 	discord.StateEnabled = true
 	discord.ShouldReconnectOnError = true
