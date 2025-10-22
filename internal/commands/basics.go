@@ -22,7 +22,7 @@ func HelpCommand(username string) *lightning.Command {
 					"- `bridge`: manage bridges between channels\n"+
 					"- `help`: get help with the bot\n"+
 					"- `ping`: check if the bot is alive\n\n"+
-					"read the [docs](https://williamhorning.eu.org/lightning) for more help",
+					"read the [docs](https://williamhorning.dev/lightning) for more help",
 			)
 
 			if err := opts.Reply(msg, false); err != nil {

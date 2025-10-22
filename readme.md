@@ -2,9 +2,9 @@
 
 ![lightning logo](./logo.svg)
 
-- [the bridge](https://williamhorning.eu.org/lightning/bridge) - connect
+- [the bridge](https://williamhorning.dev/lightning/bridge) - connect
 Discord, Guilded, Stoat, and Telegram
-- [the framework](https://williamhorning.eu.org/lightning/framework) - build
+- [the framework](https://williamhorning.dev/lightning/framework) - build
 your own cross-platform bots
 
 Lightning is a project developing *truly powerful* cross-platform bots, with
@@ -39,10 +39,10 @@ what do you do, what options do you have?
 **Bridging!** Everyone can use their favorite app, gets the same messages, and
 is on the same page. Lightning is an easy to use bridge bot that supports
 Discord, Guilded, Stoat, and Telegram. To get started, check out the
-[getting started guide](https://williamhorning.eu.org/lightning/bridge/users),
+[getting started guide](https://williamhorning.dev/lightning/bridge/users),
 which will walk you through using Bolt, the hosted version of the Lightning bot.
 If you want to self-host, read the
-[self-hosting guide](https://williamhorning.eu.org/lightning/bridge/hosting) to
+[self-hosting guide](https://williamhorning.dev/lightning/bridge/hosting) to
 get started.
 
 ## the framework
@@ -60,17 +60,17 @@ Stoat, and Telegram. The only platform-specific code is in the plugins, making
 it possible to support new platforms without modifying your bot's core logic.
 
 To see a simple example of how to use the framework, check out the
-[framework: hello world](https://williamhorning.eu.org/lightning/framework/hello-world)
+[framework: hello world](https://williamhorning.dev/lightning/framework/hello-world)
 guide, which will walk you through creating a simple bot that responds to
 messages and commands. For the full documentation, check out the
-[framework documentation](https://williamhorning.eu.org/lightning/framework).
+[framework documentation](https://williamhorning.dev/lightning/framework).
 
 ## what's the difference between Bolt and Lightning?
 
 **Lightning** is both the open-source framework and bridge bot that are used to
 run **Bolt**, the hosted version of the bridge bot. Bolt is a specific instance
 of the Lightning bridge bot, which is hosted by
-[William Horning](https://williamhorning.eu.org/) and is free to use. You can
+[William Horning](https://williamhorning.dev/) and is free to use. You can
 also self-host your own instance of the Lightning bridge
 
 ## what about matrix?
@@ -91,4 +91,4 @@ Lightning, the framework and bridge bot, is licensed under the MIT license. The
 framework and plugins will always remain under the MIT license, though the
 bridge bot may have a different license in the future, but will always be free
 to use. Bolt is also free to use, but is also subject to the
-[terms of service](https://williamhorning.eu.org/bolt/legal).
+[terms of service](https://williamhorning.dev/bolt/legal).

@@ -12,7 +12,7 @@ func sendErr(err error, msg string, opts *lightning.CommandOptions) {
 
 	if err = opts.Reply(getMessage("something went wrong :(", "uh oh! looks like you got struck by an error: "+
 		msg+"\n\n```\n"+err.Error()+"\n```\nif you think this is a bug, or need more help, see the "+
-		"[docs](https://williamhorning.eu.org/lightning/bridge)"), false); err != nil {
+		"[docs](https://williamhorning.dev/lightning/bridge)"), false); err != nil {
 		log.Printf("failed to reply with error to command: %v\n", err)
 	}
 }
@@ -25,7 +25,7 @@ func getTime() *string {
 
 func getMessage(title, description string) *lightning.Message {
 	color := 0x487C7E
-	lightningProfileURL := "https://williamhorning.eu.org/assets/lightning.png"
+	lightningProfileURL := "https://williamhorning.dev/assets/lightning.png"
 
 	if title == "something went wrong :(" {
 		color = 0xFF0000

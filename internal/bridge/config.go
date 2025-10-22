@@ -29,7 +29,7 @@ func GetConfig(file string) (Config, bool) {
 	}
 
 	if config.Author == nil {
-		picture := "https://williamhorning.eu.org/assets/clouds.jpg"
+		picture := "https://williamhorning.dev/assets/lightning.png"
 
 		config.Author = &lightning.MessageAuthor{
 			ID:             "lightning",
