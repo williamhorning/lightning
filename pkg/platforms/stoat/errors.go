@@ -1,6 +1,7 @@
 package stoat
 
 import (
+	"io"
 	"strconv"
 
 	"github.com/williamhorning/lightning/internal/rvapi"
@@ -23,6 +24,7 @@ func (e *stoatPermissionsError) Error() string {
 }
 
 type stoatStatusError struct {
+	resp io.ReadCloser
 	msg  string
 	code int
 	edit bool
@@ -33,5 +35,10 @@ func (e *stoatStatusError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stoatStatusError) Error() string {
-	return "stoat status code " + strconv.FormatInt(int64(e.code), 10) + ": " + e.msg
+	resp, err := io.ReadAll(e.resp)
+	if err != nil {
+		resp = []byte(err.Error())
+	}
+
+	return "stoat status code " + strconv.FormatInt(int64(e.code), 10) + ": " + e.msg + ": " + string(resp)
 }

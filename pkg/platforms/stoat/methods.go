@@ -36,7 +36,7 @@ func (p *stoatPlugin) stoatSendMessage(channel string, message rvapi.DataMessage
 	}()
 
 	if code != http.StatusOK {
-		return "", &stoatStatusError{"failed to send stoat message", code, false}
+		return "", &stoatStatusError{resp, "failed to send stoat message", code, false}
 	}
 
 	var response rvapi.Message
@@ -69,7 +69,7 @@ func (p *stoatPlugin) EditMessage(message *lightning.Message, ids []string, opts
 	}
 
 	if code != http.StatusOK {
-		return &stoatStatusError{"failed to edit stoat message", code, true}
+		return &stoatStatusError{resp, "failed to edit stoat message", code, true}
 	}
 
 	return nil
@@ -95,7 +95,7 @@ func (p *stoatPlugin) DeleteMessage(channel string, ids []string) error {
 	}()
 
 	if code != http.StatusNoContent {
-		return &stoatStatusError{"failed to delete stoat messages\n\tbody: " + string(payload), code, true}
+		return &stoatStatusError{resp, "failed to delete stoat messages\n\tbody: " + string(payload), code, true}
 	}
 
 	return nil
