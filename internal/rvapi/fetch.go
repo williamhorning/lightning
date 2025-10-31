@@ -47,7 +47,7 @@ func (s *Session) Fetch(method, endpoint string, body io.Reader) (io.ReadCloser,
 
 	req.Header["X-Bot-Token"] = []string{s.Token}
 	req.Header["Content-Type"] = []string{"application/json"}
-	req.Header["User-Agent"] = []string{"rvapi/0.8.0-rc.6"}
+	req.Header["User-Agent"] = []string{"rvapi/0.8.0-rc.7"}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
