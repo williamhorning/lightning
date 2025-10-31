@@ -33,7 +33,7 @@ func bridgeStatus(database data.Database) *lightning.Command {
 				}
 
 				if channel.Disabled.Write {
-					status += " (write disabled)"
+					status += " (read only: you may need to check your permissions, and rejoin the bridge)"
 				}
 
 				status += "\n"
