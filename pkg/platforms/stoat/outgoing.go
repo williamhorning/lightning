@@ -169,6 +169,10 @@ func getEmbedDescription(embed lightning.Embed) *string {
 		description += "**" + field.Name + "**\n" + field.Value
 	}
 
+	if description == "" {
+		return nil
+	}
+
 	return &description
 }
 

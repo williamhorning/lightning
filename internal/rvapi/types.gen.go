@@ -497,3 +497,36 @@ const (
 	PermissionSet2 Permission = PermissionSet1 | PermissionChangeNickname | PermissionChangeAvatar
 	PermissionSet3 Permission = PermissionViewChannel | PermissionReadMessageHistory
 )
+
+// Individual permission names.
+var PermissionNames = map[Permission]string{ //nolint:gochecknoglobals
+	PermissionManageChannel:       "Manage Channel",
+	PermissionManageServer:        "Manage Server",
+	PermissionManagePermissions:   "Manage Permissions",
+	PermissionManageRole:          "Manage Role",
+	PermissionManageCustomization: "Manage Customization",
+	PermissionKickMembers:         "Kick Members",
+	PermissionBanMembers:          "Ban Members",
+	PermissionTimeoutMembers:      "Timeout Members",
+	PermissionAssignRoles:         "Assign Roles",
+	PermissionChangeNickname:      "Change Nickname",
+	PermissionManageNicknames:     "Manage Nicknames",
+	PermissionChangeAvatar:        "Change Avatar",
+	PermissionRemoveAvatars:       "Remove Avatars",
+	PermissionViewChannel:         "View Channel",
+	PermissionReadMessageHistory:  "Read Message History",
+	PermissionSendMessage:         "Send Message",
+	PermissionManageMessages:      "Manage Messages",
+	PermissionManageWebhooks:      "Manage Webhooks",
+	PermissionInviteOthers:        "Invite Others",
+	PermissionSendEmbeds:          "Send Embeds",
+	PermissionUploadFiles:         "Upload Files",
+	PermissionMasquerade:          "Masquerade",
+	PermissionReact:               "React",
+	PermissionConnect:             "Connect",
+	PermissionSpeak:               "Speak",
+	PermissionVideo:               "Video",
+	PermissionMuteMembers:         "Mute Members",
+	PermissionDeafenMembers:       "Deafen Members",
+	PermissionMoveMembers:         "Move Members",
+}

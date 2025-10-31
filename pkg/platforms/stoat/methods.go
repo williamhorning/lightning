@@ -75,9 +75,11 @@ func (p *stoatPlugin) EditMessage(message *lightning.Message, ids []string, opts
 		return fmt.Errorf("stoat: error making edit request: %w", err)
 	}
 
-	if err := resp.Close(); err != nil {
-		log.Printf("stoat: failed to close edit body: %v\n", err)
-	}
+	defer func() {
+		if err := resp.Close(); err != nil {
+			log.Printf("stoat: failed to close edit body: %v\n", err)
+		}
+	}()
 
 	if code != http.StatusOK {
 		body, err := io.ReadAll(resp)

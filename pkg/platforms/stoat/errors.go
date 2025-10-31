@@ -17,9 +17,15 @@ func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stoatPermissionsError) Error() string {
-	return "insufficient permissions (have " +
-		strconv.FormatUint(uint64(e.permissions), 10) + ", want " +
-		strconv.FormatUint(uint64(e.expected), 10) + "), please check them"
+	err := "Missing the following permissions, please ensure these are granted: `"
+
+	for permission, name := range rvapi.PermissionNames {
+		if (e.expected&permission == permission) && (e.permissions&permission != permission) {
+			err += name + " "
+		}
+	}
+
+	return strconv.FormatUint(uint64(e.permissions), 10) + "&" + strconv.FormatUint(uint64(e.expected), 10) + "`"
 }
 
 type stoatStatusError struct {
