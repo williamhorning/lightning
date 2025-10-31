@@ -1,8 +1,4 @@
 FROM golang:1.25.3-alpine AS builder
-
-COPY ./pkg/platforms/stoat/cert.pem /usr/local/share/ca-certificates
-RUN update-ca-certificates
-
 WORKDIR /src
 COPY . .
 RUN CGO_ENABLED=0 go build -tags goolm -o /out/lightning ./cmd/lightning/main.go

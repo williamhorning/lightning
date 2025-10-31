@@ -11,6 +11,7 @@ import (
 
 	"github.com/williamhorning/lightning/internal/emoji"
 	"github.com/williamhorning/lightning/internal/rvapi"
+	"github.com/williamhorning/lightning/internal/workaround"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -97,7 +98,7 @@ func (p *stoatPlugin) getOutgoingAttachments(attachments []lightning.Attachment)
 			continue
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := workaround.Client.Do(req)
 		if err != nil {
 			cancel()
 
@@ -106,7 +107,7 @@ func (p *stoatPlugin) getOutgoingAttachments(attachments []lightning.Attachment)
 
 		file, err := p.session.UploadFile("attachments", attachment.Name, resp.Body)
 		if err == nil {
-			attachmentIDs = append(attachmentIDs, file)
+			attachmentIDs = append(attachmentIDs, file.ID)
 		} else {
 			log.Printf("%v\n", err)
 		}

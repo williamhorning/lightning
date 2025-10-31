@@ -62,11 +62,11 @@ type stoatPlugin struct {
 	session *rvapi.Session
 }
 
-const correctPermissionValue = rvapi.PermissionManageCustomization | rvapi.PermissionChangeNickname |
-	rvapi.PermissionChangeAvatar | rvapi.PermissionViewChannel | rvapi.PermissionReadMessageHistory |
-	rvapi.PermissionSendMessage | rvapi.PermissionManageMessages | rvapi.PermissionInviteOthers |
-	rvapi.PermissionSendEmbeds | rvapi.PermissionUploadFiles | rvapi.PermissionMasquerade |
-	rvapi.PermissionReact
+const correctPermissionValue = rvapi.PermissionManageCustomization | rvapi.PermissionManageRole |
+	rvapi.PermissionChangeNickname | rvapi.PermissionChangeAvatar | rvapi.PermissionViewChannel |
+	rvapi.PermissionReadMessageHistory | rvapi.PermissionSendMessage | rvapi.PermissionManageMessages |
+	rvapi.PermissionInviteOthers | rvapi.PermissionSendEmbeds | rvapi.PermissionUploadFiles |
+	rvapi.PermissionMasquerade | rvapi.PermissionReact
 
 func (p *stoatPlugin) SetupChannel(channel string) (any, error) {
 	channelData := p.session.Channel(channel)
@@ -74,6 +74,7 @@ func (p *stoatPlugin) SetupChannel(channel string) (any, error) {
 
 	if channelData.ChannelType == rvapi.ChannelTypeGroup {
 		needed &= ^rvapi.PermissionManageCustomization
+		needed &= ^rvapi.PermissionManageRole
 		needed &= ^rvapi.PermissionChangeNickname
 		needed &= ^rvapi.PermissionChangeAvatar
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/williamhorning/lightning/internal/emoji"
+	"github.com/williamhorning/lightning/internal/workaround"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -331,7 +332,7 @@ func getFile(attachment *lightning.Attachment, maxFileSize int64) *discordgo.Fil
 		return nil
 	}
 
-	resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // see cancelableReadCloser
+	resp, err := workaround.Client.Do(req) //nolint:bodyclose // see cancelableReadCloser
 	if err != nil {
 		cancel()
 
