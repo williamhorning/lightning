@@ -140,6 +140,14 @@ func convertOutgoingEmbed(embed lightning.Embed) rvapi.SendableEmbed {
 		URL:         embed.URL,
 	}
 
+	if embed.URL != nil {
+		if len(*embed.URL) > 256 {
+			*embed.URL = (*embed.URL)[:256]
+		}
+
+		stoatEmbed.URL = embed.URL
+	}
+
 	if embed.Color != nil {
 		color := "#" + strconv.FormatInt(int64(*embed.Color), 16)
 
