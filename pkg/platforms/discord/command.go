@@ -1,16 +1,32 @@
 package discord
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func getDiscordCommandOptions(arguments *lightning.Command) []*discordgo.ApplicationCommandOption {
-	options := make([]*discordgo.ApplicationCommandOption, 0, len(arguments.Arguments)+len(arguments.Subcommands))
+func lightningToDiscordCommands(original map[string]*lightning.Command) []*discordgo.ApplicationCommand {
+	cmds := make([]*discordgo.ApplicationCommand, 0, len(original))
 
-	for _, arg := range arguments.Arguments {
+	for _, cmd := range original {
+		cmds = append(cmds, &discordgo.ApplicationCommand{
+			Name:        cmd.Name,
+			Type:        discordgo.ChatApplicationCommand,
+			Description: cmd.Description,
+			Options:     lightningToDiscordCommandOptions(cmd),
+		})
+	}
+
+	return cmds
+}
+
+func lightningToDiscordCommandOptions(cmd *lightning.Command) []*discordgo.ApplicationCommandOption {
+	options := make([]*discordgo.ApplicationCommandOption, 0, len(cmd.Arguments)+len(cmd.Subcommands))
+
+	for _, arg := range cmd.Arguments {
 		options = append(options, &discordgo.ApplicationCommandOption{
 			Name:        arg.Name,
 			Description: arg.Description,
@@ -19,34 +35,22 @@ func getDiscordCommandOptions(arguments *lightning.Command) []*discordgo.Applica
 		})
 	}
 
-	for _, subcommand := range arguments.Subcommands {
+	for _, sub := range cmd.Subcommands {
 		options = append(options, &discordgo.ApplicationCommandOption{
-			Name:        subcommand.Name,
-			Description: subcommand.Description,
+			Name:        sub.Name,
+			Description: sub.Description,
 			Type:        discordgo.ApplicationCommandOptionSubCommand,
-			Options:     getDiscordCommandOptions(subcommand),
+			Options:     lightningToDiscordCommandOptions(sub),
 		})
 	}
 
 	return options
 }
 
-func getDiscordCommand(command map[string]*lightning.Command) []*discordgo.ApplicationCommand {
-	commands := make([]*discordgo.ApplicationCommand, 0, len(command))
-
-	for _, cmd := range command {
-		commands = append(commands, &discordgo.ApplicationCommand{
-			Name:        cmd.Name,
-			Type:        discordgo.ChatApplicationCommand,
-			Description: cmd.Description,
-			Options:     getDiscordCommandOptions(cmd),
-		})
-	}
-
-	return commands
-}
-
-func getLightningCommand(session *discordgo.Session, interaction *discordgo.InteractionCreate) *lightning.CommandEvent {
+func discordToLightningCommand(
+	session *discordgo.Session,
+	interaction *discordgo.InteractionCreate,
+) *lightning.CommandEvent {
 	if interaction.Type != discordgo.InteractionApplicationCommand {
 		return nil
 	}
@@ -79,27 +83,25 @@ func getLightningCommand(session *discordgo.Session, interaction *discordgo.Inte
 		CommandOptions: &lightning.CommandOptions{
 			Arguments: args,
 			BaseMessage: &lightning.BaseMessage{
-				EventID:   interaction.ID,
-				ChannelID: interaction.ChannelID,
-				Time:      &timestamp,
+				EventID: interaction.ID, ChannelID: interaction.ChannelID, Time: timestamp,
 			},
 			Prefix: "/",
 			Reply: func(message *lightning.Message, sensitive bool) error {
-				flags := discordgo.MessageFlags(0)
+				msgs := lightningToDiscordSendable(session, message, nil)
+
+				data := msgs[0].toInteractionResponseData()
 
 				if sensitive {
-					flags = discordgo.MessageFlagsEphemeral
+					data.Flags = discordgo.MessageFlagsEphemeral
 				}
 
-				msg := getOutgoingMessage(session, message, nil)
+				if err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource, Data: data,
+				}); err != nil {
+					return fmt.Errorf("failed to respond to Discord interaction: %w", err)
+				}
 
-				return session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						AllowedMentions: msg.allowedMentions, Components: msg.components, Content: msg.content,
-						Embeds: msg.embeds, Flags: flags,
-					},
-				})
+				return nil
 			},
 		},
 		Command:    data.Name,

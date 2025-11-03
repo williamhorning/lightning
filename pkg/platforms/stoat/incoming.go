@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/williamhorning/lightning/internal/rvapi"
+	"github.com/williamhorning/lightning/internal/v2/stoat"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *stoatPlugin) getIncomingMessage(message rvapi.Message) *lightning.Message {
+func (p *stoatPlugin) getIncomingMessage(message stoat.Message) *lightning.Message {
 	if message.Author == p.self.ID && message.Masquerade != nil {
 		return nil
 	}
@@ -35,24 +35,20 @@ func (p *stoatPlugin) getIncomingMessage(message rvapi.Message) *lightning.Messa
 	return msg
 }
 
-func getLightningTime(message rvapi.Message) *time.Time {
+func getLightningTime(message stoat.Message) time.Time {
 	if !message.Edited.IsZero() {
-		return &message.Edited
+		return message.Edited
 	}
 
 	msgID, err := ulid.Parse(message.ID)
 	if err != nil {
-		timestamp := time.Now()
-
-		return &timestamp
+		return time.Now()
 	}
 
-	timestamp := msgID.Timestamp()
-
-	return &timestamp
+	return msgID.Timestamp()
 }
 
-func getLightningAttachment(attachments []rvapi.File) []lightning.Attachment {
+func getLightningAttachment(attachments []stoat.File) []lightning.Attachment {
 	result := make([]lightning.Attachment, len(attachments))
 	for i, att := range attachments {
 		result[i] = lightning.Attachment{
@@ -68,7 +64,7 @@ func getLightningAttachment(attachments []rvapi.File) []lightning.Attachment {
 func (p *stoatPlugin) getLightningAuthor(
 	authorID string,
 	channelID string,
-	masquerade *rvapi.Masquerade,
+	masquerade *stoat.Masquerade,
 ) *lightning.MessageAuthor {
 	author := lightning.MessageAuthor{
 		ID:       authorID,
@@ -77,7 +73,7 @@ func (p *stoatPlugin) getLightningAuthor(
 		Color:    "#8C24EC",
 	}
 
-	user := p.session.User(authorID)
+	user := stoat.Get(p.session, "/users/"+authorID, authorID, &p.session.UserCache)
 	if user == nil {
 		return applyMasquerade(author, masquerade)
 	}
@@ -86,8 +82,7 @@ func (p *stoatPlugin) getLightningAuthor(
 	author.Nickname = user.Username
 
 	if user.Avatar != nil {
-		profilePic := getURL(user.Avatar)
-		author.ProfilePicture = &profilePic
+		author.ProfilePicture = getURL(user.Avatar)
 	}
 
 	p.setServerMember(&author, authorID, channelID)
@@ -96,12 +91,13 @@ func (p *stoatPlugin) getLightningAuthor(
 }
 
 func (p *stoatPlugin) setServerMember(author *lightning.MessageAuthor, authorID, channelID string) {
-	channel := p.session.Channel(channelID)
+	channel := stoat.Get(p.session, "/channels/"+channelID, channelID, &p.session.ChannelCache)
 	if channel == nil || channel.ChannelType != "TextChannel" || channel.Server == nil {
 		return
 	}
 
-	member := p.session.Member(*channel.Server, authorID)
+	member := stoat.Get(p.session, "/servers/"+*channel.Server+"/members/"+authorID, *channel.Server+"-"+authorID,
+		&p.session.MemberCache)
 	if member == nil {
 		return
 	}
@@ -111,16 +107,15 @@ func (p *stoatPlugin) setServerMember(author *lightning.MessageAuthor, authorID,
 	}
 
 	if member.Avatar != nil {
-		memberAvatar := getURL(member.Avatar)
-		author.ProfilePicture = &memberAvatar
+		author.ProfilePicture = getURL(member.Avatar)
 	}
 }
 
-func getURL(file *rvapi.File) string {
+func getURL(file *stoat.File) string {
 	return "https://cdn.stoatusercontent.com/" + file.Tag + "/" + file.ID
 }
 
-func applyMasquerade(author lightning.MessageAuthor, masquerade *rvapi.Masquerade) *lightning.MessageAuthor {
+func applyMasquerade(author lightning.MessageAuthor, masquerade *stoat.Masquerade) *lightning.MessageAuthor {
 	if masquerade == nil {
 		return &author
 	}
@@ -134,7 +129,7 @@ func applyMasquerade(author lightning.MessageAuthor, masquerade *rvapi.Masquerad
 	}
 
 	if masquerade.Avatar != "" {
-		author.ProfilePicture = &masquerade.Avatar
+		author.ProfilePicture = masquerade.Avatar
 	}
 
 	return &author
@@ -157,16 +152,14 @@ func replaceSpoilers(content string) string {
 func (p *stoatPlugin) replaceEmojis(message *lightning.Message) string {
 	return emojiRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
 		if emojiID := extractID(match, emojiRegex); emojiID != "" {
-			emoji := p.session.Emoji(emojiID)
+			emoji := stoat.Get(p.session, "/custom/emoji/"+emojiID, emojiID, &p.session.EmojiCache)
 
 			if emoji == nil {
 				return match
 			}
 
-			url := "https://cdn.stoatusercontent.com/emojis/" + emoji.ID
-
 			message.Emoji = append(message.Emoji, lightning.Emoji{
-				URL:  &url,
+				URL:  "https://cdn.stoatusercontent.com/emojis/" + emoji.ID,
 				ID:   emoji.ID,
 				Name: emoji.Name,
 			})
@@ -185,14 +178,15 @@ func (p *stoatPlugin) replaceMentions(channelID string, content string) string {
 			return match
 		}
 
-		user := p.session.User(userID)
+		user := stoat.Get(p.session, "/users/"+userID, userID, &p.session.UserCache)
 		if user == nil {
 			return "@" + userID
 		}
 
-		channel := p.session.Channel(channelID)
+		channel := stoat.Get(p.session, "/channels/"+channelID, channelID, &p.session.ChannelCache)
 		if channel != nil && channel.Server != nil {
-			member := p.session.Member(*channel.Server, userID)
+			member := stoat.Get(p.session, "/servers/"+*channel.Server+"/members/"+user.ID,
+				*channel.Server+"-"+user.ID, &p.session.MemberCache)
 			if member != nil && member.Nickname != nil {
 				return "@" + *member.Nickname
 			}
@@ -204,14 +198,14 @@ func (p *stoatPlugin) replaceMentions(channelID string, content string) string {
 
 func (p *stoatPlugin) replaceChannels(content string) string {
 	return channelRegex.ReplaceAllStringFunc(content, func(match string) string {
-		chanID := extractID(match, channelRegex)
-		if chanID == "" {
+		channelID := extractID(match, channelRegex)
+		if channelID == "" {
 			return match
 		}
 
-		channel := p.session.Channel(chanID)
+		channel := stoat.Get(p.session, "/channels/"+channelID, channelID, &p.session.ChannelCache)
 		if channel == nil {
-			return "#" + chanID
+			return "#" + channelID
 		}
 
 		return "#" + channel.Name
@@ -227,7 +221,7 @@ func extractID(match string, re *regexp.Regexp) string {
 	return matches[1]
 }
 
-func getLightningEmbeds(embeds []rvapi.Embed) []lightning.Embed {
+func getLightningEmbeds(embeds []stoat.Embed) []lightning.Embed {
 	result := make([]lightning.Embed, 0)
 	for _, embed := range embeds {
 		lightningEmbed := lightning.Embed{
@@ -238,10 +232,9 @@ func getLightningEmbeds(embeds []rvapi.Embed) []lightning.Embed {
 			Video:       getEmbedVideo(&embed),
 		}
 
-		if embed.Colour != nil {
-			if colorInt, err := strconv.ParseInt((*embed.Colour)[1:], 16, 32); err == nil {
-				colorVal := int(colorInt)
-				lightningEmbed.Color = &colorVal
+		if embed.Colour != "" {
+			if colorInt, err := strconv.ParseInt((embed.Colour)[1:], 16, 32); err == nil {
+				lightningEmbed.Color = int(colorInt)
 			}
 		}
 
@@ -255,7 +248,7 @@ func getLightningEmbeds(embeds []rvapi.Embed) []lightning.Embed {
 	return result
 }
 
-func getEmbedImage(embed *rvapi.Embed) *lightning.Media {
+func getEmbedImage(embed *stoat.Embed) *lightning.Media {
 	if embed.Image != nil && embed.Image.URL != "" {
 		return &lightning.Media{URL: embed.Image.URL, Width: embed.Image.Width, Height: embed.Image.Height}
 	}
@@ -263,7 +256,7 @@ func getEmbedImage(embed *rvapi.Embed) *lightning.Media {
 	return nil
 }
 
-func getEmbedVideo(embed *rvapi.Embed) *lightning.Media {
+func getEmbedVideo(embed *stoat.Embed) *lightning.Media {
 	if embed.Video != nil && embed.Video.URL != "" {
 		return &lightning.Media{URL: embed.Video.URL, Width: embed.Video.Width, Height: embed.Video.Height}
 	}

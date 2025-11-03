@@ -65,10 +65,7 @@ func New(config map[string]string) (lightning.Plugin, error) {
 			msg := getMessage(b, ctx, config["proxy_url"])
 			if ctx.EditedMessage != nil {
 				time := time.UnixMilli(ctx.EditedMessage.GetDate() * 1000)
-				edits <- &lightning.EditedMessage{
-					Message: &msg,
-					Edited:  &time,
-				}
+				edits <- &lightning.EditedMessage{Message: &msg, Edited: &time}
 			} else {
 				messages <- &msg
 			}
@@ -108,7 +105,7 @@ type telegramPlugin struct {
 	updater        *ext.Updater
 }
 
-func (*telegramPlugin) SetupChannel(_ string) (any, error) {
+func (*telegramPlugin) SetupChannel(_ string) (map[string]string, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 

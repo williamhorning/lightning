@@ -23,8 +23,8 @@ func (p *matrixPlugin) getOutgoing(
 
 	var url *id.ContentURIString
 
-	if msg.Author.ProfilePicture != nil {
-		url = p.uploadFile(*msg.Author.ProfilePicture)
+	if msg.Author.ProfilePicture != "" {
+		url = p.uploadFile(msg.Author.ProfilePicture)
 	}
 
 	message.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{

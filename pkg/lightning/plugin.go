@@ -6,7 +6,7 @@ type PluginConstructor func(config map[string]string) (Plugin, error)
 // A Plugin provides methods used by [Bot] to allow bots to not worry
 // about platform specifics, as each Plugin handles that.
 type Plugin interface {
-	SetupChannel(channel string) (any, error)
+	SetupChannel(channel string) (map[string]string, error)
 	SendCommandResponse(message *Message, opts *SendOptions, user string) ([]string, error)
 	SendMessage(message *Message, opts *SendOptions) ([]string, error)
 	EditMessage(message *Message, ids []string, opts *SendOptions) error

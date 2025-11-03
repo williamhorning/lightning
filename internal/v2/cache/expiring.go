@@ -6,9 +6,6 @@ import (
 	"time"
 )
 
-// DefaultTTL is the default time-to-live for cache items.
-const DefaultTTL = time.Second * 30
-
 type cacheItem[T any] struct {
 	Value     T
 	ExpiresAt time.Time
@@ -24,6 +21,13 @@ type Expiring[K comparable, V any] struct {
 // Get a key from the cache, returning its value and whether it exists.
 func (c *Expiring[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
+	if c.items == nil {
+		c.mu.RUnlock()
+
+		var zero V
+		return zero, false
+	}
+
 	item, exists := c.items[key]
 	c.mu.RUnlock()
 
@@ -34,14 +38,11 @@ func (c *Expiring[K, V]) Get(key K) (V, bool) {
 
 	if time.Now().After(item.ExpiresAt) {
 		c.mu.Lock()
-		defer c.mu.Unlock()
+		delete(c.items, key)
+		c.mu.Unlock()
 
-		item, exists := c.items[key]
-		if !exists || time.Now().After(item.ExpiresAt) {
-			delete(c.items, key)
-			var zero V
-			return zero, false
-		}
+		var zero V
+		return zero, false
 	}
 
 	return item.Value, true
@@ -53,7 +54,7 @@ func (c *Expiring[K, V]) Set(key K, value V) {
 	defer c.mu.Unlock()
 
 	if c.TTL == 0 {
-		c.TTL = DefaultTTL
+		c.TTL = 30 * time.Second
 	}
 
 	if c.items == nil {
@@ -64,12 +65,4 @@ func (c *Expiring[K, V]) Set(key K, value V) {
 		Value:     value,
 		ExpiresAt: time.Now().Add(c.TTL),
 	}
-}
-
-// Delete a key from the cache.
-func (c *Expiring[K, V]) Delete(key K) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	delete(c.items, key)
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"path"
@@ -117,25 +116,19 @@ func getSignature(url, token string) *guildedURLSignatureResponse {
 		return nil
 	}
 
-	var reader io.Reader = bytes.NewReader(jsonBody)
-
-	resp, err := guildedMakeRequest(token, http.MethodPost, "/url-signatures", reader)
+	resp, err := guildedMakeRequest(token, http.MethodPost, "/url-signatures", bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil
-	}
-
-	err = resp.Body.Close()
-	if err != nil {
-		log.Println("guilded: failed to close request body when getting signature")
-	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Println("guilded: failed to close request body when getting signature")
+		}
+	}()
 
 	var signatureResp guildedURLSignatureResponse
-	if err := json.Unmarshal(body, &signatureResp); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&signatureResp); err != nil {
 		return nil
 	}
 
@@ -153,16 +146,10 @@ func (p *guildedPlugin) getIncomingMessage(msg *guildedChatMessage) *lightning.M
 		}
 	}
 
-	content := ""
+	urls := attachmentRegex.FindAllString(msg.Content, -1)
 
-	if msg.Content != nil {
-		content = *msg.Content
-	}
-
-	urls := attachmentRegex.FindAllString(content, -1)
-
-	content = attachmentRegex.ReplaceAllString(content, "")
-	content = emojiRegex.ReplaceAllString(content, "$1")
+	msg.Content = attachmentRegex.ReplaceAllString(msg.Content, "")
+	msg.Content = emojiRegex.ReplaceAllString(msg.Content, "$1")
 
 	var repliedTo []string
 	if msg.ReplyMessageIDs != nil {
@@ -173,12 +160,12 @@ func (p *guildedPlugin) getIncomingMessage(msg *guildedChatMessage) *lightning.M
 		BaseMessage: lightning.BaseMessage{
 			EventID:   msg.ID,
 			ChannelID: msg.ChannelID,
-			Time:      &msg.CreatedAt,
+			Time:      msg.CreatedAt,
 		},
 		Attachments: p.getIncomingAttachments(urls),
 		Author:      p.getIncomingAuthor(msg),
-		Content:     content,
-		Embeds:      getIncomingEmbeds(msg.Embeds),
+		Content:     msg.Content,
+		Embeds:      msg.Embeds,
 		RepliedTo:   repliedTo,
 	}
 }
@@ -225,9 +212,18 @@ func (p *guildedPlugin) getMemberAuthor(msg *guildedChatMessage) (lightning.Mess
 		return lightning.MessageAuthor{}, err
 	}
 
-	var memberResp guildedServerMemberResponse
-	if err := parseResponse(resp, &memberResp); err != nil {
-		return lightning.MessageAuthor{}, err
+	var memberResp struct {
+		Member guildedServerMember `json:"member"`
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Println("guilded: failed to close request body")
+		}
+	}()
+
+	if err := json.NewDecoder(resp.Body).Decode(&memberResp); err != nil {
+		return lightning.MessageAuthor{}, fmt.Errorf("guilded: failed to unmarshal response body: %w", err)
 	}
 
 	p.membersCache.Set(key, memberResp.Member)
@@ -265,9 +261,18 @@ func (p *guildedPlugin) getWebhookAuthor(msg *guildedChatMessage) (lightning.Mes
 		return lightning.MessageAuthor{}, err
 	}
 
-	var webhookResp guildedWebhookResponse
-	if err := parseResponse(resp, &webhookResp); err != nil {
-		return lightning.MessageAuthor{}, err
+	var webhookResp struct {
+		Webhook guildedWebhook `json:"webhook"`
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Println("guilded: failed to close request body")
+		}
+	}()
+
+	if err := json.NewDecoder(resp.Body).Decode(&webhookResp); err != nil {
+		return lightning.MessageAuthor{}, fmt.Errorf("guilded: failed to unmarshal response body: %w", err)
 	}
 
 	p.webhooksCache.Set(key, webhookResp.Webhook)
@@ -282,110 +287,4 @@ func getWebhookAuthorData(wh *guildedWebhook) lightning.MessageAuthor {
 		ID:             wh.ID,
 		ProfilePicture: wh.Avatar,
 	}
-}
-
-func parseResponse(resp *http.Response, result any) error {
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("guilded: failed to read response body: %w\n\tstatus: %d", err, resp.StatusCode)
-	}
-
-	if resp.Body.Close() != nil {
-		log.Println("guilded: failed to close request body")
-	}
-
-	if err := json.Unmarshal(body, result); err != nil {
-		return fmt.Errorf("guilded: failed to unmarshal response body: %w\n\tbody: %s", err, body)
-	}
-
-	return nil
-}
-
-func processEmbedAuthor(author *guildedChatEmbedAuthor) *lightning.EmbedAuthor {
-	if author == nil {
-		return nil
-	}
-
-	result := &lightning.EmbedAuthor{
-		Name: "",
-		URL:  author.URL,
-	}
-
-	if author.Name != nil {
-		result.Name = *author.Name
-	}
-
-	if author.IconURL != nil {
-		result.IconURL = author.IconURL
-	}
-
-	return result
-}
-
-func processEmbedFooter(footer *guildedChatEmbedFooter) *lightning.EmbedFooter {
-	if footer == nil {
-		return nil
-	}
-
-	result := &lightning.EmbedFooter{
-		Text: footer.Text,
-	}
-
-	if footer.IconURL != nil {
-		result.IconURL = footer.IconURL
-	}
-
-	return result
-}
-
-func processEmbedMedia(media *guildedChatEmbedMedia) *lightning.Media {
-	if media == nil || media.URL == nil {
-		return nil
-	}
-
-	return &lightning.Media{
-		URL: *media.URL,
-	}
-}
-
-func processEmbedFields(fields *[]guildedChatEmbedField) []lightning.EmbedField {
-	if fields == nil {
-		return nil
-	}
-
-	result := make([]lightning.EmbedField, len(*fields))
-	for i, field := range *fields {
-		result[i] = lightning.EmbedField{
-			Name:   field.Name,
-			Value:  field.Value,
-			Inline: field.Inline != nil && *field.Inline,
-		}
-	}
-
-	return result
-}
-
-func getIncomingEmbeds(embeds *[]guildedChatEmbed) []lightning.Embed {
-	if embeds == nil {
-		return nil
-	}
-
-	incomingEmbeds := make([]lightning.Embed, 0)
-
-	for _, embed := range *embeds {
-		incomingEmbeds = append(incomingEmbeds, lightning.Embed{
-			Title:       embed.Title,
-			Description: embed.Description,
-			URL:         embed.URL,
-			Color:       embed.Color,
-			Author:      processEmbedAuthor(embed.Author),
-			Fields:      processEmbedFields(embed.Fields),
-			Footer:      processEmbedFooter(embed.Footer),
-			Image:       processEmbedMedia(embed.Image),
-			Thumbnail:   processEmbedMedia(embed.Thumbnail),
-			Timestamp:   embed.Timestamp,
-		})
-	}
-
-	return incomingEmbeds
 }

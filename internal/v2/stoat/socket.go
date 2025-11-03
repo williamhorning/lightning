@@ -1,4 +1,4 @@
-package rvapi
+package stoat
 
 import (
 	"encoding/json"
@@ -20,15 +20,15 @@ func (s *Session) Connect() error {
 		map[string][]string{"User-Agent": {"rvapi/0.8.0-rc.7"}},
 	)
 	if err != nil {
-		return fmt.Errorf("rvapi: failed to dial: %w", err)
+		return fmt.Errorf("failed to dial: %w", err)
 	}
 
 	if err = resp.Body.Close(); err != nil {
-		log.Printf("rvapi: failed to close body: %v\n", err)
+		log.Printf("internal/stoat: failed to close socket body: %v\n", err)
 	}
 
 	s.conn = conn
-	s.connected.Swap(true)
+	s.connected.Store(true)
 
 	go ping(s)
 	go readMessages(s)
@@ -40,9 +40,9 @@ func ping(session *Session) {
 	for session.connected.Load() && session.conn != nil {
 		time.Sleep(10 * time.Second)
 
-		err := session.conn.WriteMessage(websocket.TextMessage, []byte("{\"type\":\"Ping\"}"))
+		err := session.conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"Ping"}`))
 		if err != nil {
-			log.Printf("rvapi: error pinging: %v\n", err)
+			log.Printf("internal/stoat: error pinging: %v\n", err)
 		}
 	}
 }
@@ -51,10 +51,6 @@ func readMessages(session *Session) {
 	for session.connected.Load() && session.conn != nil {
 		_, message, err := session.conn.ReadMessage()
 		if err != nil {
-			if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				log.Printf("rvapi: error reading socket: %v\n", err)
-			}
-
 			break
 		}
 
@@ -65,7 +61,7 @@ func readMessages(session *Session) {
 
 	if session.conn != nil {
 		if err := session.conn.Close(); err != nil {
-			log.Printf("rvapi: failed to close connection: %v\n", err)
+			log.Printf("internal/stoat: failed to close connection: %v\n", err)
 		}
 
 		session.conn = nil
@@ -89,15 +85,13 @@ func handleReconnect(connect func() error) {
 
 		backoff = min(time.Duration(float64(backoff)*1.5), time.Second)
 
-		log.Printf("rvapi: attempting reconnect #%d after %s\n", attempt, backoff.String())
+		log.Printf("internal/stoat: trying reconnect #%d after %s\n", attempt, backoff.String())
 	}
 }
 
 func handleEvent(session *Session, message []byte) {
 	var data BaseEvent
 	if err := json.Unmarshal(message, &data); err != nil {
-		log.Printf("rvapi: failed unmarshaling event wrapper: %v\n\tdata: %s\n", err, string(message))
-
 		return
 	}
 
@@ -119,8 +113,6 @@ func handleEvent(session *Session, message []byte) {
 func handleBulkEvent(session *Session, message []byte) {
 	var bulk BulkEvent
 	if err := json.Unmarshal(message, &bulk); err != nil {
-		log.Printf("rvapi: failed unmarshaling bulk event: %v\n\tdata: %s\n", err, string(message))
-
 		return
 	}
 
@@ -132,8 +124,6 @@ func handleBulkEvent(session *Session, message []byte) {
 func handleReadyEvent(session *Session, message []byte) {
 	var ready ReadyEvent
 	if err := json.Unmarshal(message, &ready); err != nil {
-		log.Printf("rvapi: failed unmarshaling ready event: %v\n\tdata: %s\n", err, string(message))
-
 		return
 	}
 
@@ -167,8 +157,6 @@ func handleReadyEvent(session *Session, message []byte) {
 func handleGenericEvent[T any](message []byte, channel chan *T) {
 	var decoded T
 	if err := json.Unmarshal(message, &decoded); err != nil {
-		log.Printf("rvapi: failed unmarshaling generic event: %v\n\tdata: %s\n", err, string(message))
-
 		return
 	}
 

@@ -10,8 +10,6 @@ import (
 )
 
 func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {
-	timestamp := time.UnixMilli(ctx.EffectiveMessage.Date * 1000)
-
 	msg := lightning.Message{
 		Author: &lightning.MessageAuthor{
 			ID:             strconv.FormatInt(ctx.EffectiveSender.Id(), 10),
@@ -23,7 +21,7 @@ func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.
 		BaseMessage: lightning.BaseMessage{
 			EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
 			ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-			Time:      &timestamp,
+			Time:      time.UnixMilli(ctx.EffectiveMessage.Date * 1000),
 		},
 	}
 
@@ -58,28 +56,26 @@ func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.
 	return msg
 }
 
-func getProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) *string {
+func getProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) string {
 	if ctx.EffectiveUser == nil {
-		return nil
+		return ""
 	}
 
 	pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
 	if err != nil || pics.TotalCount <= 0 {
-		return nil
+		return ""
 	}
 
 	bestPhoto := getBestPhoto(pics.Photos[0])
 	if bestPhoto == nil {
-		return nil
+		return ""
 	}
 
 	if f, err := bot.GetFile(bestPhoto.FileId, nil); err == nil {
-		url := proxyPath + f.FilePath
-
-		return &url
+		return proxyPath + f.FilePath
 	}
 
-	return nil
+	return ""
 }
 
 func getBestPhoto(size []gotgbot.PhotoSize) *gotgbot.PhotoSize {

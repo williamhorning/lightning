@@ -63,7 +63,6 @@ func onMessageHandler(
 
 		attachments := make([]lightning.Attachment, 0)
 		content := ""
-		timestamp := time.UnixMilli(evt.Timestamp)
 
 		if msg.FileName == msg.Body {
 			url := getMXC(client, string(msg.URL))
@@ -81,7 +80,7 @@ func onMessageHandler(
 
 		newMessage := lightning.Message{
 			BaseMessage: lightning.BaseMessage{
-				Time:      &timestamp,
+				Time:      time.UnixMilli(evt.Timestamp),
 				EventID:   string(evt.ID),
 				ChannelID: string(evt.RoomID),
 			},
@@ -121,29 +120,23 @@ func getAuthor(
 				ID:             string(evt.Sender),
 				Nickname:       string(evt.Sender),
 				Username:       string(evt.Sender),
-				ProfilePicture: nil,
+				ProfilePicture: "",
 				Color:          "#ffffff",
 			}
 		}
 	}
 
-	var defaultPic *string
+	var profile string
 
 	if err == nil {
 		if !defaultProfile.AvatarURL.IsEmpty() {
-			url := getMXC(client, "mxc://"+defaultProfile.AvatarURL.Homeserver+"/"+defaultProfile.AvatarURL.FileID)
-			defaultPic = &url
+			profile = getMXC(client, "mxc://"+defaultProfile.AvatarURL.Homeserver+"/"+defaultProfile.AvatarURL.FileID)
 		}
 	}
 
 	if msg.BeeperPerMessageProfile != nil {
-		var profile *string
-
 		if msg.BeeperPerMessageProfile.AvatarURL != nil && *msg.BeeperPerMessageProfile.AvatarURL != "" {
-			url := getMXC(client, string(*msg.BeeperPerMessageProfile.AvatarURL))
-			profile = &url
-		} else if *msg.BeeperPerMessageProfile.AvatarURL == "" && !defaultProfile.AvatarURL.IsEmpty() {
-			profile = defaultPic
+			profile = getMXC(client, string(*msg.BeeperPerMessageProfile.AvatarURL))
 		}
 
 		return &lightning.MessageAuthor{
@@ -159,7 +152,7 @@ func getAuthor(
 		ID:             string(evt.Sender),
 		Nickname:       defaultProfile.DisplayName,
 		Username:       defaultProfile.DisplayName,
-		ProfilePicture: defaultPic,
+		ProfilePicture: profile,
 		Color:          "#ffffff",
 	}
 }

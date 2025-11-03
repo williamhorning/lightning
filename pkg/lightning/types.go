@@ -11,7 +11,7 @@ type Attachment struct {
 
 // BaseMessage is basic message information, such as an ID, channel, and timestamp.
 type BaseMessage struct {
-	Time      *time.Time
+	Time      time.Time
 	EventID   string
 	ChannelID string
 }
@@ -68,60 +68,60 @@ type EditedMessage struct {
 
 // EmbedAuthor is an author on an [Embed].
 type EmbedAuthor struct {
-	URL     *string
-	IconURL *string
-	Name    string
+	URL     string `json:"icon_url,omitempty"`
+	IconURL string `json:"name,omitempty"`
+	Name    string `json:"url,omitempty"`
 }
 
 // EmbedField is a field on an [Embed].
 type EmbedField struct {
-	Name   string
-	Value  string
-	Inline bool
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Inline bool   `json:"inline"`
 }
 
 // EmbedFooter is a footer on an [Embed].
 type EmbedFooter struct {
-	IconURL *string
-	Text    string
+	IconURL string `json:"icon_url,omitempty"`
+	Text    string `json:"text"`
 }
 
 // Embed is a Discord-style embed.
 type Embed struct {
-	Author      *EmbedAuthor
-	Footer      *EmbedFooter
-	Image       *Media
-	Thumbnail   *Media
-	Video       *Media
-	Timestamp   *string
-	Color       *int
-	Title       *string
-	URL         *string
-	Description *string
-	Fields      []EmbedField
+	Author      *EmbedAuthor `json:"author,omitempty"`
+	Footer      *EmbedFooter `json:"footer,omitempty"`
+	Image       *Media       `json:"image,omitempty"`
+	Thumbnail   *Media       `json:"thumbnail,omitempty"`
+	Video       *Media       `json:"video,omitempty"`
+	Timestamp   string       `json:"timestamp,omitempty"`
+	Title       string       `json:"title,omitempty"`
+	URL         string       `json:"url,omitempty"`
+	Description string       `json:"description,omitempty"`
+	Fields      []EmbedField `json:"fields,omitempty"`
+	Color       int          `json:"color,omitempty"`
 }
 
 // Emoji represents custom emoji in a [Message].
 type Emoji struct {
-	URL  *string
+	URL  string
 	ID   string
 	Name string
 }
 
 // Media represents images/videos on an [Embed].
 type Media struct {
-	URL    string
-	Height int
-	Width  int
+	URL    string `json:"url"`
+	Height int    `json:"height"`
+	Width  int    `json:"width"`
 }
 
 // MessageAuthor is an author on an [Message].
 type MessageAuthor struct {
-	ID             string  `toml:"id"`
-	Nickname       string  `toml:"nickname"`
-	Username       string  `toml:"username"`
-	ProfilePicture *string `toml:"profile_picture,omitempty"`
-	Color          string  `toml:"color,omitempty"`
+	ID             string `toml:"id"`
+	Nickname       string `toml:"nickname"`
+	Username       string `toml:"username"`
+	ProfilePicture string `toml:"profile_picture,omitempty"`
+	Color          string `toml:"color,omitempty"`
 }
 
 // Message is a representation of a message on a platform.
@@ -138,6 +138,6 @@ type Message struct {
 
 // SendOptions is possible options to use when sending a message.
 type SendOptions struct {
-	ChannelData        any
+	ChannelData        map[string]string
 	AllowEveryonePings bool
 }

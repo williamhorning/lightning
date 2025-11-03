@@ -2,6 +2,7 @@ version: "2"
 run: { build-tags: [goolm] }
 linters: {
   default: all,
+  # TODO: remove tagliatelle from this list after removing Guilded
   disable: [depguard, exhaustruct, mnd, noinlineerr, tagliatelle, wsl],
   settings: {
     govet: { enable-all: true },
@@ -24,7 +25,7 @@ linters: {
       ignore-names: [err, ok],
     },
   },
-  exclusions: { warn-unused: false, paths: [internal/cache] },
+  exclusions: { warn-unused: false, paths: [internal/v2/cache] },
 }
 formatters: {
   enable: [gci, gofmt, gofumpt, goimports, golines, swaggo],

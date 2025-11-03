@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/williamhorning/lightning/internal/cache"
+	"github.com/williamhorning/lightning/internal/v2/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -31,8 +31,8 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 	plugin := &guildedPlugin{socket: &session{
 		ready:          make(chan *guildedWelcomeMessage, 100),
 		messageDeleted: make(chan *guildedChatMessageDeleted, 1000),
-		messageCreated: make(chan *guildedChatMessageCreated, 1000),
-		messageUpdated: make(chan *guildedChatMessageUpdated, 1000),
+		messageCreated: make(chan *guildedChatMessageWrapper, 1000),
+		messageUpdated: make(chan *guildedChatMessageWrapper, 1000),
 		token:          cfg["token"],
 	}, token: cfg["token"]}
 
@@ -58,6 +58,10 @@ type guildedPlugin struct {
 	membersCache    cache.Expiring[string, guildedServerMember]
 	webhooksCache   cache.Expiring[string, guildedWebhook]
 	webhookIDsCache cache.Expiring[string, bool]
+}
+
+func (*guildedPlugin) SetupChannel(_ string) (map[string]string, error) {
+	return nil, &guildedShuttingDownError{}
 }
 
 func (*guildedPlugin) EditMessage(_ *lightning.Message, _ []string, _ *lightning.SendOptions) error {
@@ -118,7 +122,7 @@ func (p *guildedPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	go func() {
 		for msg := range p.socket.messageDeleted {
 			channel <- &lightning.BaseMessage{
-				EventID: msg.Message.ID, ChannelID: msg.Message.ChannelID, Time: &msg.DeletedAt,
+				EventID: msg.Message.ID, ChannelID: msg.Message.ChannelID, Time: msg.DeletedAt,
 			}
 		}
 	}()

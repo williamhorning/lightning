@@ -19,6 +19,7 @@ type BridgeSettings struct {
 
 // BridgeChannel represents a channel in a bridge.
 type BridgeChannel struct {
+	// TODO: introduce something to ensure this is a map[string]string, removing anything that isn't one
 	Data     any                       `json:"data,omitempty"`
 	ID       string                    `json:"id"`
 	Disabled lightning.ChannelDisabled `json:"disabled"`

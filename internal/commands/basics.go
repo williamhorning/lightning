@@ -39,7 +39,7 @@ func PingCommand() *lightning.Command {
 		Description: "check if the bot is alive",
 		Executor: func(opts *lightning.CommandOptions) {
 			if err := opts.Reply(getMessage("Pong! 🏓 ",
-				strconv.FormatInt(time.Since(*opts.Time).Milliseconds(), 10)+"ms"), false); err != nil {
+				strconv.FormatInt(time.Since(opts.Time).Milliseconds(), 10)+"ms"), false); err != nil {
 				log.Printf("failed to reply to ping command: %v\n", err)
 			}
 		},

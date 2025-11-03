@@ -17,28 +17,21 @@ func sendErr(err error, msg string, opts *lightning.CommandOptions) {
 	}
 }
 
-func getTime() *string {
-	str := time.Now().Format(time.RFC3339)
-
-	return &str
-}
-
 func getMessage(title, description string) *lightning.Message {
 	color := 0x487C7E
-	lightningProfileURL := "https://williamhorning.dev/assets/lightning.png"
 
 	if title == "something went wrong :(" {
 		color = 0xFF0000
 	}
 
 	return &lightning.Message{Embeds: []lightning.Embed{{
-		Title:       &title,
-		Description: &description,
-		Color:       &color,
+		Title:       title,
+		Description: description,
+		Color:       color,
 		Footer: &lightning.EmbedFooter{
 			Text:    "powered by lightning",
-			IconURL: &lightningProfileURL,
+			IconURL: "https://williamhorning.dev/assets/lightning.png",
 		},
-		Timestamp: getTime(),
+		Timestamp: time.Now().Format(time.RFC3339),
 	}}}
 }

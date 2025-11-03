@@ -13,9 +13,7 @@ import (
 )
 
 func (p *guildedPlugin) SendCommandResponse(
-	message *lightning.Message,
-	opts *lightning.SendOptions,
-	_ string,
+	message *lightning.Message, opts *lightning.SendOptions, _ string,
 ) ([]string, error) {
 	return p.SendMessage(message, opts)
 }
@@ -47,9 +45,11 @@ func (p *guildedPlugin) apiSendMessage(message *lightning.Message, reader io.Rea
 		return nil, err
 	}
 
-	var msg guildedChatMessageResponse
-	if err := readResponse(resp, &msg, message.ChannelID); err != nil {
-		return nil, err
+	var msg guildedChatMessageWrapper
+	if err := json.NewDecoder(resp.Body).Decode(&msg); err != nil {
+		return nil, fmt.Errorf(
+			"guilded: failed to unmarshal response body: %w\n\tchannel: %s\n\tstatus: %d",
+			err, message.ChannelID, resp.StatusCode)
 	}
 
 	if resp.Body.Close() != nil {
@@ -59,35 +59,14 @@ func (p *guildedPlugin) apiSendMessage(message *lightning.Message, reader io.Rea
 	return []string{msg.Message.ID}, nil
 }
 
-func (p *guildedPlugin) getWebhookInfo(data any) (guildedWebhook, error) {
-	webhookData, ok := data.(map[string]any)
-	if !ok {
-		return guildedWebhook{}, &guildedWebhookDataError{}
-	}
-
-	whID, idOk := webhookData["id"].(string)
-	token, tokenOk := webhookData["token"].(string)
-
-	if !idOk || !tokenOk {
-		return guildedWebhook{}, &guildedWebhookDataError{}
-	}
-
-	p.webhookIDsCache.Set(whID, true)
-
-	return guildedWebhook{ID: whID, Token: &token}, nil
-}
-
 func (p *guildedPlugin) sendWebhookMessage(
 	message *lightning.Message,
 	opts *lightning.SendOptions,
 	reader io.Reader,
 ) ([]string, error) {
-	webhook, err := p.getWebhookInfo(opts.ChannelData)
-	if err != nil {
-		return nil, err
-	}
+	p.webhookIDsCache.Set(opts.ChannelData["id"], true)
 
-	url := "https://media.guilded.gg/webhooks/" + webhook.ID + "/" + *webhook.Token
+	url := "https://media.guilded.gg/webhooks/" + opts.ChannelData["id"] + "/" + opts.ChannelData["token"]
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, reader)
 	if err != nil {
@@ -107,9 +86,13 @@ func (p *guildedPlugin) sendWebhookMessage(
 		return nil, err
 	}
 
-	var response guildedWebhookExecuteResponse
-	if err := readResponse(resp, &response, message.ChannelID); err != nil {
-		return nil, err
+	var response struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf(
+			"guilded: failed to unmarshal response body: %w\n\tchannel: %s\n\tstatus: %d",
+			err, message.ChannelID, resp.StatusCode)
 	}
 
 	if resp.Body.Close() != nil {
@@ -142,19 +125,4 @@ func checkStatusCode(resp *http.Response, channelID string) error {
 	}
 
 	return &guildedStatusError{"failed to send message to " + channelID + ": " + errMsg, "", resp.StatusCode, disable}
-}
-
-func readResponse(resp *http.Response, target any, channelID string) error {
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("guilded: failed to read response body: %w\n\tchannel: %s\n\tstatus: %d",
-			err, channelID, resp.StatusCode)
-	}
-
-	if err := json.Unmarshal(bodyBytes, target); err != nil {
-		return fmt.Errorf("guilded: failed to unmarshal response body: %w\n\tchannel: %s\n\tstatus: %d",
-			err, channelID, resp.StatusCode)
-	}
-
-	return nil
 }

@@ -10,26 +10,26 @@ func (embed *Embed) ToMarkdown() string {
 
 	str := ""
 
-	if embed.Title != nil && embed.URL != nil {
-		str += "[" + *embed.Title + "](" + *embed.URL + ")"
-	} else if embed.Title != nil {
-		str += *embed.Title
+	if embed.Title != "" && embed.URL != "" {
+		str += "[" + embed.Title + "](" + embed.URL + ")"
+	} else if embed.Title != "" {
+		str += embed.Title
 	}
 
-	if embed.Timestamp != nil {
-		str += " (" + *embed.Timestamp + ")"
+	if embed.Timestamp != "" {
+		str += " (" + embed.Timestamp + ")"
 	}
 
 	str += "\n\n"
 
-	if embed.Author != nil && embed.Author.URL != nil {
-		str += "[" + embed.Author.Name + "](" + *embed.Author.URL + ")\n\n"
+	if embed.Author != nil && embed.Author.URL != "" {
+		str += "[" + embed.Author.Name + "](" + embed.Author.URL + ")\n\n"
 	} else if embed.Author != nil {
 		str += embed.Author.Name + "\n\n"
 	}
 
-	if embed.Description != nil {
-		str += *embed.Description + "\n\n"
+	if embed.Description != "" {
+		str += embed.Description + "\n\n"
 	}
 
 	str += formatMedia(embed.Image) + formatMedia(embed.Thumbnail) + formatMedia(embed.Video) + formatFooter(embed)
@@ -44,8 +44,8 @@ func formatFooter(embed *Embed) string {
 		str += "**" + field.Name + "**\n" + field.Value + "\n\n"
 	}
 
-	if embed.Footer != nil && embed.Footer.IconURL != nil {
-		str += "[" + embed.Footer.Text + "](" + *embed.Footer.IconURL + ")\n"
+	if embed.Footer != nil && embed.Footer.IconURL != "" {
+		str += "[" + embed.Footer.Text + "](" + embed.Footer.IconURL + ")\n"
 	} else if embed.Footer != nil {
 		str += embed.Footer.Text + "\n"
 	}

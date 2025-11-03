@@ -3,7 +3,7 @@ package lightning
 import "strings"
 
 // AddCommand takes [Command]s and registers it with the built-in
-// text command handler and any platform-specific command systems.
+// text command handler and platform-specific command systems.
 func (b *Bot) AddCommand(commands ...*Command) error {
 	var errs []error
 

@@ -60,8 +60,8 @@ type session struct {
 	conn           *websocket.Conn
 	ready          chan *guildedWelcomeMessage
 	messageDeleted chan *guildedChatMessageDeleted
-	messageCreated chan *guildedChatMessageCreated
-	messageUpdated chan *guildedChatMessageUpdated
+	messageCreated chan *guildedChatMessageWrapper
+	messageUpdated chan *guildedChatMessageWrapper
 	token          string
 	connected      atomic.Bool
 }

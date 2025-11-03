@@ -197,7 +197,7 @@ func handleChannel(
 
 	opts := &lightning.SendOptions{
 		AllowEveryonePings: bridge.Settings.AllowEveryone,
-		ChannelData:        channel.Data,
+		ChannelData:        channel.Data.(map[string]string),
 	}
 
 	var err error

@@ -16,7 +16,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/williamhorning/lightning/internal/cache"
+	"github.com/williamhorning/lightning/internal/v2/cache"
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -71,7 +71,7 @@ type matrixPlugin struct {
 	mxcCache    cache.Expiring[string, id.ContentURIString]
 }
 
-func (*matrixPlugin) SetupChannel(_ string) (any, error) {
+func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
@@ -147,10 +147,8 @@ func (p *matrixPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	channel := make(chan *lightning.BaseMessage, 1000)
 
 	p.syncer.OnEventType(event.EventRedaction, func(_ context.Context, evt *event.Event) {
-		timestamp := time.UnixMilli(evt.Timestamp)
-
 		channel <- &lightning.BaseMessage{
-			Time:      &timestamp,
+			Time:      time.UnixMilli(evt.Timestamp),
 			EventID:   string(evt.Content.AsRedaction().Redacts),
 			ChannelID: string(evt.RoomID),
 		}
