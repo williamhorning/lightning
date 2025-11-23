@@ -2,14 +2,14 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/williamhorning/lightning/internal/bridge"
+	"github.com/williamhorning/lightning/internal/app"
+	"github.com/williamhorning/lightning/internal/data"
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"github.com/williamhorning/lightning/pkg/platforms/discord"
 	"github.com/williamhorning/lightning/pkg/platforms/guilded"
@@ -19,40 +19,36 @@ import (
 )
 
 func main() {
-	config := flag.String("config", "lightning.toml", "path to the configuration file")
+	cfgPath := flag.String("config", "lightning.toml", "path to the configuration file")
 	flag.Parse()
 
-	handler := bridge.SetupLogging()
-
-	cfg, ok := bridge.GetConfig(*config)
-	if !ok {
-		os.Exit(1)
+	config, err := app.GetConfig(*cfgPath)
+	if err != nil {
+		log.Fatalf("failed to get config: %v\n", err)
 	}
 
-	handler.URL = cfg.ErrorURL
+	app.SetupLogging(config.ErrorURL)
 
-	bot := lightning.NewBot(lightning.BotOptions{
-		Prefix: cfg.CommandPrefix,
-	})
+	bot := lightning.NewBot(lightning.BotOptions{Prefix: config.CommandPrefix})
 
-	if err := errors.Join(
-		bot.AddPluginType("discord", discord.New),
-		bot.AddPluginType("guilded", guilded.New),
-		bot.AddPluginType("revolt", stoat.New),
-		bot.AddPluginType("telegram", telegram.New),
-		bot.AddPluginType("matrix", matrix.New),
-	); err != nil {
-		log.Fatalf("failed to setup platform plugins: %v\n", err)
-	}
-
-	database, err := cfg.DatabaseConfig.GetDatabase()
+	database, err := data.GetDatabase(config.DatabaseConfig)
 	if err != nil {
 		log.Fatalf("failed to setup database: %v\n", err)
 	}
 
-	bridge.Setup(bot, cfg.Author, database)
+	app.RegisterCommands(bot, database, config.Username)
 
-	for plugin, cfg := range cfg.Plugins {
+	bot.AddPluginType("discord", discord.New)
+	bot.AddPluginType("guilded", guilded.New)
+	bot.AddPluginType("revolt", stoat.New)
+	bot.AddPluginType("telegram", telegram.New)
+	bot.AddPluginType("matrix", matrix.New)
+
+	bot.AddHandler(app.Create(database))
+	bot.AddHandler(app.Edit(database))
+	bot.AddHandler(app.Delete(database))
+
+	for plugin, cfg := range config.Plugins {
 		if err := bot.UsePluginType(plugin, "", cfg); err != nil {
 			log.Fatalf("failed to setup plugin for %s: %v\n", plugin, err)
 		}

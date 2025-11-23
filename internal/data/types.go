@@ -2,16 +2,6 @@ package data
 
 import "github.com/williamhorning/lightning/pkg/lightning"
 
-// EventType is the event type used by the bridge.
-type EventType string
-
-// These event types are supported by the bridge.
-const (
-	TypeCreate EventType = "create"
-	TypeEdit   EventType = "edit"
-	TypeDelete EventType = "delete"
-)
-
 // BridgeSettings are used to configure the bridge.
 type BridgeSettings struct {
 	AllowEveryone bool `json:"allow_everyone"`
@@ -19,7 +9,7 @@ type BridgeSettings struct {
 
 // BridgeChannel represents a channel in a bridge.
 type BridgeChannel struct {
-	Data     any                       `json:"data,omitempty"`
+	Data     map[string]string         `json:"data,omitempty"`
 	ID       string                    `json:"id"`
 	Disabled lightning.ChannelDisabled `json:"disabled"`
 }

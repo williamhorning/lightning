@@ -2,6 +2,7 @@ package matrix
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
@@ -10,7 +11,7 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-func (p *matrixPlugin) getOutgoing(
+func (p *matrixPlugin) lightningToMatrixMessage(
 	msg *lightning.Message,
 	ids []string,
 	opts *lightning.SendOptions,
@@ -23,15 +24,16 @@ func (p *matrixPlugin) getOutgoing(
 
 	var url *id.ContentURIString
 
-	if msg.Author.ProfilePicture != nil {
-		url = p.uploadFile(*msg.Author.ProfilePicture)
-	}
+	if msg.Author != nil {
+		if msg.Author.ProfilePicture != "" {
+			url = p.uploadFile(msg.Author.ProfilePicture)
+		}
 
-	message.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{
-		ID:          msg.Author.ID,
-		Displayname: msg.Author.Nickname,
-		AvatarURL:   url,
-		HasFallback: false,
+		message.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{
+			ID:          msg.Author.ID,
+			Displayname: msg.Author.Nickname,
+			AvatarURL:   url,
+		}
 	}
 
 	if opts != nil && !opts.AllowEveryonePings {
@@ -70,6 +72,8 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 
 		return &curl
 	}
+
+	log.Printf("matrix: upload failed for %s: %v", url, err)
 
 	return nil
 }

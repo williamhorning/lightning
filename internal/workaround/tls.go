@@ -3,12 +3,10 @@ package workaround
 
 import "net/http"
 
-// Client is a workaround for cloudflare issuing invalid certificates... pls fix >:(.
-var Client *http.Client //nolint:gochecknoglobals
-
-func init() { //nolint:gochecknoinits
+// Do is a workaround for cloudflare issuing invalid certificates... pls fix >:(.
+func Do(req *http.Request) (*http.Response, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone() //nolint:forcetypeassert
-	transport.TLSClientConfig.InsecureSkipVerify = true
+	transport.TLSClientConfig.InsecureSkipVerify = req.Host == "cdn.stoatusercontent.com"
 
-	Client = &http.Client{Transport: transport}
+	return (&http.Client{Transport: transport}).Do(req) //nolint:wrapcheck
 }

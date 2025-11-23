@@ -6,7 +6,7 @@ type PluginConstructor func(config map[string]string) (Plugin, error)
 // A Plugin provides methods used by [Bot] to allow bots to not worry
 // about platform specifics, as each Plugin handles that.
 type Plugin interface {
-	SetupChannel(channel string) (any, error)
+	SetupChannel(channel string) (map[string]string, error)
 	SendCommandResponse(message *Message, opts *SendOptions, user string) ([]string, error)
 	SendMessage(message *Message, opts *SendOptions) ([]string, error)
 	EditMessage(message *Message, ids []string, opts *SendOptions) error
@@ -19,18 +19,12 @@ type Plugin interface {
 }
 
 // AddPluginType takes in a [PluginConstructor] and registers it so you can later
-// use it. It only returns an error if the plugin type is already registered.
-func (b *Bot) AddPluginType(name string, constructor PluginConstructor) error {
+// use it. It overwrites existing plugin types if the name is a duplicate.
+func (b *Bot) AddPluginType(name string, constructor PluginConstructor) {
 	b.typesMutex.Lock()
 	defer b.typesMutex.Unlock()
 
-	if _, exists := b.types[name]; exists {
-		return PluginRegisteredError{}
-	}
-
 	b.types[name] = constructor
-
-	return nil
 }
 
 // UsePluginType takes in a plugin name and config to use a plugin with your bot.

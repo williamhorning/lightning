@@ -6,35 +6,21 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type guildedWebhookDataError struct{}
-
-func (guildedWebhookDataError) Disable() *lightning.ChannelDisabled {
-	return &lightning.ChannelDisabled{Read: false, Write: true}
-}
-
-func (guildedWebhookDataError) Error() string {
-	return "invalid webhook data for Guilded channel"
-}
-
 type guildedStatusError struct {
-	msg          string
-	data         string
-	code         int
-	disableWrite bool
+	code int
 }
 
 func (e guildedStatusError) Disable() *lightning.ChannelDisabled {
-	return &lightning.ChannelDisabled{Read: false, Write: e.disableWrite}
+	return &lightning.ChannelDisabled{Read: false, Write: e.code >= 400 && e.code < 500}
 }
 
 func (e guildedStatusError) Error() string {
-	return strconv.FormatInt(int64(e.code), 10) + ": " + e.msg + "\n\tdata: " + e.data
+	return "failed to send Guilded message: " + strconv.FormatInt(int64(e.code), 10)
 }
 
-type guildedWebhookTokenNilError struct {
-	channel string
-}
+type guildedShuttingDownError struct{}
 
-func (e guildedWebhookTokenNilError) Error() string {
-	return "guilded: " + e.channel + " has a nil webhook token, probably due to a Guilded bug"
+func (*guildedShuttingDownError) Error() string {
+	return "Guilded is shutting down on December 19th, so you'll no longer able to setup new channels with Guilded." +
+		"Please look at moving your server elsewhere. See https://www.guilded.gg/blog/guilded-shut-down-12-19-25"
 }

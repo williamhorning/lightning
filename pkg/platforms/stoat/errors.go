@@ -3,13 +3,13 @@ package stoat
 import (
 	"strconv"
 
-	"github.com/williamhorning/lightning/internal/rvapi"
+	"github.com/williamhorning/lightning/internal/stoat"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 type stoatPermissionsError struct {
-	permissions rvapi.Permission
-	expected    rvapi.Permission
+	permissions stoat.Permission
+	expected    stoat.Permission
 }
 
 func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
@@ -19,18 +19,17 @@ func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
 func (e *stoatPermissionsError) Error() string {
 	err := "Missing the following permissions, please ensure these are granted: `"
 
-	for permission, name := range rvapi.PermissionNames {
+	for permission, name := range stoat.PermissionNames {
 		if (e.expected&permission == permission) && (e.permissions&permission != permission) {
 			err += name + " "
 		}
 	}
 
-	return strconv.FormatUint(uint64(e.permissions), 10) + "&" + strconv.FormatUint(uint64(e.expected), 10) + "`"
+	return err + strconv.FormatUint(uint64(e.permissions), 10) + "&" + strconv.FormatUint(uint64(e.expected), 10) + "`"
 }
 
 type stoatStatusError struct {
 	msg  string
-	resp []byte
 	code int
 	edit bool
 }
@@ -40,5 +39,5 @@ func (e *stoatStatusError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stoatStatusError) Error() string {
-	return "stoat status code " + strconv.FormatInt(int64(e.code), 10) + ": " + e.msg + ": " + string(e.resp)
+	return "stoat status code " + strconv.FormatInt(int64(e.code), 10) + ": " + e.msg
 }

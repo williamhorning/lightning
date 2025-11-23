@@ -1,6 +1,6 @@
 # lightning: *truly powerful* cross-platform bots
 
-![lightning logo](./logo.svg)
+![lightning logo](./.github/logo.svg)
 
 - [the bridge](https://williamhorning.dev/lightning/bridge) - connect
 Discord, Guilded, Stoat, and Telegram

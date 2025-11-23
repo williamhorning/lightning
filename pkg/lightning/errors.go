@@ -5,12 +5,11 @@ type ChannelDisabler interface {
 	Disable() *ChannelDisabled
 }
 
-// PluginRegisteredError only occurs when a plugin/type is already registered and
-// can't be registered again.
+// PluginRegisteredError only occurs when a plugin is already registered and can't be registered again.
 type PluginRegisteredError struct{}
 
 func (PluginRegisteredError) Error() string {
-	return "plugin (or type) already registered: this is a bug or misconfiguration"
+	return "plugin already registered: this is a bug or misconfiguration"
 }
 
 // MissingPluginError only occurs when a plugin/type is not found.
@@ -18,16 +17,6 @@ type MissingPluginError struct{}
 
 func (MissingPluginError) Error() string {
 	return "plugin not found internally: this is a bug or misconfiguration"
-}
-
-// PluginConfigError only occurs when a plugin is passed an invalid config on registration.
-type PluginConfigError struct {
-	Plugin  string
-	Message string
-}
-
-func (p PluginConfigError) Error() string {
-	return "plugin configuration error: " + p.Plugin + ": " + p.Message
 }
 
 // PluginMethodError is a wrapped error that occurs when a plugin method fails.

@@ -9,20 +9,7 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type discordInvalidWebhookError struct {
-	channelID string
-}
-
-func (discordInvalidWebhookError) Disable() *lightning.ChannelDisabled {
-	return &lightning.ChannelDisabled{Read: false, Write: true}
-}
-
-func (err discordInvalidWebhookError) Error() string {
-	return "invalid webhook data for Discord channel: " + err.channelID
-}
-
 type discordAPIError struct {
-	extra   map[string]any
 	message string
 	code    int
 }
@@ -42,19 +29,18 @@ func (e discordAPIError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e discordAPIError) Error() string {
-	return "Discord API Error " + strconv.Itoa(e.code) + ": " +
-		fmt.Sprintf("%#+v, disable %#+v", e.extra, e.Disable()) + ": " + e.message
+	return "Discord API Error " + strconv.FormatInt(int64(e.code), 10) + ": " + e.message
 }
 
-func getError(err error, extra map[string]any, message string) error {
+func getError(err error, message string) error {
 	var restErr *discordgo.RESTError
 	if errors.As(err, &restErr) {
 		if restErr.Message.Code == discordgo.ErrCodeUnknownMessage {
 			return nil
 		}
 
-		return &discordAPIError{extra, message + ": " + restErr.Message.Message, restErr.Message.Code}
+		return &discordAPIError{message + ": " + restErr.Message.Message, restErr.Message.Code}
 	}
 
-	return fmt.Errorf("discord: unknown error: %w\n\textra: %#+v", err, extra)
+	return fmt.Errorf("%s: %w", message, err)
 }

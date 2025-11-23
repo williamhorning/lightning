@@ -7,10 +7,10 @@ import (
 )
 
 // VERSION is the version of the lightning bot framework.
-const VERSION = "0.8.0-rc.7"
+const VERSION = "0.8.0-rc.8"
 
 // BotOptions allows you to configure the prefix used by the bot for registered
-// commands, in addition to any platform specifics (like slash commands). If a
+// commands, in addition to platform specifics (like slash commands). If a
 // zero value is provided for the Prefix, it will default to "!".
 type BotOptions struct {
 	Prefix string

@@ -15,10 +15,10 @@ package stoat
 import (
 	"fmt"
 	"log"
-	"math"
+	"slices"
 	"time"
 
-	"github.com/williamhorning/lightning/internal/rvapi"
+	"github.com/williamhorning/lightning/internal/stoat"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
@@ -30,27 +30,28 @@ import (
 //		"token": "", // a string with your Stoat bot token
 //	}
 func New(cfg map[string]string) (lightning.Plugin, error) {
-	plugin := &stoatPlugin{session: &rvapi.Session{
-		MessageDeleted: make(chan *rvapi.MessageDeleteEvent, 1000),
-		MessageCreated: make(chan *rvapi.MessageEvent, 1000),
-		MessageUpdated: make(chan *rvapi.MessageUpdateEvent, 1000),
-		Ready:          make(chan *rvapi.ReadyEvent, 100),
+	plugin := &stoatPlugin{session: &stoat.Session{
+		MessageDeleted: make(chan *stoat.MessageDeleteEvent, 1000),
+		MessageCreated: make(chan *stoat.Message, 1000),
+		MessageUpdated: make(chan *stoat.MessageUpdateEvent, 1000),
+		Ready:          make(chan *stoat.ReadyEvent, 100),
 		Token:          cfg["token"],
 	}}
-	plugin.self = plugin.session.User("@me")
 
-	if plugin.self == nil {
-		return nil, lightning.PluginConfigError{Plugin: "stoat", Message: "failed to get self user"}
+	var err error
+
+	plugin.self, err = stoat.Get(plugin.session, "/users/@me", "@me", &plugin.session.UserCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get self: %w", err)
 	}
 
 	go func() {
 		for ready := range plugin.session.Ready {
 			log.Printf("stoat: ready as %s in %d servers!\n", plugin.self.Username, len(ready.Servers))
-			log.Printf("stoat: https://app.stoat.chat/invite/%s\n", plugin.self.ID)
 		}
 	}()
 
-	if err := plugin.session.Connect(); err != nil {
+	if err = plugin.session.Connect(); err != nil {
 		return nil, fmt.Errorf("stoat: failed to connect to socket: %w", err)
 	}
 
@@ -58,25 +59,29 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 }
 
 type stoatPlugin struct {
-	self    *rvapi.User
-	session *rvapi.Session
+	self    *stoat.User
+	session *stoat.Session
 }
 
-const correctPermissionValue = rvapi.PermissionManageCustomization | rvapi.PermissionManageRole |
-	rvapi.PermissionChangeNickname | rvapi.PermissionChangeAvatar | rvapi.PermissionViewChannel |
-	rvapi.PermissionReadMessageHistory | rvapi.PermissionSendMessage | rvapi.PermissionManageMessages |
-	rvapi.PermissionInviteOthers | rvapi.PermissionSendEmbeds | rvapi.PermissionUploadFiles |
-	rvapi.PermissionMasquerade | rvapi.PermissionReact
+const correctPermissionValue = stoat.PermissionManageCustomization | stoat.PermissionManageRole |
+	stoat.PermissionChangeNickname | stoat.PermissionChangeAvatar | stoat.PermissionViewChannel |
+	stoat.PermissionReadMessageHistory | stoat.PermissionSendMessage | stoat.PermissionManageMessages |
+	stoat.PermissionInviteOthers | stoat.PermissionSendEmbeds | stoat.PermissionUploadFiles |
+	stoat.PermissionMasquerade | stoat.PermissionReact
 
-func (p *stoatPlugin) SetupChannel(channel string) (any, error) {
-	channelData := p.session.Channel(channel)
+func (p *stoatPlugin) SetupChannel(channel string) (map[string]string, error) {
+	channelData, err := stoat.Get(p.session, "/channels/"+channel, channel, &p.session.ChannelCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get channel: %w", err)
+	}
+
 	needed := correctPermissionValue
 
-	if channelData.ChannelType == rvapi.ChannelTypeGroup {
-		needed &= ^rvapi.PermissionManageCustomization
-		needed &= ^rvapi.PermissionManageRole
-		needed &= ^rvapi.PermissionChangeNickname
-		needed &= ^rvapi.PermissionChangeAvatar
+	if channelData.ChannelType == stoat.ChannelTypeGroup {
+		needed &= ^stoat.PermissionManageCustomization
+		needed &= ^stoat.PermissionManageRole
+		needed &= ^stoat.PermissionChangeNickname
+		needed &= ^stoat.PermissionChangeAvatar
 	}
 
 	permissions := p.session.GetPermissions(p.self, channelData)
@@ -93,10 +98,9 @@ func (p *stoatPlugin) SendCommandResponse(
 	opts *lightning.SendOptions,
 	user string,
 ) ([]string, error) {
-	var channel rvapi.Channel
-
-	if err := rvapi.Get(p.session, "/users/"+user+"/dm", &channel); err != nil {
-		return nil, fmt.Errorf("stoat: failed to get dm channel: %w", err)
+	channel, err := stoat.Get(p.session, "/users/"+user+"/dm", "", &p.session.ChannelCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dm channel: %w", err)
 	}
 
 	message.ChannelID = channel.ID
@@ -105,7 +109,7 @@ func (p *stoatPlugin) SendCommandResponse(
 }
 
 func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
-	msg := p.getOutgoing(message, opts)
+	msg := lightningToStoatMessage(p.session, message, opts)
 	leftover := make([]string, 0)
 
 	if len(msg.Attachments) > 5 {
@@ -124,16 +128,8 @@ func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.Se
 		return ids, nil
 	}
 
-	chunks := make([][]string, 0, int(math.Ceil(float64(len(leftover))/5)))
-
-	for i := 0; i < len(leftover); i += 5 {
-		end := min(i+5, len(leftover))
-
-		chunks = append(chunks, leftover[i:end])
-	}
-
-	for _, chunk := range chunks {
-		res, err := p.stoatSendMessage(message.ChannelID, rvapi.DataMessageSend{
+	for chunk := range slices.Chunk(leftover, 5) {
+		res, err := p.stoatSendMessage(message.ChannelID, stoat.DataMessageSend{
 			Attachments: chunk,
 			Masquerade:  msg.Masquerade,
 			Replies:     msg.Replies,
@@ -157,7 +153,7 @@ func (p *stoatPlugin) ListenMessages() <-chan *lightning.Message {
 
 	go func() {
 		for m := range p.session.MessageCreated {
-			if msg := p.getIncomingMessage(m.Message); msg != nil {
+			if msg := stoatToLightningMessage(p.session, p.self.ID, m); msg != nil {
 				channel <- msg
 			}
 		}
@@ -171,11 +167,8 @@ func (p *stoatPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 
 	go func() {
 		for m := range p.session.MessageUpdated {
-			if msg := p.getIncomingMessage(m.Data); msg != nil {
-				channel <- &lightning.EditedMessage{
-					Message: msg,
-					Edited:  &m.Data.Edited,
-				}
+			if msg := stoatToLightningMessage(p.session, p.self.ID, &m.Data); msg != nil {
+				channel <- &lightning.EditedMessage{Message: msg, Edited: m.Data.Edited}
 			}
 		}
 	}()
@@ -188,12 +181,7 @@ func (p *stoatPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 
 	go func() {
 		for m := range p.session.MessageDeleted {
-			timestamp := time.Now()
-			channel <- &lightning.BaseMessage{
-				EventID:   m.ID,
-				ChannelID: m.Channel,
-				Time:      &timestamp,
-			}
+			channel <- &lightning.BaseMessage{EventID: m.ID, ChannelID: m.Channel, Time: time.Now()}
 		}
 	}()
 

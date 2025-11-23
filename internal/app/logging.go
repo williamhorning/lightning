@@ -1,8 +1,7 @@
-package bridge
+package app
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -11,26 +10,19 @@ import (
 )
 
 // SetupLogging creates a logger that deals with color and webhooks.
-func SetupLogging() *WebhookLogger {
+func SetupLogging(url string) {
 	log.SetFlags(log.Ltime | log.Lshortfile)
-
 	log.SetPrefix("")
-
-	instance := &WebhookLogger{}
-
-	log.SetOutput(io.MultiWriter(os.Stderr, instance))
-
-	return instance
+	log.SetOutput(io.MultiWriter(os.Stderr, &webhookLogger{url}))
 }
 
-// WebhookLogger is a custom log handler that sends logs to a webhook.
-type WebhookLogger struct {
-	URL string
+type webhookLogger struct {
+	url string
 }
 
-func (l *WebhookLogger) Write(output []byte) (int, error) {
+func (l *webhookLogger) Write(output []byte) (int, error) {
 	go func() {
-		if l.URL == "" {
+		if l.url == "" {
 			return
 		}
 
@@ -39,7 +31,7 @@ func (l *WebhookLogger) Write(output []byte) (int, error) {
 			return
 		}
 
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, l.URL, bytes.NewBuffer(data))
+		req, err := http.NewRequest(http.MethodPost, l.url, bytes.NewBuffer(data))
 		if err != nil {
 			return
 		}
@@ -51,9 +43,7 @@ func (l *WebhookLogger) Write(output []byte) (int, error) {
 			return
 		}
 
-		if err := resp.Body.Close(); err != nil {
-			return
-		}
+		defer resp.Body.Close()
 	}()
 
 	return len(output), nil

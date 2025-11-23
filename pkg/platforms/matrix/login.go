@@ -3,24 +3,26 @@ package matrix
 import (
 	"context"
 	"fmt"
-	"log"
+	"os"
 
 	"github.com/williamhorning/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/crypto"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
-	"maunium.net/go/mautrix/id"
 )
 
 func setupClient(cfg map[string]string) (*mautrix.Client, error) {
-	client, err := mautrix.NewClient(cfg["homeserver"], id.UserID(cfg["mxid"]), cfg["access_token"])
+	client, err := mautrix.NewClient(cfg["homeserver"], "", "")
 	if err != nil {
 		return nil, fmt.Errorf("matrix: failed to create client: %w", err)
 	}
 
 	client.UserAgent = "lightning/" + lightning.VERSION
 
-	if cfg["access_token"] == "" || cfg["device_id"] == "" || cfg["mxid"] == "" {
+	_, err = os.Stat(cfg["path"])
+
+	var store *cryptoStore
+
+	if os.IsNotExist(err) {
 		_, err = client.Login(context.Background(), &mautrix.ReqLogin{
 			Type:             mautrix.AuthTypePassword,
 			Identifier:       mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: cfg["username"]},
@@ -31,37 +33,36 @@ func setupClient(cfg map[string]string) (*mautrix.Client, error) {
 			return nil, fmt.Errorf("matrix: failed to login: %w", err)
 		}
 
-		cfg["device_id"] = string(client.DeviceID)
-		cfg["access_token"] = client.AccessToken
-		cfg["mxid"] = string(client.UserID)
-
-		log.Printf("matrix: please set the following in your config: %#+v\n", cfg)
+		store = newCryptoStore(client.AccessToken, string(client.DeviceID), string(client.UserID), cfg["store"])
+	} else {
+		store, err = openCryptoStore(cfg["store"])
+		if err != nil {
+			return nil, fmt.Errorf("matrix: failed to open store: %w", err)
+		}
 	}
 
-	helper, err := cryptohelper.NewCryptoHelper(
-		client,
-		[]byte(cfg["random"]),
-		crypto.NewMemoryStore(func() error { return nil }),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup crypto helper: %w", err)
-	}
-
-	err = helper.Init(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to init crypto helper: %w", err)
-	}
-
-	client.Crypto = helper
-
-	if err = setupKeys(cfg, helper); err != nil {
+	if err = setupKeys(cfg, client, store); err != nil {
 		return nil, err
 	}
 
 	return client, nil
 }
 
-func setupKeys(cfg map[string]string, helper *cryptohelper.CryptoHelper) error {
+func setupKeys(cfg map[string]string, client *mautrix.Client, store *cryptoStore) error {
+	client.StateStore = store
+
+	helper, err := cryptohelper.NewCryptoHelper(client, []byte(store.Pickle), &store)
+	if err != nil {
+		return fmt.Errorf("failed to setup crypto helper: %w", err)
+	}
+
+	err = helper.Init(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to init crypto helper: %w", err)
+	}
+
+	client.Crypto = helper
+
 	keyID, keyData, err := helper.Machine().SSSS.GetDefaultKeyData(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get default key: %w", err)

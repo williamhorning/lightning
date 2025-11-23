@@ -1,0 +1,22 @@
+version = "2"
+
+[run]
+build-tags = ["goolm"]
+
+[linters]
+default = "all"
+disable = ["depguard", "exhaustruct", "noctx", "noinlineerr", "mnd", "tagliatelle", "wsl"]
+exclusions = { presets = ["std-error-handling"] }
+settings.ireturn = { allow = ["error", "stdlib", "Plugin", "Database"] }
+settings.lll = { tab-width = 4 }
+settings.revive.enable-all-rules = true
+settings.revive.rules = [
+  { name = "add-constant", disabled = true },
+  { name = "cognitive-complexity", disabled = true },
+  { name = "line-length-limit", disabled = true },
+  { name = "max-public-structs", disabled = true }
+]
+
+[formatters]
+enable = ["gci", "gofmt", "gofumpt", "goimports", "golines", "swaggo"]
+settings = { golines = { max-len = 120, tab-len = 4 } }

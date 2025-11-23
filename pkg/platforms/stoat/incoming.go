@@ -6,12 +6,16 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/williamhorning/lightning/internal/rvapi"
+	"github.com/williamhorning/lightning/internal/stoat"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *stoatPlugin) getIncomingMessage(message rvapi.Message) *lightning.Message {
-	if message.Author == p.self.ID && message.Masquerade != nil {
+func stoatToLightningMessage(
+	session *stoat.Session,
+	selfID string,
+	message *stoat.Message,
+) *lightning.Message {
+	if message.Author == selfID && message.Masquerade.Name != "" {
 		return nil
 	}
 
@@ -19,254 +23,224 @@ func (p *stoatPlugin) getIncomingMessage(message rvapi.Message) *lightning.Messa
 		BaseMessage: lightning.BaseMessage{
 			EventID:   message.ID,
 			ChannelID: message.Channel,
-			Time:      getLightningTime(message),
+			Time:      stoatToLightningTime(message),
 		},
-		Attachments: getLightningAttachment(message.Attachments),
-		Author:      p.getLightningAuthor(message.Author, message.Channel, message.Masquerade),
-		Embeds:      getLightningEmbeds(message.Embeds),
+		Author:      stoatToLightningAuthor(session, message),
+		Content:     stoatToLightningContent(session, message),
+		Embeds:      stoatToLightningEmbeds(message.Embeds),
+		Attachments: stoatToLightningAttachments(message.Attachments),
 		RepliedTo:   message.Replies,
 	}
 
-	msg.Content = replaceSpoilers(message.Content)
-	msg.Content = p.replaceEmojis(msg)
-	msg.Content = p.replaceMentions(msg.ChannelID, msg.Content)
-	msg.Content = p.replaceChannels(msg.Content)
+	msg.Content = stoatToLightningEmoji(session, msg)
 
 	return msg
 }
 
-func getLightningTime(message rvapi.Message) *time.Time {
+func stoatToLightningTime(message *stoat.Message) time.Time {
 	if !message.Edited.IsZero() {
-		return &message.Edited
+		return message.Edited
 	}
 
-	msgID, err := ulid.Parse(message.ID)
+	id, err := ulid.Parse(message.ID)
 	if err != nil {
-		timestamp := time.Now()
-
-		return &timestamp
+		return time.Now()
 	}
 
-	timestamp := msgID.Timestamp()
-
-	return &timestamp
+	return id.Timestamp()
 }
 
-func getLightningAttachment(attachments []rvapi.File) []lightning.Attachment {
-	result := make([]lightning.Attachment, len(attachments))
+func stoatToLightningAuthor(session *stoat.Session, msg *stoat.Message) *lightning.MessageAuthor {
+	author := &lightning.MessageAuthor{ID: msg.Author, Username: "StoatUser", Nickname: "Stoat User", Color: "#8C24EC"}
+
+	if u, err := stoat.Get(session, "/users/"+msg.Author, msg.Author, &session.UserCache); err == nil {
+		author.Username, author.Nickname = u.Username, u.Username
+		if u.Avatar != nil {
+			author.ProfilePicture = getStoatFileURL(u.Avatar)
+		}
+	}
+
+	if mem := getStoatMember(session, msg); mem != nil {
+		if mem.Nickname != nil {
+			author.Nickname = *mem.Nickname
+		}
+
+		if mem.Avatar != nil {
+			author.ProfilePicture = getStoatFileURL(mem.Avatar)
+		}
+	}
+
+	if msg.Masquerade.Name != "" {
+		author.Nickname = msg.Masquerade.Name
+	}
+
+	if msg.Masquerade.Colour != "" {
+		author.Color = msg.Masquerade.Colour
+	}
+
+	if msg.Masquerade.Avatar != "" {
+		author.ProfilePicture = msg.Masquerade.Avatar
+	}
+
+	return author
+}
+
+func getStoatMember(session *stoat.Session, msg *stoat.Message) *stoat.Member {
+	channel, err := stoat.Get(session, "/channels/"+msg.Channel, msg.Channel, &session.ChannelCache)
+	if err != nil || channel.Server == nil {
+		return nil
+	}
+
+	mem, err := stoat.Get(
+		session,
+		"/servers/"+*channel.Server+"/members/"+msg.Author,
+		*channel.Server+"-"+msg.Author,
+		&session.MemberCache,
+	)
+	if err != nil {
+		return nil
+	}
+
+	return mem
+}
+
+func stoatToLightningAttachments(attachments []stoat.File) []lightning.Attachment {
+	out := make([]lightning.Attachment, len(attachments))
+
 	for i, att := range attachments {
-		result[i] = lightning.Attachment{
-			URL:  getURL(&att),
+		out[i] = lightning.Attachment{
+			URL:  getStoatFileURL(&att),
 			Name: att.Filename,
 			Size: int64(att.Size),
 		}
 	}
 
-	return result
-}
-
-func (p *stoatPlugin) getLightningAuthor(
-	authorID string,
-	channelID string,
-	masquerade *rvapi.Masquerade,
-) *lightning.MessageAuthor {
-	author := lightning.MessageAuthor{
-		ID:       authorID,
-		Username: "StoatUser",
-		Nickname: "Stoat User",
-		Color:    "#8C24EC",
-	}
-
-	user := p.session.User(authorID)
-	if user == nil {
-		return applyMasquerade(author, masquerade)
-	}
-
-	author.Username = user.Username
-	author.Nickname = user.Username
-
-	if user.Avatar != nil {
-		profilePic := getURL(user.Avatar)
-		author.ProfilePicture = &profilePic
-	}
-
-	p.setServerMember(&author, authorID, channelID)
-
-	return applyMasquerade(author, masquerade)
-}
-
-func (p *stoatPlugin) setServerMember(author *lightning.MessageAuthor, authorID, channelID string) {
-	channel := p.session.Channel(channelID)
-	if channel == nil || channel.ChannelType != "TextChannel" || channel.Server == nil {
-		return
-	}
-
-	member := p.session.Member(*channel.Server, authorID)
-	if member == nil {
-		return
-	}
-
-	if member.Nickname != nil {
-		author.Nickname = *member.Nickname
-	}
-
-	if member.Avatar != nil {
-		memberAvatar := getURL(member.Avatar)
-		author.ProfilePicture = &memberAvatar
-	}
-}
-
-func getURL(file *rvapi.File) string {
-	return "https://cdn.stoatusercontent.com/" + file.Tag + "/" + file.ID
-}
-
-func applyMasquerade(author lightning.MessageAuthor, masquerade *rvapi.Masquerade) *lightning.MessageAuthor {
-	if masquerade == nil {
-		return &author
-	}
-
-	if masquerade.Name != "" {
-		author.Nickname = masquerade.Name
-	}
-
-	if masquerade.Colour != "" {
-		author.Color = masquerade.Colour
-	}
-
-	if masquerade.Avatar != "" {
-		author.ProfilePicture = &masquerade.Avatar
-	}
-
-	return &author
+	return out
 }
 
 var (
 	stoatSpoilerRegex = regexp.MustCompile(`!!(.+?)!!`)
-	spoilerRegex      = regexp.MustCompile(`\|\|(.+?)\|\|`)
-	emojiRegex        = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
-	mentionRegex      = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
-	channelRegex      = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	stoatEmojiRegex   = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
+	stoatMentionRegex = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
+	stoatChannelRegex = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
 )
 
-func replaceSpoilers(content string) string {
-	return stoatSpoilerRegex.ReplaceAllStringFunc(content, func(match string) string {
+func stoatToLightningContent(session *stoat.Session, message *stoat.Message) string {
+	content := stoatSpoilerRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
 		return "||" + match[2:len(match)-2] + "||"
 	})
+
+	content = stoatEmojiRegex.ReplaceAllStringFunc(content, func(match string) string {
+		if emojiID := extractStoatID(match, stoatEmojiRegex); emojiID != "" {
+			e, err := stoat.Get(session, "/custom/emoji/"+emojiID, emojiID, &session.EmojiCache)
+			if err == nil {
+				return ":" + e.Name + ":"
+			}
+		}
+
+		return match
+	})
+
+	content = stoatMentionRegex.ReplaceAllStringFunc(content, func(match string) string {
+		userID := extractStoatID(match, stoatMentionRegex)
+		if userID == "" {
+			return match
+		}
+
+		user, err := stoat.Get(session, "/users/"+userID, userID, &session.UserCache)
+		if err != nil {
+			return "@" + userID
+		}
+
+		if member := getStoatMember(session, message); member != nil && member.Nickname != nil {
+			return "@" + *member.Nickname
+		}
+
+		return "@" + user.Username
+	})
+
+	content = stoatChannelRegex.ReplaceAllStringFunc(content, func(match string) string {
+		channelID := extractStoatID(match, stoatChannelRegex)
+		if channelID == "" {
+			return match
+		}
+
+		ch, err := stoat.Get(session, "/channels/"+channelID, channelID, &session.ChannelCache)
+		if err != nil {
+			return "#" + channelID
+		}
+
+		return "#" + ch.Name
+	})
+
+	return content
 }
 
-func (p *stoatPlugin) replaceEmojis(message *lightning.Message) string {
-	return emojiRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
-		if emojiID := extractID(match, emojiRegex); emojiID != "" {
-			emoji := p.session.Emoji(emojiID)
+func stoatToLightningEmbeds(embeds []stoat.Embed) []lightning.Embed {
+	out := make([]lightning.Embed, 0, len(embeds))
 
-			if emoji == nil {
-				return match
+	for _, embed := range embeds {
+		newEmbed := lightning.Embed{
+			Title: embed.Title, Description: embed.Description, URL: embed.URL,
+			Image: getStoatEmbedMedia(embed.Image), Video: getStoatEmbedMedia(embed.Video),
+		}
+
+		if embed.Colour != "" {
+			if c, err := strconv.ParseInt(embed.Colour[1:], 16, 32); err == nil {
+				newEmbed.Color = int(c)
 			}
+		}
 
-			url := "https://cdn.stoatusercontent.com/emojis/" + emoji.ID
+		if embed.IconURL != nil {
+			newEmbed.Thumbnail = &lightning.Media{URL: *embed.IconURL}
+		}
 
-			message.Emoji = append(message.Emoji, lightning.Emoji{
-				URL:  &url,
-				ID:   emoji.ID,
-				Name: emoji.Name,
-			})
+		out = append(out, newEmbed)
+	}
 
-			return ":" + emoji.Name + ":"
+	return out
+}
+
+func stoatToLightningEmoji(session *stoat.Session, msg *lightning.Message) string {
+	return stoatEmojiRegex.ReplaceAllStringFunc(msg.Content, func(match string) string {
+		if emojiID := extractStoatID(match, stoatEmojiRegex); emojiID != "" {
+			emoji, err := stoat.Get(session, "/custom/emoji/"+emojiID, emojiID, &session.EmojiCache)
+			if err == nil {
+				msg.Emoji = append(msg.Emoji, lightning.Emoji{
+					URL:  "https://cdn.stoatusercontent.com/emojis/" + emoji.ID,
+					ID:   emoji.ID,
+					Name: emoji.Name,
+				})
+
+				return ":" + emoji.Name + ":"
+			}
 		}
 
 		return match
 	})
 }
 
-func (p *stoatPlugin) replaceMentions(channelID string, content string) string {
-	return mentionRegex.ReplaceAllStringFunc(content, func(match string) string {
-		userID := extractID(match, mentionRegex)
-		if userID == "" {
-			return match
-		}
-
-		user := p.session.User(userID)
-		if user == nil {
-			return "@" + userID
-		}
-
-		channel := p.session.Channel(channelID)
-		if channel != nil && channel.Server != nil {
-			member := p.session.Member(*channel.Server, userID)
-			if member != nil && member.Nickname != nil {
-				return "@" + *member.Nickname
-			}
-		}
-
-		return "@" + user.Username
-	})
+func getStoatFileURL(file *stoat.File) string {
+	return "https://cdn.stoatusercontent.com/" + file.Tag + "/" + file.ID
 }
 
-func (p *stoatPlugin) replaceChannels(content string) string {
-	return channelRegex.ReplaceAllStringFunc(content, func(match string) string {
-		chanID := extractID(match, channelRegex)
-		if chanID == "" {
-			return match
+func getStoatEmbedMedia(media *stoat.Media) *lightning.Media {
+	if media != nil && media.URL != "" {
+		return &lightning.Media{
+			URL:    media.URL,
+			Width:  media.Width,
+			Height: media.Height,
 		}
+	}
 
-		channel := p.session.Channel(chanID)
-		if channel == nil {
-			return "#" + chanID
-		}
-
-		return "#" + channel.Name
-	})
+	return nil
 }
 
-func extractID(match string, re *regexp.Regexp) string {
+func extractStoatID(match string, re *regexp.Regexp) string {
 	matches := re.FindStringSubmatch(match)
 	if len(matches) < 2 {
 		return ""
 	}
 
 	return matches[1]
-}
-
-func getLightningEmbeds(embeds []rvapi.Embed) []lightning.Embed {
-	result := make([]lightning.Embed, 0)
-	for _, embed := range embeds {
-		lightningEmbed := lightning.Embed{
-			Title:       embed.Title,
-			Description: embed.Description,
-			URL:         embed.URL,
-			Image:       getEmbedImage(&embed),
-			Video:       getEmbedVideo(&embed),
-		}
-
-		if embed.Colour != nil {
-			if colorInt, err := strconv.ParseInt((*embed.Colour)[1:], 16, 32); err == nil {
-				colorVal := int(colorInt)
-				lightningEmbed.Color = &colorVal
-			}
-		}
-
-		if embed.IconURL != nil {
-			lightningEmbed.Thumbnail = &lightning.Media{URL: *embed.IconURL}
-		}
-
-		result = append(result, lightningEmbed)
-	}
-
-	return result
-}
-
-func getEmbedImage(embed *rvapi.Embed) *lightning.Media {
-	if embed.Image != nil && embed.Image.URL != "" {
-		return &lightning.Media{URL: embed.Image.URL, Width: embed.Image.Width, Height: embed.Image.Height}
-	}
-
-	return nil
-}
-
-func getEmbedVideo(embed *rvapi.Embed) *lightning.Media {
-	if embed.Video != nil && embed.Video.URL != "" {
-		return &lightning.Media{URL: embed.Video.URL, Width: embed.Video.Width, Height: embed.Video.Height}
-	}
-
-	return nil
 }

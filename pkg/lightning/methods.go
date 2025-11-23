@@ -5,7 +5,7 @@ import "strings"
 // SetupChannel allows you to create the platform-specific equivalent of
 // a webhook and allows you to send messages with a different author, when
 // then return value is passed as ChannelData in [*SendOptions].
-func (b *Bot) SetupChannel(channelID string) (any, error) {
+func (b *Bot) SetupChannel(channelID string) (map[string]string, error) {
 	plugin, channel, ok := b.getPluginFromChannel(channelID)
 	if !ok {
 		return nil, MissingPluginError{}
@@ -51,7 +51,8 @@ func (b *Bot) EditMessage(message *Message, ids []string, opts *SendOptions) err
 	oldID := message.ChannelID
 	message.ChannelID = channel
 
-	if err := plugin.EditMessage(message, ids, opts); err != nil {
+	err := plugin.EditMessage(message, ids, opts)
+	if err != nil {
 		return &PluginMethodError{oldID, "EditMessage", "failed to edit message", []error{err}}
 	}
 
@@ -67,7 +68,8 @@ func (b *Bot) DeleteMessages(channelID string, ids []string) error {
 		return MissingPluginError{}
 	}
 
-	if err := plugin.DeleteMessage(channel, ids); err != nil {
+	err := plugin.DeleteMessage(channel, ids)
+	if err != nil {
 		return &PluginMethodError{channelID, "DeleteMessages", "failed to delete messages", []error{err}}
 	}
 
@@ -75,14 +77,14 @@ func (b *Bot) DeleteMessages(channelID string, ids []string) error {
 }
 
 func (b *Bot) getPluginFromChannel(channel string) (Plugin, string, bool) {
-	pluginName, channelName, ok := strings.Cut(channel, "::")
-	if !ok {
+	pluginName, channelName, found := strings.Cut(channel, "::")
+	if !found {
 		return nil, "", false
 	}
 
 	b.pluginMutex.RLock()
-	plugin, ok := b.plugins[pluginName]
+	plugin, found := b.plugins[pluginName]
 	b.pluginMutex.RUnlock()
 
-	return plugin, channelName, ok
+	return plugin, channelName, found
 }

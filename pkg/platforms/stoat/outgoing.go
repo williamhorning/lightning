@@ -1,26 +1,23 @@
 package stoat
 
 import (
-	"context"
 	"log"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/williamhorning/lightning/internal/emoji"
-	"github.com/williamhorning/lightning/internal/rvapi"
-	"github.com/williamhorning/lightning/internal/workaround"
+	"github.com/williamhorning/lightning/internal/stoat"
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func (p *stoatPlugin) getOutgoing(
+func lightningToStoatMessage(
+	session *stoat.Session,
 	message *lightning.Message,
 	opts *lightning.SendOptions,
-) rvapi.DataMessageSend {
-	content := spoilerRegex.ReplaceAllStringFunc(
-		emojiSendRegex.ReplaceAllStringFunc(message.Content, p.replaceOutgoingEmoji(message)),
+) stoat.DataMessageSend {
+	content := stoatOutgoingSpoilerRegex.ReplaceAllStringFunc(stoatOutgoingEmojiRegex.ReplaceAllStringFunc(
+		message.Content, func(match string) string { return replaceStoatOutgoingEmoji(session, message, match) }),
 		func(match string) string { return "!!" + match[2:len(match)-2] + "!!" },
 	)
 
@@ -29,179 +26,148 @@ func (p *stoatPlugin) getOutgoing(
 		content = strings.ReplaceAll(content, "@online", "@\u2800online")
 	}
 
-	if len([]rune(content)) > 2000 {
-		content = string([]rune(content)[:1997]) + "..." // split the message?
+	if len(content) > 2000 {
+		content = content[:1997] + "..."
 	}
 
-	msg := rvapi.DataMessageSend{
-		Attachments: p.getOutgoingAttachments(message.Attachments),
+	msg := stoat.DataMessageSend{
+		Attachments: lightningToStoatAttachments(session, message.Attachments),
 		Content:     content,
-		Embeds:      getOutgoingEmbeds(message.Embeds),
-		Replies:     getOutgoingReplies(message.RepliedTo),
+		Embeds:      lightningToStoatEmbeds(message.Embeds),
+		Replies:     lightningToStoatReplies(message.RepliedTo),
 	}
 
 	if len(content) == 0 && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
 		msg.Content = "\u200B"
 	}
 
-	if opts != nil {
-		msg.Masquerade = getOutgoingMasquerade(message.Author)
+	if opts != nil && message.Author != nil {
+		msg.Masquerade = lightningToStoatMasquerade(*message.Author)
 	}
 
 	return msg
 }
 
-var emojiSendRegex = regexp.MustCompile(`:\w+:`)
+var (
+	stoatOutgoingEmojiRegex   = regexp.MustCompile(`:\w+:`)
+	stoatOutgoingSpoilerRegex = regexp.MustCompile(`\|\|(.+?)\|\|`)
+)
 
-func (p *stoatPlugin) replaceOutgoingEmoji(message *lightning.Message) func(string) string {
-	return func(match string) string {
-		if emoji.IsEmoji(match) {
-			return match
-		}
+func replaceStoatOutgoingEmoji(session *stoat.Session, message *lightning.Message, match string) string {
+	if str, ok := emoji.GetEmoji(match); ok {
+		return str
+	}
 
-		name := strings.ReplaceAll(match, ":", "")
+	name := strings.ReplaceAll(match, ":", "")
 
-		channel := p.session.Channel(message.ChannelID)
-
-		if channel != nil && channel.ChannelType == rvapi.ChannelTypeText && channel.Server != nil {
-			for _, emoji := range p.session.ServerEmoji(*channel.Server) {
-				if emoji.Name == name {
-					return ":" + emoji.ID + ":"
+	channel, err := stoat.Get(session, "/channels/"+message.ChannelID, message.ChannelID, &session.ChannelCache)
+	if err == nil && channel.ChannelType == stoat.ChannelTypeText && channel.Server != nil {
+		serverEmojis, err := stoat.Get(session, "/servers/"+*channel.Server+"/emojis", *channel.Server,
+			&session.ServerEmojiCache)
+		if err == nil {
+			for _, instance := range *serverEmojis {
+				if instance.Name == name {
+					return ":" + instance.ID + ":"
 				}
 			}
 		}
-
-		for _, emoji := range message.Emoji {
-			if emoji.Name == name && emoji.URL != nil {
-				return "[" + emoji.Name + "](" + *emoji.URL + ")"
-			}
-		}
-
-		return match
 	}
+
+	for _, e := range message.Emoji {
+		if e.Name == name {
+			return "[" + e.Name + "](" + e.URL + ")"
+		}
+	}
+
+	return match
 }
 
-func (p *stoatPlugin) getOutgoingAttachments(attachments []lightning.Attachment) []string {
-	if len(attachments) == 0 {
-		return nil
-	}
-
-	attachmentIDs := make([]string, 0, len(attachments))
-
-	for _, attachment := range attachments {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, attachment.URL, nil)
-		if err != nil {
-			cancel()
-
-			continue
-		}
-
-		resp, err := workaround.Client.Do(req)
-		if err != nil {
-			cancel()
-
-			continue
-		}
-
-		file, err := p.session.UploadFile("attachments", attachment.Name, resp.Body)
+func lightningToStoatAttachments(session *stoat.Session, attachments []lightning.Attachment) []string {
+	out := make([]string, 0, len(attachments))
+	for _, att := range attachments {
+		file, err := session.UploadFile("attachments", att.URL, att.Name)
 		if err == nil {
-			attachmentIDs = append(attachmentIDs, file.ID)
+			out = append(out, file.ID)
 		} else {
 			log.Printf("%v\n", err)
 		}
-
-		err = resp.Body.Close()
-		if err != nil {
-			log.Printf("stoat: failed to close upload body: %v\n", err)
-		}
-
-		cancel()
 	}
 
-	return attachmentIDs
+	return out
 }
 
-func getOutgoingEmbeds(embeds []lightning.Embed) []rvapi.SendableEmbed {
-	result := make([]rvapi.SendableEmbed, 0, len(embeds))
+func lightningToStoatEmbeds(embeds []lightning.Embed) []stoat.SendableEmbed {
+	out := make([]stoat.SendableEmbed, 0, len(embeds))
 
-	for _, embed := range embeds {
-		result = append(result, convertOutgoingEmbed(embed))
+	for _, e := range embeds {
+		out = append(out, lightningToStoatEmbed(e))
 	}
 
-	return result
+	return out
 }
 
-func convertOutgoingEmbed(embed lightning.Embed) rvapi.SendableEmbed {
-	stoatEmbed := rvapi.SendableEmbed{
+func lightningToStoatEmbed(embed lightning.Embed) stoat.SendableEmbed {
+	newEmbed := stoat.SendableEmbed{
 		Title:       embed.Title,
-		Description: getEmbedDescription(embed),
-		URL:         embed.URL,
+		Description: *stoatEmbedDescription(embed),
 	}
 
-	if embed.URL != nil {
-		if len(*embed.URL) > 256 {
-			*embed.URL = (*embed.URL)[:256]
+	if embed.URL != "" {
+		if len(embed.URL) > 256 {
+			embed.URL = embed.URL[:256]
 		}
 
-		stoatEmbed.URL = embed.URL
+		newEmbed.URL = embed.URL
 	}
 
-	if embed.Color != nil {
-		color := "#" + strconv.FormatInt(int64(*embed.Color), 16)
-
-		stoatEmbed.Colour = &color
+	if embed.Color != 0 {
+		newEmbed.Colour = "#" + strconv.FormatInt(int64(embed.Color), 16)
 	}
 
-	setEmbedMedia(&stoatEmbed, embed)
+	setStoatEmbedMedia(&newEmbed, embed)
 
-	return stoatEmbed
+	return newEmbed
 }
 
-func getEmbedDescription(embed lightning.Embed) *string {
-	description := ""
-	if embed.Description != nil {
-		description = *embed.Description
-	}
-
+func stoatEmbedDescription(embed lightning.Embed) *string {
 	if len(embed.Fields) == 0 {
-		return &description
+		return &embed.Description
 	}
 
 	for _, field := range embed.Fields {
-		if description != "" {
-			description += "\n\n"
+		if embed.Description != "" {
+			embed.Description += "\n\n"
 		}
 
-		description += "**" + field.Name + "**\n" + field.Value
+		embed.Description += "**" + field.Name + "**\n" + field.Value
 	}
 
-	if description == "" {
+	if embed.Description == "" {
 		return nil
 	}
 
-	return &description
+	return &embed.Description
 }
 
-func setEmbedMedia(stoatEmbed *rvapi.SendableEmbed, embed lightning.Embed) {
+func setStoatEmbedMedia(sEmbed *stoat.SendableEmbed, embed lightning.Embed) {
 	if embed.Image != nil {
-		stoatEmbed.Media = &embed.Image.URL
+		sEmbed.Media = embed.Image.URL
 	}
 
 	if embed.Video != nil {
-		stoatEmbed.Media = &embed.Video.URL
+		sEmbed.Media = embed.Video.URL
 	}
 
-	if embed.Thumbnail != nil && len([]rune(embed.Thumbnail.URL)) > 0 && len([]rune(embed.Thumbnail.URL)) <= 128 {
-		stoatEmbed.IconURL = &embed.Thumbnail.URL
+	if embed.Thumbnail != nil && len(embed.Thumbnail.URL) > 0 && len(embed.Thumbnail.URL) <= 128 {
+		sEmbed.IconURL = embed.Thumbnail.URL
 	}
 }
 
-func getOutgoingReplies(replyIDs []string) []rvapi.ReplyIntent {
-	replies := make([]rvapi.ReplyIntent, len(replyIDs))
+func lightningToStoatReplies(replyIDs []string) []stoat.ReplyIntent {
+	replies := make([]stoat.ReplyIntent, len(replyIDs))
+
 	for i, id := range replyIDs {
-		replies[i] = rvapi.ReplyIntent{
+		replies[i] = stoat.ReplyIntent{
 			ID:              id,
 			Mention:         false,
 			FailIfNotExists: false,
@@ -211,22 +177,18 @@ func getOutgoingReplies(replyIDs []string) []rvapi.ReplyIntent {
 	return replies
 }
 
-func getOutgoingMasquerade(author *lightning.MessageAuthor) *rvapi.Masquerade {
-	avatar := ""
-	if author.ProfilePicture != nil && len([]rune(*author.ProfilePicture)) > 1 &&
-		len([]rune(*author.ProfilePicture)) <= 256 {
-		avatar = *author.ProfilePicture
+func lightningToStoatMasquerade(author lightning.MessageAuthor) *stoat.Masquerade {
+	if len(author.ProfilePicture) >= 256 {
+		author.ProfilePicture = author.ProfilePicture[:256]
 	}
 
-	nickname := author.Nickname
-
-	if len([]rune(nickname)) > 32 {
-		nickname = string([]rune(nickname))[:32]
+	if len(author.Nickname) > 32 {
+		author.Nickname = author.Nickname[:32]
 	}
 
-	return &rvapi.Masquerade{
+	return &stoat.Masquerade{
 		Colour: author.Color,
-		Name:   nickname,
-		Avatar: avatar,
+		Name:   author.Nickname,
+		Avatar: author.ProfilePicture,
 	}
 }

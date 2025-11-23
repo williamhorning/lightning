@@ -66,5 +66,8 @@ const (
 
 	selectDatabaseVersionQuery = `SELECT value FROM lightning WHERE prop = 'db_data_version';`
 
-	insertDatabaseVersionQuery = `INSERT INTO lightning (prop, value) VALUES ('db_data_version', '0.8.2');`
+	insertDatabaseVersionQuery = `INSERT INTO lightning (prop, value) VALUES ('db_data_version', '0.8.3');`
+
+	zeroEightThreeMigrationQuery = `UPDATE bridge_channels SET data = CASE WHEN jsonb_typeof(data) = 'object' THEN
+		(SELECT jsonb_object_agg(key, value) FROM jsonb_each_text(data)) ELSE NULL END;`
 )

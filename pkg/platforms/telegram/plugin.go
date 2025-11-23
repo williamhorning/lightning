@@ -62,12 +62,10 @@ func New(config map[string]string) (lightning.Plugin, error) {
 			return true
 		},
 		Response: func(b *gotgbot.Bot, ctx *ext.Context) error {
-			msg := getMessage(b, ctx, config["proxy_url"])
+			msg := telegramToLightningMessage(b, ctx, config["proxy_url"])
 			if ctx.EditedMessage != nil {
-				time := time.UnixMilli(ctx.EditedMessage.GetDate() * 1000)
 				edits <- &lightning.EditedMessage{
-					Message: &msg,
-					Edited:  &time,
+					Message: &msg, Edited: time.UnixMilli(ctx.EditedMessage.GetDate() * 1000),
 				}
 			} else {
 				messages <- &msg
@@ -108,7 +106,7 @@ type telegramPlugin struct {
 	updater        *ext.Updater
 }
 
-func (*telegramPlugin) SetupChannel(_ string) (any, error) {
+func (*telegramPlugin) SetupChannel(_ string) (map[string]string, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
@@ -128,7 +126,7 @@ func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning
 		return nil, &channelIDError{message.ChannelID}
 	}
 
-	content := parseContent(message, opts)
+	content := lightningToTelegramMessage(message, opts)
 
 	sendOpts := &gotgbot.SendMessageOpts{
 		ParseMode: gotgbot.ParseModeMarkdownV2, RequestOpts: &gotgbot.RequestOpts{Timeout: defaultTimeout},
@@ -177,7 +175,7 @@ func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, o
 			err, message.ChannelID, ids[0])
 	}
 
-	content := parseContent(message, opts)
+	content := lightningToTelegramMessage(message, opts)
 
 	_, _, err = p.telegram.EditMessageText(
 		content,

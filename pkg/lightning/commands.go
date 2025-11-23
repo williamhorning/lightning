@@ -3,29 +3,15 @@ package lightning
 import "strings"
 
 // AddCommand takes [Command]s and registers it with the built-in
-// text command handler and any platform-specific command systems.
-func (b *Bot) AddCommand(commands ...*Command) error {
-	var errs []error
-
+// text command handler and platform-specific command systems.
+func (b *Bot) AddCommand(commands ...Command) {
 	for _, command := range commands {
-		if command == nil {
-			continue
-		}
-
-		b.commands[command.Name] = command
+		b.commands[command.Name] = &command
 	}
 
 	for _, plugin := range b.plugins {
-		if err := plugin.SetupCommands(b.commands); err != nil {
-			errs = append(errs, err)
-		}
+		_ = plugin.SetupCommands(b.commands)
 	}
-
-	if len(errs) > 0 {
-		return &PluginMethodError{"", "AddCommand", "failed to register command", errs}
-	}
-
-	return nil
 }
 
 func handleMessageCommand(bot *Bot, event *Message) {
@@ -41,27 +27,20 @@ func handleMessageCommand(bot *Bot, event *Message) {
 	commandName := args[0]
 	options := args[1:]
 
-	reply := func(msg *Message, sensitive bool) error {
+	reply := func(msg *Message, sensitive bool) {
 		plugin, channel, ok := bot.getPluginFromChannel(event.ChannelID)
 		if !ok {
-			return MissingPluginError{}
+			return
 		}
 
 		msg.ChannelID = channel
-
-		var err error
+		msg.RepliedTo = append(msg.RepliedTo, event.EventID)
 
 		if sensitive {
-			_, err = plugin.SendCommandResponse(msg, nil, event.Author.ID)
+			_, _ = plugin.SendCommandResponse(msg, nil, event.Author.ID)
 		} else {
-			_, err = plugin.SendMessage(msg, nil)
+			_, _ = plugin.SendMessage(msg, nil)
 		}
-
-		if err == nil {
-			return nil
-		}
-
-		return &PluginMethodError{event.ChannelID, "CommandReply", "failed to send command response", []error{err}}
 	}
 
 	handleCommandEvent(bot, &CommandEvent{
@@ -86,7 +65,7 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 
 	if event.Subcommand != nil {
 		if cmd, ok := command.Subcommands[*event.Subcommand]; ok {
-			command = cmd
+			command = &cmd
 		}
 	}
 

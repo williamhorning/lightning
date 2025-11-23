@@ -9,21 +9,19 @@ import (
 	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {
-	timestamp := time.UnixMilli(ctx.EffectiveMessage.Date * 1000)
-
+func telegramToLightningMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {
 	msg := lightning.Message{
 		Author: &lightning.MessageAuthor{
 			ID:             strconv.FormatInt(ctx.EffectiveSender.Id(), 10),
 			Nickname:       ctx.EffectiveSender.Name(),
 			Username:       ctx.EffectiveSender.Username(),
-			ProfilePicture: getProfilePicture(bot, ctx, proxyPath),
+			ProfilePicture: telegramToLightningProfilePicture(bot, ctx, proxyPath),
 			Color:          "#24A1DE",
 		},
 		BaseMessage: lightning.BaseMessage{
 			EventID:   strconv.FormatInt(ctx.EffectiveMessage.GetMessageId(), 10),
 			ChannelID: strconv.FormatInt(ctx.EffectiveChat.Id, 10),
-			Time:      &timestamp,
+			Time:      time.UnixMilli(ctx.EffectiveMessage.Date * 1000),
 		},
 	}
 
@@ -58,48 +56,41 @@ func getMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.
 	return msg
 }
 
-func getProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) *string {
-	if ctx.EffectiveUser == nil {
-		return nil
-	}
+func telegramToLightningProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) string {
+	var fileID string
 
-	pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
-	if err != nil || pics.TotalCount <= 0 {
-		return nil
-	}
-
-	bestPhoto := getBestPhoto(pics.Photos[0])
-	if bestPhoto == nil {
-		return nil
-	}
-
-	if f, err := bot.GetFile(bestPhoto.FileId, nil); err == nil {
-		url := proxyPath + f.FilePath
-
-		return &url
-	}
-
-	return nil
-}
-
-func getBestPhoto(size []gotgbot.PhotoSize) *gotgbot.PhotoSize {
-	var bestPhoto *gotgbot.PhotoSize
-
-	for _, photo := range size {
-		if bestPhoto == nil || photo.Width > bestPhoto.Width {
-			bestPhoto = &photo
+	switch {
+	case ctx.EffectiveChat != nil:
+		chat, err := ctx.EffectiveChat.Get(bot, nil)
+		if err != nil || chat.Photo == nil {
+			return ""
 		}
+
+		fileID = chat.Photo.BigFileId
+	case ctx.EffectiveUser != nil:
+		pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
+		if err != nil || pics.TotalCount <= 0 {
+			return ""
+		}
+
+		fileID = getBestPhoto(pics.Photos[0])
+	default:
+		return ""
 	}
 
-	return bestPhoto
+	if f, err := bot.GetFile(fileID, nil); err == nil {
+		return proxyPath + f.FilePath
+	}
+
+	return ""
 }
 
 func getFileDetails(ctx *ext.Context) (string, string) { //nolint:revive,cyclop
 	switch {
 	case len(ctx.EffectiveMessage.NewChatPhoto) != 0:
-		return getBestPhoto(ctx.EffectiveMessage.NewChatPhoto).FileId, "photo.jpg"
+		return getBestPhoto(ctx.EffectiveMessage.NewChatPhoto), "photo.jpg"
 	case len(ctx.EffectiveMessage.Photo) != 0:
-		return getBestPhoto(ctx.EffectiveMessage.Photo).FileId, "photo.jpg"
+		return getBestPhoto(ctx.EffectiveMessage.Photo), "photo.jpg"
 	case ctx.EffectiveMessage.Document != nil:
 		return ctx.EffectiveMessage.Document.FileId, ctx.EffectiveMessage.Document.FileName
 	case ctx.EffectiveMessage.Animation != nil:
@@ -118,6 +109,18 @@ func getFileDetails(ctx *ext.Context) (string, string) { //nolint:revive,cyclop
 	default:
 		return "", ""
 	}
+}
+
+func getBestPhoto(size []gotgbot.PhotoSize) string {
+	var bestPhoto *gotgbot.PhotoSize
+
+	for _, photo := range size {
+		if bestPhoto == nil || photo.Width > bestPhoto.Width {
+			bestPhoto = &photo
+		}
+	}
+
+	return bestPhoto.FileId
 }
 
 func getStickerExtension(sticker *gotgbot.Sticker) string {

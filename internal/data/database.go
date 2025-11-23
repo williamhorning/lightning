@@ -18,7 +18,7 @@ type DatabaseConfig struct {
 }
 
 // GetDatabase returns a Database based on the configuration.
-func (config DatabaseConfig) GetDatabase() (Database, error) {
+func GetDatabase(config DatabaseConfig) (Database, error) {
 	switch config.Type {
 	case "postgres":
 		return newPostgresDatabase(config.Connection)

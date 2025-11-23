@@ -3,60 +3,24 @@ package guilded
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
-type guildedChatEmbedAuthor struct {
-	IconURL *string `json:"icon_url,omitempty"`
-	Name    *string `json:"name,omitempty"`
-	URL     *string `json:"url,omitempty"`
-}
-
-type guildedChatEmbedField struct {
-	Inline *bool  `json:"inline,omitempty"`
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-}
-
-type guildedChatEmbedFooter struct {
-	IconURL *string `json:"icon_url,omitempty"`
-	Text    string  `json:"text"`
-}
-
-type guildedChatEmbedMedia struct {
-	URL *string `json:"url,omitempty"`
-}
-
-type guildedChatEmbed struct {
-	Author      *guildedChatEmbedAuthor  `json:"author,omitempty"`
-	Color       *int                     `json:"color,omitempty"`
-	Description *string                  `json:"description,omitempty"`
-	Fields      *[]guildedChatEmbedField `json:"fields,omitempty"`
-	Footer      *guildedChatEmbedFooter  `json:"footer,omitempty"`
-	Image       *guildedChatEmbedMedia   `json:"image,omitempty"`
-	Thumbnail   *guildedChatEmbedMedia   `json:"thumbnail,omitempty"`
-	Timestamp   *string                  `json:"timestamp,omitempty"`
-	Title       *string                  `json:"title,omitempty"`
-	URL         *string                  `json:"url,omitempty"`
-}
-
 type guildedChatMessage struct {
-	CreatedAt          time.Time           `json:"createdAt"`
-	Content            *string             `json:"content,omitempty"`
-	CreatedByWebhookID *string             `json:"createdByWebhookId,omitempty"`
-	Embeds             *[]guildedChatEmbed `json:"embeds,omitempty"`
-	ReplyMessageIDs    *[]string           `json:"replyMessageIds,omitempty"`
-	ServerID           *string             `json:"serverId,omitempty"`
-	UpdatedAt          *time.Time          `json:"updatedAt,omitempty"`
-	ChannelID          string              `json:"channelId"`
-	CreatedBy          string              `json:"createdBy"`
-	ID                 string              `json:"id"`
+	CreatedAt          time.Time         `json:"createdAt"`
+	Content            string            `json:"content,omitempty"`
+	CreatedByWebhookID string            `json:"createdByWebhookId,omitempty"`
+	ReplyMessageIDs    []string          `json:"replyMessageIds,omitempty"`
+	ServerID           *string           `json:"serverId,omitempty"`
+	UpdatedAt          time.Time         `json:"updatedAt,omitempty"`
+	ChannelID          string            `json:"channelId"`
+	CreatedBy          string            `json:"createdBy"`
+	ID                 string            `json:"id"`
+	Embeds             []lightning.Embed `json:"embeds,omitempty"`
 }
 
-type guildedChatMessageResponse struct {
-	Message guildedChatMessage `json:"message"`
-}
-
-type guildedChatMessageCreated struct {
+type guildedChatMessageWrapper struct {
 	Message guildedChatMessage `json:"message"`
 }
 
@@ -65,33 +29,17 @@ type guildedChatMessageDeleted struct {
 	Message   guildedChatMessage `json:"message"`
 }
 
-type guildedChatMessageUpdated struct {
-	Message guildedChatMessage `json:"message"`
-}
-
 type guildedPayload struct {
-	Content         string             `json:"content,omitempty"`
-	AvatarURL       string             `json:"avatar_url,omitempty"`
-	Username        string             `json:"username,omitempty"`
-	Embeds          []guildedChatEmbed `json:"embeds,omitempty"`
-	ReplyMessageIDs []string           `json:"replyMessageIds,omitempty"`
-}
-
-type guildedServerChannel struct {
-	ServerID string `json:"serverId"`
-}
-
-type guildedServerChannelResponse struct {
-	Channel guildedServerChannel `json:"channel"`
+	Content         string            `json:"content,omitempty"`
+	AvatarURL       string            `json:"avatar_url,omitempty"`
+	Username        string            `json:"username,omitempty"`
+	Embeds          []lightning.Embed `json:"embeds,omitempty"`
+	ReplyMessageIDs []string          `json:"replyMessageIds,omitempty"`
 }
 
 type guildedServerMember struct {
 	Nickname *string     `json:"nickname,omitempty"`
 	User     guildedUser `json:"user"`
-}
-
-type guildedServerMemberResponse struct {
-	Member guildedServerMember `json:"member"`
 }
 
 type guildedSocketEventEnvelope struct {
@@ -110,26 +58,7 @@ type guildedURLSignatureResponse struct {
 }
 
 type guildedUser struct {
-	Avatar *string `json:"avatar,omitempty"`
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-}
-
-type guildedWebhook struct {
-	Avatar *string `json:"avatar,omitempty"`
-	Token  *string `json:"token,omitempty"`
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-}
-
-type guildedWebhookResponse struct {
-	Webhook guildedWebhook `json:"webhook"`
-}
-
-type guildedWebhookExecuteResponse struct {
-	ID string `json:"id"`
-}
-
-type guildedWelcomeMessage struct {
-	User guildedUser `json:"user"`
+	Avatar string `json:"avatar,omitempty"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
 }
