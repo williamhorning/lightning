@@ -42,7 +42,7 @@ func Get[T any](session *Session, endpoint string, key string, cacher *cache.Exp
 		}
 	}
 
-	body, code, err := session.Fetch(http.MethodGet, endpoint, nil, nil, nil)
+	body, code, err := session.Fetch(http.MethodGet, endpoint, nil, nil, map[string][]string{})
 	if err != nil || code != 200 {
 		return nil, fmt.Errorf("failed to fetch (%d): %w", code, err)
 	}
@@ -89,10 +89,6 @@ func (session *Session) Fetch(
 		return nil, 0, fmt.Errorf("failed to create %s request for %s: %w", method, endpoint, err)
 	}
 
-	if headers == nil {
-		headers = map[string][]string{}
-	}
-
 	req.Header = headers
 	req.Header["X-Bot-Token"] = []string{session.Token}
 	req.Header["User-Agent"] = []string{"rvapi/0.8.0-rc.8"}
@@ -128,5 +124,5 @@ func handleRatelimiting(
 
 	time.Sleep(retryAfterDuration)
 
-	return session.Fetch(method, endpoint, body, nil, nil)
+	return session.Fetch(method, endpoint, body, nil, map[string][]string{})
 }
