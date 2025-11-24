@@ -10,13 +10,13 @@ import (
 )
 
 // Connect to the Stoat socket.
-func (s *Session) Connect() error {
-	if s.connected.Load() {
+func (session *Session) Connect() error {
+	if session.connected.Load() {
 		return nil
 	}
 
 	conn, resp, err := websocket.DefaultDialer.Dial(
-		"wss://events.stoat.chat/?version=1&format=json&token="+s.Token,
+		"wss://events.stoat.chat/?version=1&format=json&token="+session.Token,
 		map[string][]string{"User-Agent": {"rvapi/0.8.0-rc.8"}},
 	)
 	if err != nil {
@@ -25,11 +25,11 @@ func (s *Session) Connect() error {
 
 	defer resp.Body.Close()
 
-	s.conn = conn
-	s.connected.Store(true)
+	session.conn = conn
+	session.connected.Store(true)
 
-	go ping(s)
-	go readMessages(s)
+	go ping(session)
+	go readMessages(session)
 
 	return nil
 }

@@ -43,8 +43,8 @@ type guildedServerMember struct {
 }
 
 type guildedSocketEventEnvelope struct {
-	T  *string         `json:"t,omitempty"`
-	D  json.RawMessage `json:"d,omitempty"`
+	T  string          `json:"t"`
+	D  json.RawMessage `json:"d"`
 	Op int             `json:"op"`
 }
 

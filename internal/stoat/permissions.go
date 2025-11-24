@@ -1,9 +1,6 @@
 package stoat
 
-import (
-	"slices"
-	"time"
-)
+import "time"
 
 // GetPermissions returns the permissions for the user in the given channel.
 func (session *Session) GetPermissions(user *User, channel *Channel) Permission {
@@ -57,6 +54,10 @@ func (session *Session) calculateUserPermissions(self *User, channel *Channel) P
 }
 
 func (session *Session) calculateServerPermissions(channel *Channel, user *User) Permission {
+	if channel.Server == nil {
+		return 0
+	}
+
 	server, err := Get(session, "/servers/"+*channel.Server, *channel.Server, &session.ServerCache)
 	if err != nil {
 		return 0
@@ -75,29 +76,30 @@ func (session *Session) calculateServerPermissions(channel *Channel, user *User)
 }
 
 func getMemberPermissions(member *Member, server *Server, channel *Channel) Permission {
+	if server.Owner == member.ID.User {
+		return PermissionAll
+	}
+
 	permissions := server.DefaultPermissions
 
 	for _, roleID := range member.Roles {
 		role, ok := server.Roles[roleID]
 		if ok {
 			permissions |= role.Permissions.Allow
-			permissions &= ^role.Permissions.Deny
+			permissions &^= role.Permissions.Deny
 		}
-	}
-
-	if member.Timeout.After(time.Now()) {
-		permissions &= PermissionSet3
 	}
 
 	if channel.DefaultPerms != nil {
 		permissions |= channel.DefaultPerms.Allow
-		permissions &= ^channel.DefaultPerms.Deny
+		permissions &^= channel.DefaultPerms.Deny
 	}
 
-	for id, role := range channel.RolePermissions {
-		if slices.Contains(member.Roles, id) {
+	for _, roleID := range member.Roles {
+		role, ok := channel.RolePermissions[roleID]
+		if ok {
 			permissions |= role.Allow
-			permissions &= ^role.Deny
+			permissions &^= role.Deny
 		}
 	}
 
@@ -113,37 +115,41 @@ type Permission uint64
 
 // Individual permission flags.
 const (
-	PermissionManageChannel       Permission = 1 << iota // Manage the channel or channels on the server
-	PermissionManageServer                               // Manage the server
-	PermissionManagePermissions                          // Manage permissions on servers or channels
-	PermissionManageRole                                 // Manage roles on server
-	PermissionManageCustomization                        // Manage emoji on servers
-	PermissionKickMembers                                // Kick other members below their ranking
-	PermissionBanMembers                                 // Ban other members below their ranking
-	PermissionTimeoutMembers                             // Timeout other members below their ranking
-	PermissionAssignRoles                                // Assign roles to members below their ranking
-	PermissionChangeNickname                             // Change own nickname
-	PermissionManageNicknames                            // Change or remove other's nicknames below their ranking
-	PermissionChangeAvatar                               // Change own avatar
-	PermissionRemoveAvatars                              // Remove other's avatars below their ranking
-	PermissionViewChannel                                // View a channel
-	PermissionReadMessageHistory                         // Read a channel's past message history
-	PermissionSendMessage                                // Send a message in a channel
-	PermissionManageMessages                             // Delete messages in a channel
-	PermissionManageWebhooks                             // Manage webhook entries on a channel
-	PermissionInviteOthers                               // Create invites to this channel
-	PermissionSendEmbeds                                 // Send embedded content in this channel
-	PermissionUploadFiles                                // Send attachments and media in this channel
-	PermissionMasquerade                                 // Masquerade messages using custom nickname and avatar
-	PermissionReact                                      // React to messages with emojis
-	PermissionConnect                                    // Connect to a voice channel
-	PermissionSpeak                                      // Speak in a voice call
-	PermissionVideo                                      // Share video in a voice call
-	PermissionMuteMembers                                // Mute other members with lower ranking in a voice call
-	PermissionDeafenMembers                              // Deafen other members with lower ranking in a voice call
-	PermissionMoveMembers                                // Move members between voice channels
-	PermissionAll                 Permission = 0x000F_FFFF_FFFF_FFFF
-	PermissionSet1                Permission = PermissionSet3 | PermissionSendMessage |
+	PermissionManageChannel Permission = 1 << iota
+	PermissionManageServer
+	PermissionManagePermissions
+	PermissionManageRole
+	PermissionManageCustomization
+	PermissionKickMembers Permission = 1 << (iota + 1)
+	PermissionBanMembers
+	PermissionTimeoutMembers
+	PermissionAssignRoles
+	PermissionChangeNickname
+	PermissionManageNicknames
+	PermissionChangeAvatar
+	PermissionRemoveAvatars
+	PermissionViewChannel Permission = 1 << (iota + 7)
+	PermissionReadMessageHistory
+	PermissionSendMessage
+	PermissionManageMessages
+	PermissionManageWebhooks
+	PermissionInviteOthers
+	PermissionSendEmbeds
+	PermissionUploadFiles
+	PermissionMasquerade
+	PermissionReact
+	PermissionConnect
+	PermissionSpeak
+	PermissionVideo
+	PermissionMuteMembers
+	PermissionDeafenMembers
+	PermissionMoveMembers
+	PermissionListen
+	PermissionMentionEveryone
+	PermissionMentionRoles
+
+	PermissionAll  Permission = 0x000F_FFFF_FFFF_FFFF
+	PermissionSet1 Permission = PermissionSet3 | PermissionSendMessage |
 		PermissionManageChannel | PermissionConnect | PermissionSendEmbeds | PermissionInviteOthers |
 		PermissionUploadFiles
 	PermissionSet2 Permission = PermissionSet1 | PermissionChangeNickname | PermissionChangeAvatar

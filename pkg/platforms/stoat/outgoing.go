@@ -89,7 +89,7 @@ func lightningToStoatAttachments(session *stoat.Session, attachments []lightning
 		if err == nil {
 			out = append(out, file.ID)
 		} else {
-			log.Printf("%v\n", err)
+			log.Printf("stoat: %v\n", err)
 		}
 	}
 

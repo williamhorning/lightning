@@ -52,9 +52,9 @@ func lightningToDiscordSendable(
 		}
 	}
 
-	for _, message := range toSend {
-		if message.Content == "" && len(message.Embeds) == 0 && len(message.Files) == 0 {
-			message.Content = "_ _"
+	for i := range toSend {
+		if toSend[i].Content == "" && len(toSend[i].Embeds) == 0 && len(toSend[i].Files) == 0 {
+			toSend[i].Content = "_ _"
 		}
 	}
 
@@ -123,16 +123,19 @@ func lightningToDiscordEmbeds(src []lightning.Embed) []*discordgo.MessageEmbed {
 		return &discordgo.MessageEmbedImage{URL: media.URL, Width: media.Width, Height: media.Height}
 	}
 
+	toThumbnail := func(media *lightning.Media) *discordgo.MessageEmbedThumbnail {
+		if media == nil {
+			return nil
+		}
+
+		return &discordgo.MessageEmbedThumbnail{URL: media.URL, Width: media.Width, Height: media.Height}
+	}
+
 	embeds := make([]*discordgo.MessageEmbed, len(src))
 	for idx, embed := range src {
 		embeds[idx] = &discordgo.MessageEmbed{
-			URL:         embed.URL,
-			Title:       embed.Title,
-			Description: embed.Description,
-			Timestamp:   embed.Timestamp,
-			Color:       embed.Color,
-			Image:       toImage(embed.Image),
-			Thumbnail:   (*discordgo.MessageEmbedThumbnail)(toImage(embed.Image)),
+			URL: embed.URL, Title: embed.Title, Description: embed.Description, Timestamp: embed.Timestamp,
+			Color: embed.Color, Image: toImage(embed.Image), Thumbnail: toThumbnail(embed.Image),
 			Video: func() *discordgo.MessageEmbedVideo {
 				if embed.Video == nil {
 					return nil
@@ -179,10 +182,7 @@ func lightningToDiscordAllowedMentions(opts *lightning.SendOptions) *discordgo.M
 	}
 
 	return &discordgo.MessageAllowedMentions{
-		Parse: []discordgo.AllowedMentionType{
-			discordgo.AllowedMentionTypeRoles,
-			discordgo.AllowedMentionTypeUsers,
-		},
+		Parse: []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeRoles, discordgo.AllowedMentionTypeUsers},
 	}
 }
 

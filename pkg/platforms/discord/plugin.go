@@ -74,6 +74,7 @@ func (p *discordPlugin) SendCommandResponse(
 	}
 
 	message.ChannelID = channel.ID
+	message.RepliedTo = nil
 
 	return p.SendMessage(message, opts)
 }
@@ -84,7 +85,9 @@ func (p *discordPlugin) SendMessage(message *lightning.Message, opts *lightning.
 	if opts != nil {
 		p.webhooks.Set(opts.ChannelData["id"], true)
 
-		res, err := p.session.WebhookExecute(opts.ChannelData["id"], opts.ChannelData["id"], true, msgs[0].toWebhook())
+		res, err := p.session.WebhookExecute(
+			opts.ChannelData["id"], opts.ChannelData["token"], true, msgs[0].toWebhook(),
+		)
 		if err != nil {
 			return nil, getError(err, "Failed to send message to Discord via webhook")
 		}

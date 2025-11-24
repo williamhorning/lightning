@@ -143,7 +143,7 @@ func getJoin(database data.Database, name string) lightning.Command {
 		Name:        name,
 		Description: "Join an existing bridge with the given ID",
 		Arguments:   []lightning.CommandArgument{{Name: "id", Description: "bridge ID", Required: true}},
-		Executor: getExecutor("bridge join", "", false, func(opts *lightning.CommandOptions) string {
+		Executor: getExecutor("bridge join", "", true, func(opts *lightning.CommandOptions) string {
 			bridge, err := database.GetBridge(opts.Arguments["id"])
 			if err != nil || bridge.ID == "" {
 				return "that bridge doesn't exist"

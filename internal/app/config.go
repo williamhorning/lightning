@@ -24,5 +24,9 @@ func GetConfig(file string) (Config, error) {
 		return config, fmt.Errorf("failed loading config: %w", err)
 	}
 
+	if config.Username == "" {
+		config.Username = "lightning"
+	}
+
 	return config, nil
 }

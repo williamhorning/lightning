@@ -94,11 +94,11 @@ func readMessages(session *session) {
 		}
 
 		var data guildedSocketEventEnvelope
-		if json.NewDecoder(reader).Decode(&data) != nil || data.T == nil {
+		if json.NewDecoder(reader).Decode(&data) != nil {
 			return
 		}
 
-		switch *data.T {
+		switch data.T {
 		case "ChatMessageCreated":
 			handleGenericEvent(data.D, session.messageCreated)
 		case "ChatMessageUpdated":

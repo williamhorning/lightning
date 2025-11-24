@@ -41,10 +41,11 @@ func Create(database data.Database) func(*lightning.Bot, *lightning.Message) { /
 					}
 				}()
 
-				message.ChannelID = channel.ID
-				message.RepliedTo = repliedTo.GetChannelMessageIDs(channel.ID)
+				msg := *message
+				msg.ChannelID = channel.ID
+				msg.RepliedTo = repliedTo.GetChannelMessageIDs(channel.ID)
 
-				resultIDs, err := bot.SendMessage(message, &lightning.SendOptions{
+				resultIDs, err := bot.SendMessage(&msg, &lightning.SendOptions{
 					AllowEveryonePings: bridge.Settings.AllowEveryone, ChannelData: channel.Data,
 				})
 				if err == nil {
@@ -62,12 +63,10 @@ func Create(database data.Database) func(*lightning.Bot, *lightning.Message) { /
 			messages = append(messages, msg)
 		}
 
-		messages = append(messages, data.ChannelMessage{
-			ChannelID: message.ChannelID, MessageIDs: []string{message.EventID},
-		})
-
 		if err = database.CreateMessage(data.BridgeMessageCollection{
-			ID: message.EventID, BridgeID: bridge.ID, Messages: messages,
+			ID: message.EventID, BridgeID: bridge.ID, Messages: append(messages, data.ChannelMessage{
+				ChannelID: message.ChannelID, MessageIDs: []string{message.EventID},
+			}),
 		}); err != nil {
 			log.Printf("failed to set message collection in bridge_messages on create: %v\n", err)
 		}
@@ -97,10 +96,12 @@ func Edit(database data.Database) func(*lightning.Bot, *lightning.EditedMessage)
 					}
 				}()
 
-				message.Message.ChannelID = channel.ID
-				message.Message.RepliedTo = repliedTo.GetChannelMessageIDs(channel.ID)
+				msg := *message.Message
 
-				if err := bot.EditMessage(message.Message, prior.GetChannelMessageIDs(channel.ID),
+				msg.ChannelID = channel.ID
+				msg.RepliedTo = repliedTo.GetChannelMessageIDs(channel.ID)
+
+				if err := bot.EditMessage(&msg, prior.GetChannelMessageIDs(channel.ID),
 					&lightning.SendOptions{
 						AllowEveryonePings: bridge.Settings.AllowEveryone, ChannelData: channel.Data,
 					}); err != nil {
@@ -202,7 +203,7 @@ func handleError(database data.Database, bridge *data.Bridge, channelID, event s
 		}
 	}
 
-	log.Printf("bridge: error in channel %s in bridge %s on %s: %v\n", channelID, bridge.ID, event, err)
+	log.Printf("bridge: in bridge %s on %s: %v\n", bridge.ID, event, err)
 
 	if !disabled.Read && !disabled.Write {
 		return

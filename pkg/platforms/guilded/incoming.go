@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"regexp"
@@ -173,7 +174,7 @@ func getSignature(url, token string) *guildedURLSignatureResponse {
 }
 
 func doJSONRequest(token, method, endpoint string, body, out any) error {
-	var buf *bytes.Reader
+	var buf io.Reader
 
 	if body != nil {
 		b, err := json.Marshal(body)

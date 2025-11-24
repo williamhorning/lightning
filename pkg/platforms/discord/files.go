@@ -71,7 +71,7 @@ func lightningToDiscordFiles(session *discordgo.Session, msg *lightning.Message)
 		if err != nil {
 			cancel()
 
-			return nil
+			continue
 		}
 
 		files = append(files, &discordgo.File{

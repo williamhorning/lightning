@@ -63,7 +63,7 @@ func Get[T any](session *Session, endpoint string, key string, cacher *cache.Exp
 }
 
 // Fetch returns a request body, status code, and/or possible error from the Stoat API.
-func (s *Session) Fetch(
+func (session *Session) Fetch(
 	method, endpoint string, data any, base *string, headers map[string][]string,
 ) (io.ReadCloser, int, error) {
 	if base == nil {
@@ -89,8 +89,12 @@ func (s *Session) Fetch(
 		return nil, 0, fmt.Errorf("failed to create %s request for %s: %w", method, endpoint, err)
 	}
 
+	if headers == nil {
+		headers = map[string][]string{}
+	}
+
 	req.Header = headers
-	req.Header["X-Bot-Token"] = []string{s.Token}
+	req.Header["X-Bot-Token"] = []string{session.Token}
 	req.Header["User-Agent"] = []string{"rvapi/0.8.0-rc.8"}
 
 	resp, err := workaround.Do(req)
@@ -99,7 +103,7 @@ func (s *Session) Fetch(
 	}
 
 	if method != http.MethodGet && resp.StatusCode == http.StatusTooManyRequests {
-		return handleRatelimiting(s, resp, method, endpoint, body)
+		return handleRatelimiting(session, resp, method, endpoint, body)
 	}
 
 	return resp.Body, resp.StatusCode, nil

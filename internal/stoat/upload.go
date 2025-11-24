@@ -14,7 +14,7 @@ import (
 )
 
 // UploadFile uploads a file to Autumn.
-func (s *Session) UploadFile(tag, srcURL, filename string) (*CDNFile, error) {
+func (session *Session) UploadFile(tag, srcURL, filename string) (*CDNFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	defer cancel()
@@ -50,7 +50,7 @@ func (s *Session) UploadFile(tag, srcURL, filename string) (*CDNFile, error) {
 
 	base := "https://cdn.stoatusercontent.com/"
 
-	body, _, err := s.Fetch(http.MethodPost, "/"+tag, &buf, &base,
+	body, _, err := session.Fetch(http.MethodPost, tag, &buf, &base,
 		map[string][]string{"Content-Type": {writer.FormDataContentType()}})
 	if err != nil {
 		return nil, fmt.Errorf("upload failed: %w", err)

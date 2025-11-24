@@ -77,7 +77,8 @@ func New(config map[string]string) (lightning.Plugin, error) {
 
 	updater := ext.NewUpdater(dispatch, &ext.UpdaterOpts{
 		UnhandledErrFunc: func(err error) {
-			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) &&
+				!strings.Contains(err.Error(), "connection reset") {
 				log.Printf("telegram: unhandled error in dispatcher: %v\n", err)
 			}
 		},
