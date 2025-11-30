@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 // New creates a new [lightning.Plugin] that provides Telegram support for Lightning

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/bwmarrin/discordgo"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 type discordAPIError struct {

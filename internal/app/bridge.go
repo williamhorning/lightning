@@ -6,8 +6,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/williamhorning/lightning/internal/data"
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/internal/data"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
 // Create handles and bridges new messages.

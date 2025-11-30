@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"codeberg.org/jersey/lightning/internal/cache"
+	"codeberg.org/jersey/lightning/internal/workaround"
 	"github.com/gorilla/websocket"
-	"github.com/williamhorning/lightning/internal/cache"
-	"github.com/williamhorning/lightning/internal/workaround"
 )
 
 // Session represents a bot session on Stoat.

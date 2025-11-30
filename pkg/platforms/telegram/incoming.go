@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"time"
 
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func telegramToLightningMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath string) lightning.Message {

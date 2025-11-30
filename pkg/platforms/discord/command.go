@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/bwmarrin/discordgo"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func lightningToDiscordCommands(original map[string]*lightning.Command) []*discordgo.ApplicationCommand {

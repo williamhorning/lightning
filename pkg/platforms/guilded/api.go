@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/gorilla/websocket"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func guildedMakeRequest(token, method, endpoint string, body io.Reader) (*http.Response, error) {

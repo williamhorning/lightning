@@ -3,8 +3,8 @@ package stoat
 import (
 	"strconv"
 
-	"github.com/williamhorning/lightning/internal/stoat"
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/internal/stoat"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
 type stoatPermissionsError struct {

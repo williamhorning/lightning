@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 const defaultTimeout = gotgbot.DefaultTimeout * 2

@@ -11,7 +11,7 @@ LABEL description="Lightning"
 LABEL org.opencontainers.image.title="Lightning"
 LABEL org.opencontainers.image.description="extensible chatbot connecting communities"
 LABEL org.opencontainers.image.version="0.8.0-rc.8"
-LABEL org.opencontainers.image.source="https://github.com/williamhorning/lightning"
+LABEL org.opencontainers.image.source="https://codeberg.org/jersey/lightning"
 LABEL org.opencontainers.image.licenses="MIT"
 
 USER 1001:1001

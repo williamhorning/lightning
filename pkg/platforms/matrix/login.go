@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
 )

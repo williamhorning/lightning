@@ -16,8 +16,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/williamhorning/lightning/internal/cache"
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/internal/cache"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
 // New creates a new [lightning.Plugin] that provides Guilded support for Lightning

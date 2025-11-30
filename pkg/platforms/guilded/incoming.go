@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
 const assetCacheTTL = 24 * time.Hour

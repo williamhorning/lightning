@@ -1,29 +1,29 @@
-# lightning: *truly powerful* cross-platform bots
+# lightning: _truly powerful_ cross-platform bots
 
 ![lightning logo](./.github/logo.svg)
 
 - [the bridge](https://williamhorning.dev/lightning/bridge) - connect
-Discord, Guilded, Stoat, and Telegram
+  Discord, Guilded, Stoat, and Telegram
 - [the framework](https://williamhorning.dev/lightning/framework) - build
-your own cross-platform bots
+  your own cross-platform bots
 
-Lightning is a project developing *truly powerful* cross-platform bots, with
-the underlying *Lightning framework* being used for *Lightning bridge*,
-which is what runs *Bolt*, the hosted bridge bot. The goal is to also make the
+Lightning is a project developing _truly powerful_ cross-platform bots, with
+the underlying _Lightning framework_ being used for _Lightning bridge_,
+which is what runs _Bolt_, the hosted bridge bot. The goal is to also make the
 framework itself usable by other developers, to create their own bots, and to
 make the bridge easy to self-host, while also supporting the principles of:
 
 - **Connecting communities**: the Lightning bridge connects Discord, Guilded,
-Stoat, and Telegram, allowing communities to connect, wherever they are
+  Stoat, and Telegram, allowing communities to connect, wherever they are
 - **Extensibility**: the Lightning framework uses plugins to make it easy to
-add new features, while keeping the core simple. The bridge is also designed to
-be flexible, with options to disable pings, setup subscribe-only channels, and
-more.
+  add new features, while keeping the core simple. The bridge is also designed to
+  be flexible, with options to disable pings, setup subscribe-only channels, and
+  more.
 - **Ease of use**: the Lightning framework is designed to be easy to use,
-with a simple API, and the bridge is designed to be easy to set up and use,
-with easy-to-understand documentation.
+  with a simple API, and the bridge is designed to be easy to set up and use,
+  with easy-to-understand documentation.
 - **Strength**: Lightning is built on Go, making it easy to build, run, and
-configure, all while being performant and reliable.
+  configure, all while being performant and reliable.
 
 ## the bridge bot
 
@@ -33,7 +33,7 @@ with fragmentation as your community grows and changes, with many people using
 multiple messaging apps. People eventually grow tired of the differences
 between apps, and switching between them, with things becoming a mess.
 
-You could *try* to move everyone to one app, but that might alienate people, so
+You could _try_ to move everyone to one app, but that might alienate people, so
 what do you do, what options do you have?
 
 **Bridging!** Everyone can use their favorite app, gets the same messages, and
@@ -79,7 +79,7 @@ The [Matrix protocol](https://matrix.org) is great, and adding support for it
 to the Lightning framework would be amazing, but non-trivial. Implementing all
 the features necessary to make a smooth and reliable experience, on par with
 other platforms, is something that is being worked on in
-[#98](https://github.com/williamhorning/lightning/pull/98), but isn't complete.
+[#98](https://codeberg.org/jersey/lightning/pull/98), but isn't complete.
 [MSC4144](https://github.com/matrix-org/matrix-spec-proposals/pull/4144) is a
 new proposal which makes things easier for the bridge use-case, but that still
 needs a lot of other work to happen first. Please feel free to contribute if

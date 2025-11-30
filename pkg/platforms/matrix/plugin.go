@@ -17,8 +17,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/williamhorning/lightning/internal/cache"
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/internal/cache"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"

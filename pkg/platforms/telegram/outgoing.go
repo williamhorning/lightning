@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/williamhorning/lightning/internal/telegram"
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/internal/telegram"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
 type channelIDError struct {

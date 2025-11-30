@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
+	"codeberg.org/jersey/lightning/internal/stoat"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/oklog/ulid/v2"
-	"github.com/williamhorning/lightning/internal/stoat"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func stoatToLightningMessage(

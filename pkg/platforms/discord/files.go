@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"codeberg.org/jersey/lightning/internal/workaround"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/bwmarrin/discordgo"
-	"github.com/williamhorning/lightning/internal/workaround"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 func getMaxFileSize(session *discordgo.Session, channel string) int64 {

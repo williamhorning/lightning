@@ -3,7 +3,7 @@ package guilded
 import (
 	"strconv"
 
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
 type guildedStatusError struct {

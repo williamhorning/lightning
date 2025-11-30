@@ -3,8 +3,8 @@ package app
 import (
 	"fmt"
 
+	"codeberg.org/jersey/lightning/internal/data"
 	"github.com/BurntSushi/toml"
-	"github.com/williamhorning/lightning/internal/data"
 )
 
 // Config is the configuration for the bridge bot.

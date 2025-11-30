@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/jersey/lightning/internal/data"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/oklog/ulid/v2"
-	"github.com/williamhorning/lightning/internal/data"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 // RegisterCommands setups commands for the bridge bot.

@@ -1,6 +1,6 @@
 package data
 
-import "github.com/williamhorning/lightning/pkg/lightning"
+import "codeberg.org/jersey/lightning/pkg/lightning"
 
 // BridgeSettings are used to configure the bridge.
 type BridgeSettings struct {

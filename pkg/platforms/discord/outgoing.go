@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
+	"codeberg.org/jersey/lightning/internal/emoji"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/bwmarrin/discordgo"
-	"github.com/williamhorning/lightning/internal/emoji"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 type discordSendable struct {

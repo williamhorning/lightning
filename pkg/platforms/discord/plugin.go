@@ -17,9 +17,9 @@ import (
 	"log"
 	"time"
 
+	"codeberg.org/jersey/lightning/internal/cache"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/bwmarrin/discordgo"
-	"github.com/williamhorning/lightning/internal/cache"
-	"github.com/williamhorning/lightning/pkg/lightning"
 )
 
 // New creates a new [lightning.Plugin] that provides Discord support for Lightning

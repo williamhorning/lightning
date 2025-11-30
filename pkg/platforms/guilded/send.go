@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
 var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_ ()-]{1,25}$`)

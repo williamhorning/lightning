@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/williamhorning/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
 )
 

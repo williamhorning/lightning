@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/williamhorning/lightning/internal/workaround"
+	"codeberg.org/jersey/lightning/internal/workaround"
 )
 
 // UploadFile uploads a file to Autumn.

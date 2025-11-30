@@ -8,14 +8,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/williamhorning/lightning/internal/app"
-	"github.com/williamhorning/lightning/internal/data"
-	"github.com/williamhorning/lightning/pkg/lightning"
-	"github.com/williamhorning/lightning/pkg/platforms/discord"
-	"github.com/williamhorning/lightning/pkg/platforms/guilded"
-	"github.com/williamhorning/lightning/pkg/platforms/matrix"
-	"github.com/williamhorning/lightning/pkg/platforms/stoat"
-	"github.com/williamhorning/lightning/pkg/platforms/telegram"
+	"codeberg.org/jersey/lightning/internal/app"
+	"codeberg.org/jersey/lightning/internal/data"
+	"codeberg.org/jersey/lightning/pkg/lightning"
+	"codeberg.org/jersey/lightning/pkg/platforms/discord"
+	"codeberg.org/jersey/lightning/pkg/platforms/guilded"
+	"codeberg.org/jersey/lightning/pkg/platforms/matrix"
+	"codeberg.org/jersey/lightning/pkg/platforms/stoat"
+	"codeberg.org/jersey/lightning/pkg/platforms/telegram"
 )
 
 func main() {
