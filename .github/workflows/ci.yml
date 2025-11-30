@@ -6,7 +6,7 @@ permissions: { contents: read, pull-requests: read }
 jobs:
     ci:
         name: lint
-        runs-on: codeberg-small-lazy
+        runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
             - uses: actions/setup-go@v6

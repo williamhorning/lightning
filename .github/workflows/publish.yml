@@ -8,7 +8,7 @@ permissions:
 jobs:
     publish:
         name: publish to ghcr
-        runs-on: codeberg-medium
+        runs-on: ubuntu-latest
         steps:
             - name: checkout
               uses: actions/checkout@v6
@@ -21,7 +21,7 @@ jobs:
               with:
                   registry: codeberg.org
                   username: jersey
-                  password: ${{ secrets.FORGEJO_TOKEN }}
+                  password: ${{ secrets.CODEBERG_TOKEN }}
             - name: build image
               uses: docker/build-push-action@v6
               with:
