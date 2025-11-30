@@ -12,5 +12,5 @@ jobs:
             - uses: actions/setup-go@v6
               with: { go-version: stable }
             - name: golangci-lint
-              uses: golangci/golangci-lint-action@v9
+              uses: https://github.com/golangci/golangci-lint-action@v9
               with: { version: v2.4.0 }
