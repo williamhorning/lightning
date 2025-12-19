@@ -390,5 +390,5 @@ var mapping = map[string]string{ //nolint:gochecknoglobals
 	":part_alternation_mark:": "〽️", ":congratulations:": "㊗️", ":secret:": "㊙️", ":poop:": "💩",
 	":free_of_charge:": "🈚", ":reserved:": "🈯", ":prohibited:": "🈲", ":vacancy:": "🈳", ":passing_grade:": "🈴",
 	":no_vacancy:": "🈵", ":not_free_of_charge:": "🈶", ":month:": "🈷️", ":application:": "🈸", ":discount:": "🈹",
-	":open_for_business:": "🈺",
+	":open_for_business:": "🈺", ":thinking:": "🤔",
 }
