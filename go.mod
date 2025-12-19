@@ -3,7 +3,7 @@ module codeberg.org/jersey/lightning
 go 1.25.0
 
 require (
-	github.com/BurntSushi/toml v1.5.0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.33
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/gorilla/websocket v1.5.3
