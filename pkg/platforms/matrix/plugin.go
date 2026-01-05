@@ -14,6 +14,7 @@ package matrix
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -29,16 +30,17 @@ import (
 // It only takes in a map with the following structure:
 //
 //	map[string]string{
-//		"homeserver": "",  // a string with your Matrix homeserver URL
-//		"password": "", // a string with your Matrix bot password
-//		"recovery_key": "", // a string with your Matrix bot recovery key
-//		"username": "", // a string with your Matrix bot username
+//		"access_token": "", // a string with your Matrix bot token
+//		"homeserver": "",   // a string with your Matrix homeserver URL
+//		"mxid": "",         // a string with your Matrix bot ID
 //	}
 func New(config map[string]string) (lightning.Plugin, error) {
-	client, err := setupClient(config)
+	client, err := mautrix.NewClient(config["homeserver"], id.UserID(config["mxid"]), config["access_token"])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
+
+	client.UserAgent += " lightning/0.8.0-rc.9"
 
 	syncer, ok := client.Syncer.(*mautrix.DefaultSyncer)
 	if !ok {
@@ -54,10 +56,12 @@ func New(config map[string]string) (lightning.Plugin, error) {
 	go func() {
 		for {
 			if err := client.Sync(); err != nil {
-				log.Printf("matrix: sync stopped: %v, retrying...", err)
+				log.Printf("matrix: sync stopped, will retry: %v\n", err)
 			}
 		}
 	}()
+
+	log.Println("matrix: ready at https://matrix.to/#/" + config["mxid"])
 
 	return &matrixPlugin{client: client, syncer: syncer, msgChannel: msgChannel, editChannel: editChannel}, nil
 }
@@ -74,14 +78,6 @@ func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
-func (p *matrixPlugin) SendCommandResponse(
-	message *lightning.Message,
-	opts *lightning.SendOptions,
-	_ string,
-) ([]string, error) {
-	return p.SendMessage(message, opts)
-}
-
 func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	ids := make([]string, 0, len(message.Attachments)+1)
 
@@ -90,7 +86,7 @@ func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
 		)
 		if err != nil {
-			return nil, handleError(err, "failed to send matrix message")
+			return nil, handleError(err, "send")
 		}
 
 		ids = append(ids, string(resp.EventID))
@@ -108,7 +104,7 @@ func (p *matrixPlugin) EditMessage(message *lightning.Message, ids []string, opt
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
 		)
 		if err != nil {
-			return handleError(err, "failed to edit matrix message")
+			return handleError(err, "edit")
 		}
 	}
 
@@ -120,16 +116,14 @@ func (p *matrixPlugin) DeleteMessage(channel string, ids []string) error {
 		if _, err := p.client.RedactEvent(
 			context.Background(), id.RoomID(channel), id.EventID(msgID), mautrix.ReqRedact{Reason: "deleted in bridge"},
 		); err != nil {
-			return handleError(err, "Failed to redact Matrix message")
+			return handleError(err, "redact")
 		}
 	}
 
 	return nil
 }
 
-func (*matrixPlugin) SetupCommands(_ map[string]*lightning.Command) error {
-	return nil
-}
+func (*matrixPlugin) SetupCommands(_ map[string]*lightning.Command) {}
 
 func (p *matrixPlugin) ListenMessages() <-chan *lightning.Message {
 	return p.msgChannel

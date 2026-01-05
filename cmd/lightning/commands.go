@@ -1,38 +1,22 @@
-package app
+package main
 
 import (
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"codeberg.org/jersey/lightning/internal/data"
 	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/oklog/ulid/v2"
 )
 
-// RegisterCommands setups commands for the bridge bot.
-func RegisterCommands(bot *lightning.Bot, database data.Database, username string) {
+func registerCommands(bot *lightning.Bot, database *database, username string) {
 	bot.AddCommand(lightning.Command{
-		Name:        "about",
-		Description: "describes the bot",
-		Executor: getExecutor(
-			"about lightning", "https://williamhorning.dev/lightning", false, `
-Lightning is a project developing *truly powerful* cross-platform bots, with the underlying *Lightning framework*
-being used for *Lightning bridge*, which is what runs *Bolt*, the hosted bridge bot. The goal is to also make the
-framework itself usable by other developers, to create their own bots, and to make the bridge easy to self-host, while
-also supporting the principles of connecting communities, extensibility, ease of use, and strength.
-
-Lightning, the framework and bridge bot, is licensed under the MIT license. The framework and plugins will always
-remain under the MIT license, though the bridge bot may have a different license in the future, but will always be
-free to use. Bolt is also free to use, but is also subject to its Terms of Service.`),
-	}, lightning.Command{
 		Name:        "bridge",
 		Description: "manage bridges between channels",
 		Executor: getExecutor(
 			"the `bridge` command", "", false,
-			"This command allows you to create and manage bridges between channels on different platforms. "+
+			"This command allows you to create and manage bridges between channels on different platforms. \n\n"+
 				"Subcommands that are available are:\n"+
 				"- `create`: Create a new bridge containing this channel.\n"+
 				"- `join <id>`: Join an existing bridge with the given ID.\n"+
@@ -51,15 +35,19 @@ free to use. Bolt is also free to use, but is also subject to its Terms of Servi
 	}, lightning.Command{
 		Name:        "help",
 		Description: "get help with the bot",
-		Executor: getExecutor("help", "", false, "Hi, I'm "+username+" "+lightning.VERSION+"! available commands are:"+
-			"\n- `about`: learn about this bot\n- `bridge`: manage bridges between channels\n- `help`: returns this "+
-			"help message\n- `ping`: checks the one way ping of the bot\n\n"+
-			"read the [docs](https://williamhorning.dev/lightning) for more help"),
+		Executor: getExecutor(
+			"help for "+username, "https://williamhorning.dev/lightning", false,
+			"Hi, I'm "+username+" 0.8.0-rc.9!\n\n"+
+				"Available commands are: \n"+
+				"- `bridge`: manage bridges between channels\n"+
+				"- `help`: returns this help message\n"+
+				"- `ping`: checks the one way ping of the bot\n\n"+
+				"See the [docs](https://williamhorning.dev/lightning) for more help"),
 	}, lightning.Command{
 		Name:        "ping",
 		Description: "check the bot's one way ping",
 		Executor: getExecutor("Pong! 🏓", "", false, func(opts *lightning.CommandOptions) string {
-			return strconv.FormatInt(time.Since(opts.Time).Milliseconds(), 10) + "ms"
+			return strconv.FormatInt(time.Since(opts.Time).Milliseconds(), 10) + "ms (one-way)"
 		}),
 	})
 }
@@ -87,71 +75,68 @@ func getExecutor[T string | func(*lightning.CommandOptions) string](
 	}
 }
 
-type alreadyInBridgeError struct{}
-
-func (alreadyInBridgeError) Error() string { return "this channel is already in a bridge" }
-
-const notInBridge = "this channel is not in a bridge"
-
-func getErr(msg string, err error) string {
-	return "uh oh! looks like you got struck by an error: " +
-		msg + "\n\n```\n" + err.Error() + "\n```\nif you think this is a bug, or need more help, see the " +
-		"[docs](https://williamhorning.dev/lightning/bridge)"
+func getErr(prefix, action string, err error) string {
+	return "Something went wrong while running that command when it tried to " + action + ". Try `" +
+		prefix + "bridge help` or see the [docs](https://williamhorning.dev/lightning) for help. \n\n```\n" +
+		err.Error() + "\n```"
 }
 
-func prepareChannelForBridge(db data.Database, opts *lightning.CommandOptions) (*data.BridgeChannel, error) {
-	if br, err := db.GetBridgeByChannel(opts.ChannelID); br.ID != "" || err != nil {
-		return nil, alreadyInBridgeError{}
+func prepareChannelForBridge(db *database, opts *lightning.CommandOptions) (*bridgeChannel, string) {
+	if br, err := db.getBridgeByChannel(opts.ChannelID); br.ID != "" || err != nil {
+		return nil, "You are already in a bridge, so you can't be in another one. If you didn't expect this, try `" +
+			opts.Prefix + "bridge status` or `" + opts.Prefix + "bridge help`."
 	}
 
 	channelData, err := opts.Bot.SetupChannel(opts.ChannelID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup %s for bridge: %w", opts.ChannelID, err)
+		return nil, getErr(opts.Prefix, "setup the channel `"+opts.ChannelID+"`", err)
 	}
 
-	return &data.BridgeChannel{Data: channelData, ID: opts.ChannelID}, nil
+	return &bridgeChannel{Data: channelData, ID: opts.ChannelID}, ""
 }
 
-func getCreate(database data.Database) lightning.Command {
+func getCreate(database *database) lightning.Command {
 	return lightning.Command{
 		Name:        "create",
 		Description: "Create a new bridge containing this channel",
 		Executor: getExecutor("bridge create", "", true, func(opts *lightning.CommandOptions) string {
-			channel, err := prepareChannelForBridge(database, opts)
-			if err != nil {
-				return getErr("failed to prepare channel data", err)
+			channel, msg := prepareChannelForBridge(database, opts)
+			if msg != "" {
+				return msg
 			}
 
-			bridge := data.Bridge{
+			bridge := bridge{
 				ID:       ulid.Make().String(),
-				Channels: []data.BridgeChannel{*channel},
-				Settings: data.BridgeSettings{},
+				Channels: []bridgeChannel{*channel},
+				Settings: bridgeSettings{},
 			}
 
-			if err := database.CreateBridge(bridge); err != nil {
-				return getErr("failed to insert bridge row", err)
+			if err := database.createBridge(bridge); err != nil {
+				return getErr(opts.Prefix, "update the database", err)
 			}
 
-			return "you can now join the bridge you made in other channels by using ||`" +
-				opts.Prefix + "bridge join " + bridge.ID + "`||. Keep that command secret!"
+			return "Bridge created successfully! You can now join it with the following command: ||`" +
+				opts.Prefix + "bridge join " + bridge.ID + "`||. Keep that command secret, or else anyone could join!"
 		}),
 	}
 }
 
-func getJoin(database data.Database, name string) lightning.Command {
+func getJoin(database *database, name string) lightning.Command {
 	cmd := lightning.Command{
 		Name:        name,
 		Description: "Join an existing bridge with the given ID",
-		Arguments:   []lightning.CommandArgument{{Name: "id", Description: "bridge ID", Required: true}},
+		Arguments:   []lightning.CommandArgument{{Name: "id", Description: "bridge ID"}},
 		Executor: getExecutor("bridge join", "", true, func(opts *lightning.CommandOptions) string {
-			bridge, err := database.GetBridge(opts.Arguments["id"])
+			bridge, err := database.getBridge(opts.Arguments["id"])
 			if err != nil || bridge.ID == "" {
-				return "that bridge doesn't exist"
+				return "You can't join a bridge that doesn't exist. Check if you made one, " +
+					"or if you provided the wrong ID. Try `" + opts.Prefix + "bridge create` or `" +
+					opts.Prefix + "bridge help`."
 			}
 
-			channel, err := prepareChannelForBridge(database, opts)
-			if err != nil {
-				return getErr("failed to prepare channel data", err)
+			channel, msg := prepareChannelForBridge(database, opts)
+			if msg != "" {
+				return msg
 			}
 
 			if name == "subscribe" {
@@ -160,11 +145,11 @@ func getJoin(database data.Database, name string) lightning.Command {
 
 			bridge.Channels = append(bridge.Channels, *channel)
 
-			if err := database.CreateBridge(bridge); err != nil {
-				return getErr("failed to update bridge row", err)
+			if err := database.createBridge(bridge); err != nil {
+				return getErr(opts.Prefix, "update the database", err)
 			}
 
-			return "bridge joined (or subscribed) successfully!"
+			return "You successfully joined the bridge."
 		}),
 	}
 
@@ -175,15 +160,16 @@ func getJoin(database data.Database, name string) lightning.Command {
 	return cmd
 }
 
-func getLeave(database data.Database) lightning.Command {
+func getLeave(database *database) lightning.Command {
 	return lightning.Command{
 		Name:        "leave",
 		Description: "Leave the bridge that this channel is part of",
-		Arguments:   []lightning.CommandArgument{{Name: "id", Description: "bridge ID", Required: true}},
+		Arguments:   []lightning.CommandArgument{{Name: "id", Description: "bridge ID"}},
 		Executor: getExecutor("bridge leave", "", true, func(opts *lightning.CommandOptions) string {
-			bridge, err := database.GetBridge(opts.Arguments["id"])
+			bridge, err := database.getBridge(opts.Arguments["id"])
 			if err != nil || bridge.ID == "" || bridge.ID != opts.Arguments["id"] {
-				return notInBridge
+				return "You can't leave a bridge if your aren't in a bridge, or provided the wrong ID. " +
+					"Try `" + opts.Prefix + "bridge join` or `" + opts.Prefix + "bridge help`."
 			}
 
 			for idx, channel := range bridge.Channels {
@@ -194,60 +180,69 @@ func getLeave(database data.Database) lightning.Command {
 				}
 			}
 
-			if err := database.CreateBridge(bridge); err != nil {
-				return getErr("failed to update bridge row", err)
+			if err := database.createBridge(bridge); err != nil {
+				return getErr(opts.Prefix, "update the database", err)
 			}
 
-			return "channel removed from the bridge."
+			return "You successfully left the bridge."
 		}),
 	}
 }
 
-func getReset(database data.Database) lightning.Command {
+func getReset(database *database) lightning.Command {
 	return lightning.Command{
 		Name:        "reset",
 		Description: "Tries to reset the state of channels in a bridge",
 		Executor: getExecutor("bridge reset", "", false, func(opts *lightning.CommandOptions) string {
-			bridge, err := database.GetBridgeByChannel(opts.ChannelID)
+			bridge, err := database.getBridgeByChannel(opts.ChannelID)
 			if err != nil || bridge.ID == "" {
-				return notInBridge
+				return "You can't reset channels in a bridge without being in a bridge. Try `" +
+					opts.Prefix + "bridge join` or `" + opts.Prefix + "bridge help`."
 			}
 
-			restored := 0
+			errors := make([]string, 0, len(bridge.Channels))
 
-			for idx, ch := range bridge.Channels {
-				if !ch.Disabled.Read && !ch.Disabled.Write {
+			for idx, channel := range bridge.Channels {
+				if !channel.Disabled.Read && !channel.Disabled.Write {
 					continue
 				}
 
-				data, err := opts.Bot.SetupChannel(ch.ID)
+				data, err := opts.Bot.SetupChannel(channel.ID)
 				if err != nil {
+					errors = append(errors, getErr(channel.ID, "setup the channel `"+channel.ID+"`", err))
+
 					continue
 				}
 
 				bridge.Channels[idx].Data = data
 				bridge.Channels[idx].Disabled.Read = false
 				bridge.Channels[idx].Disabled.Write = false
-				restored++
 			}
 
-			if err := database.CreateBridge(bridge); err != nil {
-				return getErr("failed to update bridge row", err)
+			if err := database.createBridge(bridge); err != nil {
+				return getErr(opts.Prefix, "update the database", err)
 			}
 
-			return "finished resetting: " + strconv.FormatInt(int64(restored), 10) + " channels reset"
+			errStr := ""
+			if len(errors) != 0 {
+				errStr = " The following errors occurred: \n\n" + strings.Join(errors, "\n\n")
+			}
+
+			return "Finished resetting channels in the bridge: " +
+				strconv.FormatInt(int64(len(bridge.Channels)-len(errors)), 10) + " channels were reset." + errStr
 		}),
 	}
 }
 
-func getStatus(database data.Database) lightning.Command {
+func getStatus(database *database) lightning.Command {
 	return lightning.Command{
 		Name:        "status",
 		Description: "view channels and settings in this bridge",
 		Executor: getExecutor("bridge status", "", false, func(opts *lightning.CommandOptions) string {
-			bridge, err := database.GetBridgeByChannel(opts.ChannelID)
+			bridge, err := database.getBridgeByChannel(opts.ChannelID)
 			if err != nil || bridge.ID == "" {
-				return notInBridge
+				return "You are not in a bridge right now. If you didn't expect this, try `" +
+					opts.Prefix + "bridge join` or `" + opts.Prefix + "bridge help`."
 			}
 
 			status := "**Channels:**\n"
@@ -266,34 +261,37 @@ func getStatus(database data.Database) lightning.Command {
 				}
 			}
 
-			return "\n**Settings:**\n- AllowEveryone: " + strconv.FormatBool(bridge.Settings.AllowEveryone)
+			return status + "\n**Settings:**\n- AllowEveryone: " + strconv.FormatBool(bridge.Settings.AllowEveryone)
 		}),
 	}
 }
 
-func getToggle(database data.Database) lightning.Command {
+func getToggle(database *database) lightning.Command {
 	return lightning.Command{
 		Name:        "toggle",
 		Description: "toggle a bridge setting",
-		Arguments:   []lightning.CommandArgument{{Name: "setting", Description: "setting name", Required: true}},
+		Arguments:   []lightning.CommandArgument{{Name: "setting", Description: "setting name"}},
 		Executor: getExecutor("bridge toggle", "", false, func(opts *lightning.CommandOptions) string {
-			bridge, err := database.GetBridgeByChannel(opts.ChannelID)
+			bridge, err := database.getBridgeByChannel(opts.ChannelID)
 			if err != nil || bridge.ID == "" {
-				return notInBridge
+				return "You can't toggle settings without being in a bridge. Try `" +
+					opts.Prefix + "bridge join` or `" + opts.Prefix + "bridge help`."
 			}
 
 			switch strings.ToLower(opts.Arguments["setting"]) {
 			case "alloweveryone", "allow_everyone":
 				bridge.Settings.AllowEveryone = !bridge.Settings.AllowEveryone
 			default:
-				return "unknown setting: " + opts.Arguments["setting"]
+				return "`" + opts.Arguments["setting"] + "` is not a known setting! Try `" +
+					opts.Prefix + "bridge help` for valid options."
 			}
 
-			if err := database.CreateBridge(bridge); err != nil {
-				return getErr("failed to update bridge row", err)
+			if err := database.createBridge(bridge); err != nil {
+				return getErr(opts.Prefix, "update the database", err)
 			}
 
-			return "setting toggled successfully."
+			return "Toggled `" + opts.Arguments["setting"] + "` successfully. Try `" + opts.Prefix +
+				"bridge status` for the current value."
 		}),
 	}
 }

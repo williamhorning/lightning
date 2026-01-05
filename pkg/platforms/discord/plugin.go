@@ -15,6 +15,8 @@ package discord
 import (
 	"fmt"
 	"log"
+	"net/http"
+	"strings"
 	"time"
 
 	"codeberg.org/jersey/lightning/internal/cache"
@@ -27,19 +29,19 @@ import (
 // It only takes in a map with the following structure:
 //
 //	map[string]string{
-//		"base_url": "", // optional, allows you to specify a non-Discord API implementation
-//		"cdn_url": "",  // optional, allows you to specify a non-Discord CDN implementation
+//		"api_host": "", // optional, can specify a non-Discord API implementation. must be paired with cdn_host
+//		"cdn_host": "", // optional, can specify a non-Discord CDN implementation. must be paired with api_host
 //		"token": "",    // required, a string with your Discord bot token
 //	}
 //
 // Note that you MUST enable the Message Content intent for the plugin to work.
 func New(cfg map[string]string) (lightning.Plugin, error) {
-	if base, ok := cfg["base_url"]; ok {
-		setBaseURL(base)
-	}
+	transport := http.DefaultTransport
 
-	if cdn, ok := cfg["cdn_url"]; ok {
-		setCDNURL(cdn)
+	if _, ok := cfg["api_host"]; ok {
+		transport = &rewriteTransport{apiHost: cfg["api_host"], cdnHost: cfg["cdn_host"]}
+	} else {
+		cfg["cdn_host"] = "cdn.discordapp.com"
 	}
 
 	session, err := discordgo.New("Bot " + cfg["token"])
@@ -47,124 +49,121 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("failed to create Discord session: %w", err)
 	}
 
+	session.Client.Transport = transport
 	session.Identify.Intents |= discordgo.IntentMessageContent
-	session.UserAgent += " lightning/" + lightning.VERSION
+	session.UserAgent += " lightning/0.8.0-rc.9"
 
 	if err = session.Open(); err != nil {
 		return nil, fmt.Errorf("failed to open Discord session: %w", err)
 	}
 
-	log.Printf("discord: ready as %s in %d servers\n", session.State.User.DisplayName(), len(session.State.Guilds))
+	invite := "https://discord.com/oauth2/authorize?client_id=" + session.State.Application.ID + "&permissions=8"
 
-	return &discordPlugin{session: session}, nil
+	if transport != http.DefaultTransport {
+		invite = strings.ReplaceAll(invite, "discord.com", "fermi.chat")
+	}
+
+	log.Printf("discord: ready as %s in %d servers! %s\n", session.State.User.Username, len(session.State.Guilds),
+		invite)
+
+	return &discordPlugin{session: session, cdnHost: cfg["cdn_host"]}, nil
 }
 
 type discordPlugin struct {
 	session  *discordgo.Session
 	webhooks cache.Expiring[string, bool]
+	cdnHost  string
 }
 
 func (p *discordPlugin) SetupChannel(channel string) (map[string]string, error) {
 	wh, err := p.session.WebhookCreate(channel, channel, "")
 	if err != nil {
-		return nil, getError(err, "Failed to create webhook for channel")
+		return nil, fmt.Errorf("failed to create webhook for channel: %w", err)
 	}
 
 	return map[string]string{"id": wh.ID, "token": wh.Token}, nil
 }
 
-func (p *discordPlugin) SendCommandResponse(
-	message *lightning.Message,
-	opts *lightning.SendOptions,
-	user string,
-) ([]string, error) {
-	channel, err := p.session.UserChannelCreate(user)
-	if err != nil {
-		return nil, getError(err, "Failed to create DM channel for "+user+" in command response")
+func (p *discordPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+	if opts.CommandResponse {
+		channel, err := p.session.UserChannelCreate(opts.CommandUser)
+		if err != nil {
+			return nil, getError(err, "Failed to create DM channel for "+opts.CommandUser+" in command response")
+		}
+
+		message.ChannelID = channel.ID
+		message.RepliedTo = nil
 	}
 
-	message.ChannelID = channel.ID
-	message.RepliedTo = nil
+	msg := lightningToDiscordSendable(p.session, message, opts)
 
-	return p.SendMessage(message, opts)
-}
+	defer func() {
+		for _, cancel := range msg.cancels {
+			cancel()
+		}
+	}()
 
-func (p *discordPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
-	msgs := lightningToDiscordSendable(p.session, message, opts)
-
-	if opts != nil {
+	if opts.ChannelData != nil {
 		p.webhooks.Set(opts.ChannelData["id"], true)
 
 		res, err := p.session.WebhookExecute(
-			opts.ChannelData["id"], opts.ChannelData["token"], true, msgs[0].toWebhook(),
+			opts.ChannelData["id"], opts.ChannelData["token"], true, msg.toWebhook(),
 		)
 		if err != nil {
-			return nil, getError(err, "Failed to send message to Discord via webhook")
+			return nil, getError(err, "send (via webhook)")
 		}
 
 		return []string{res.ID}, nil
 	}
 
-	res, err := p.session.ChannelMessageSendComplex(message.ChannelID, &msgs[0].MessageSend)
+	res, err := p.session.ChannelMessageSendComplex(message.ChannelID, &msg.MessageSend)
 	if err == nil {
 		return []string{res.ID}, nil
 	}
 
-	return nil, getError(err, "Failed to send message to Discord")
+	return nil, getError(err, "send")
 }
 
 func (p *discordPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
-	p.webhooks.Set(opts.ChannelData["id"], true)
-
-	if len(ids) == 0 {
+	if opts.ChannelData == nil || len(ids) == 0 {
 		return nil
 	}
 
-	msgs := lightningToDiscordSendable(p.session, message, opts)
+	p.webhooks.Set(opts.ChannelData["id"], true)
+	msg := lightningToDiscordSendable(p.session, message, opts)
+
+	defer func() {
+		for _, cancel := range msg.cancels {
+			cancel()
+		}
+	}()
 
 	_, err := p.session.WebhookMessageEdit(opts.ChannelData["id"], opts.ChannelData["id"], ids[0],
-		msgs[0].toWebhookEdit())
+		msg.toWebhookEdit())
 	if err == nil {
 		return nil
 	}
 
-	err = getError(err, "Failed to edit message in Discord via webhook")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return getError(err, "edit (via webhook)")
 }
 
 func (p *discordPlugin) DeleteMessage(channel string, ids []string) error {
-	if err := p.session.ChannelMessagesBulkDelete(channel, ids); err != nil {
-		if err = getError(err, "Failed to delete messages in Discord"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return getError(p.session.ChannelMessagesBulkDelete(channel, ids), "Failed to delete messages")
 }
 
-func (p *discordPlugin) SetupCommands(command map[string]*lightning.Command) error {
-	app, err := p.session.Application("@me")
+func (p *discordPlugin) SetupCommands(command map[string]*lightning.Command) {
+	_, err := p.session.ApplicationCommandBulkOverwrite(p.session.State.Application.ID, "",
+		lightningToDiscordCommands(command))
 	if err != nil {
-		return getError(err, "failed to get application info for Discord commands")
+		log.Printf("discord: failed to setup commands: %v\n", err)
 	}
-
-	_, err = p.session.ApplicationCommandBulkOverwrite(app.ID, "", lightningToDiscordCommands(command))
-	if err != nil {
-		return getError(err, "failed to setup Discord commands")
-	}
-
-	return nil
 }
 
 func (p *discordPlugin) ListenMessages() <-chan *lightning.Message {
 	channel := make(chan *lightning.Message, 1000)
 
 	p.session.AddHandler(func(_ *discordgo.Session, m *discordgo.MessageCreate) {
-		if msg := discordToLightning(&p.webhooks, p.session, m.Message); msg != nil {
+		if msg := discordToLightning(&p.webhooks, p.session, m.Message, p.cdnHost); msg != nil {
 			channel <- msg
 		}
 	})
@@ -176,7 +175,7 @@ func (p *discordPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	channel := make(chan *lightning.EditedMessage, 1000)
 
 	p.session.AddHandler(func(_ *discordgo.Session, message *discordgo.MessageUpdate) {
-		if msg := discordToLightning(&p.webhooks, p.session, message.Message); msg != nil {
+		if msg := discordToLightning(&p.webhooks, p.session, message.Message, p.cdnHost); msg != nil {
 			if message.EditedTimestamp == nil {
 				now := time.Now()
 				message.EditedTimestamp = &now

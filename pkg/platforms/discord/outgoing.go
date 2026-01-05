@@ -1,8 +1,8 @@
 package discord
 
 import (
+	"net/http"
 	"regexp"
-	"slices"
 	"strings"
 
 	"codeberg.org/jersey/lightning/internal/emoji"
@@ -15,47 +15,36 @@ type discordSendable struct {
 
 	Username  string
 	AvatarURL string
+
+	cancels []func()
 }
 
 func lightningToDiscordSendable(
 	session *discordgo.Session,
 	msg *lightning.Message,
 	opts *lightning.SendOptions,
-) []discordSendable {
-	toSend := []discordSendable{{
+) *discordSendable {
+	files, cancels := lightningToDiscordFiles(session, msg)
+
+	toSend := &discordSendable{
 		MessageSend: discordgo.MessageSend{
 			Content:         lightningToDiscordContent(session, msg),
 			Embeds:          lightningToDiscordEmbeds(msg.Embeds),
 			AllowedMentions: lightningToDiscordAllowedMentions(opts),
 			Components:      lightningToDiscordComponents(session, msg),
 			Reference:       lightningToDiscordReference(msg),
-			Files:           lightningToDiscordFiles(session, msg),
+			Files:           files,
 		},
-	}}
+		cancels: cancels,
+	}
 
 	if msg.Author != nil {
-		toSend[0].AvatarURL = msg.Author.ProfilePicture
-		toSend[0].Username = msg.Author.Nickname
+		toSend.AvatarURL = msg.Author.ProfilePicture
+		toSend.Username = msg.Author.Username
 	}
 
-	if len(toSend[0].Content) > 2000 {
-		leftover := toSend[0].Content[2000:]
-
-		toSend[0].Content = toSend[0].Content[:2000]
-
-		for chunk := range slices.Chunk([]byte(leftover), 2000) {
-			toSend = append(toSend, discordSendable{
-				AvatarURL:   toSend[0].AvatarURL,
-				Username:    toSend[0].Username,
-				MessageSend: discordgo.MessageSend{Content: string(chunk)},
-			})
-		}
-	}
-
-	for i := range toSend {
-		if toSend[i].Content == "" && len(toSend[i].Embeds) == 0 && len(toSend[i].Files) == 0 {
-			toSend[i].Content = "_ _"
-		}
+	if toSend.Content == "" && len(toSend.Embeds) == 0 && len(toSend.Files) == 0 {
+		toSend.Content = "_ _"
 	}
 
 	return toSend
@@ -77,7 +66,7 @@ func (msg *discordSendable) toWebhookEdit() *discordgo.WebhookEdit {
 
 func (msg *discordSendable) toInteractionResponseData() *discordgo.InteractionResponseData {
 	return &discordgo.InteractionResponseData{
-		Content: msg.Content, TTS: msg.TTS, Files: msg.Files, Components: msg.Components, Embeds: msg.Embeds,
+		Content: msg.Content, TTS: msg.TTS, Files: msg.Files, Embeds: msg.Embeds,
 		AllowedMentions: msg.AllowedMentions, Flags: msg.Flags,
 	}
 }
@@ -86,7 +75,7 @@ var sendableEmojiRegex = regexp.MustCompile(`:\w+:`)
 
 func lightningToDiscordContent(session *discordgo.Session, msg *lightning.Message) string {
 	return sendableEmojiRegex.ReplaceAllStringFunc(msg.Content, func(match string) string {
-		if emoji, ok := emoji.GetEmoji(match); ok {
+		if emoji, ok := emoji.Emoji[match]; ok {
 			return emoji
 		}
 
@@ -177,7 +166,7 @@ func lightningToDiscordEmbeds(src []lightning.Embed) []*discordgo.MessageEmbed {
 }
 
 func lightningToDiscordAllowedMentions(opts *lightning.SendOptions) *discordgo.MessageAllowedMentions {
-	if opts == nil || opts.AllowEveryonePings {
+	if opts.AllowEveryonePings {
 		return nil
 	}
 
@@ -188,20 +177,28 @@ func lightningToDiscordAllowedMentions(opts *lightning.SendOptions) *discordgo.M
 
 func lightningToDiscordComponents(session *discordgo.Session, msg *lightning.Message) []discordgo.MessageComponent {
 	if len(msg.RepliedTo) == 0 {
-		return nil
+		return []discordgo.MessageComponent{}
 	}
 
 	replyMessage, err := session.State.Message(msg.ChannelID, msg.RepliedTo[0])
 	if err != nil {
-		return nil
+		return []discordgo.MessageComponent{}
 	}
 
-	return []discordgo.MessageComponent{discordgo.Button{
-		Label: "reply to " + replyMessage.Member.DisplayName(),
-		Style: discordgo.LinkButton,
-		URL: "https://discord.com/channels/" + replyMessage.GuildID + "/" + replyMessage.ChannelID +
-			"/" + replyMessage.ID,
-	}}
+	baseURL := "https://discord.com/channels/"
+
+	if session.Client.Transport != http.DefaultTransport {
+		baseURL = "https://fermi.chat/channels/"
+	}
+
+	return []discordgo.MessageComponent{
+		&discordgo.ActionsRow{Components: []discordgo.MessageComponent{&discordgo.Button{
+			Label: "↪️ " + replyMessage.Member.DisplayName() + " > " +
+				replyMessage.ContentWithMentionsReplaced()[:min(len(replyMessage.ContentWithMentionsReplaced()), 42)],
+			Style: discordgo.LinkButton,
+			URL:   baseURL + replyMessage.GuildID + "/" + replyMessage.ChannelID + "/" + replyMessage.ID,
+		}}},
+	}
 }
 
 func lightningToDiscordReference(msg *lightning.Message) *discordgo.MessageReference {

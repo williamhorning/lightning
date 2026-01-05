@@ -1,4 +1,4 @@
-package app
+package main
 
 import (
 	"bytes"
@@ -9,8 +9,7 @@ import (
 	"os"
 )
 
-// SetupLogging creates a logger that deals with color and webhooks.
-func SetupLogging(url string) {
+func setupLogging(url string) {
 	log.SetFlags(log.Ltime | log.Lshortfile)
 	log.SetPrefix("")
 	log.SetOutput(io.MultiWriter(os.Stderr, &webhookLogger{url}))

@@ -19,7 +19,7 @@ type Expiring[K comparable, V any] struct {
 }
 
 // Get a key from the cache, returning its value and whether it exists.
-func (c *Expiring[K, V]) Get(key K) (V, bool) { //nolint:all
+func (c *Expiring[K, V]) Get(key K) (V, bool) { //nolint:nolintlint,ireturn
 	c.mu.RLock()
 
 	if c.items == nil {

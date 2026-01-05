@@ -9,7 +9,7 @@ import (
 )
 
 func lightningToDiscordCommands(original map[string]*lightning.Command) []*discordgo.ApplicationCommand {
-	cmds := make([]*discordgo.ApplicationCommand, 0, len(original))
+	var cmds []*discordgo.ApplicationCommand //nolint:prealloc
 
 	for _, cmd := range original {
 		cmds = append(cmds, &discordgo.ApplicationCommand{
@@ -24,15 +24,17 @@ func lightningToDiscordCommands(original map[string]*lightning.Command) []*disco
 }
 
 func lightningToDiscordCommandOptions(cmd *lightning.Command) []*discordgo.ApplicationCommandOption {
-	options := make([]*discordgo.ApplicationCommandOption, 0, len(cmd.Arguments)+len(cmd.Subcommands))
+	var options []*discordgo.ApplicationCommandOption //nolint:prealloc
 
-	for _, arg := range cmd.Arguments {
-		options = append(options, &discordgo.ApplicationCommandOption{
-			Name:        arg.Name,
-			Description: arg.Description,
-			Required:    arg.Required,
-			Type:        discordgo.ApplicationCommandOptionString,
-		})
+	if len(cmd.Subcommands) == 0 {
+		for _, arg := range cmd.Arguments {
+			options = append(options, &discordgo.ApplicationCommandOption{
+				Name:        arg.Name,
+				Description: arg.Description,
+				Type:        discordgo.ApplicationCommandOptionString,
+				Required:    true,
+			})
+		}
 	}
 
 	for _, sub := range cmd.Subcommands {
@@ -81,15 +83,19 @@ func discordToLightningCommand(
 
 	return &lightning.CommandEvent{
 		CommandOptions: &lightning.CommandOptions{
-			Arguments: args,
-			BaseMessage: &lightning.BaseMessage{
+			Arguments: args, BaseMessage: lightning.BaseMessage{
 				EventID: interaction.ID, ChannelID: interaction.ChannelID, Time: timestamp,
-			},
-			Prefix: "/",
+			}, Prefix: "/",
 			Reply: func(message *lightning.Message, sensitive bool) {
-				msgs := lightningToDiscordSendable(session, message, nil)
+				message.BaseMessage = lightning.BaseMessage{Time: time.Now(), ChannelID: interaction.ChannelID}
+				msg := lightningToDiscordSendable(session, message, &lightning.SendOptions{})
+				data := msg.toInteractionResponseData()
 
-				data := msgs[0].toInteractionResponseData()
+				defer func() {
+					for _, cancel := range msg.cancels {
+						cancel()
+					}
+				}()
 
 				if sensitive {
 					data.Flags = discordgo.MessageFlagsEphemeral
@@ -98,11 +104,10 @@ func discordToLightningCommand(
 				if err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource, Data: data,
 				}); err != nil {
-					log.Printf("discord: failed to respond to command: %v\n", err)
+					log.Printf("discord: failed responding to command: %v\n", err)
 				}
 			},
 		},
-		Command:    data.Name,
-		Subcommand: subcommand,
+		Command: data.Name, Subcommand: subcommand,
 	}
 }

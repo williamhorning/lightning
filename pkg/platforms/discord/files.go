@@ -2,12 +2,9 @@ package discord
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http"
 	"time"
 
-	"codeberg.org/jersey/lightning/internal/workaround"
 	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/bwmarrin/discordgo"
 )
@@ -17,12 +14,11 @@ func getMaxFileSize(session *discordgo.Session, channel string) int64 {
 
 	if ch, err := session.State.Channel(channel); err == nil && ch.GuildID != "" {
 		if guild, err := session.State.Guild(ch.GuildID); err == nil {
-			switch guild.PremiumTier {
+			switch guild.PremiumTier { //nolint:exhaustive
 			case discordgo.PremiumTier2:
 				maxFileSize = 52428800
 			case discordgo.PremiumTier3:
 				maxFileSize = 104857600
-			case discordgo.PremiumTier1, discordgo.PremiumTierNone:
 			default:
 			}
 		}
@@ -31,25 +27,10 @@ func getMaxFileSize(session *discordgo.Session, channel string) int64 {
 	return maxFileSize
 }
 
-type cancelableReadCloser struct {
-	io.ReadCloser
-
-	cancel context.CancelFunc
-}
-
-func (c *cancelableReadCloser) Close() error {
-	err := c.ReadCloser.Close()
-	c.cancel()
-
-	if err != nil {
-		return fmt.Errorf("discord: failed closing cancelable read closer: %w", err)
-	}
-
-	return nil
-}
-
-func lightningToDiscordFiles(session *discordgo.Session, msg *lightning.Message) []*discordgo.File {
+func lightningToDiscordFiles(session *discordgo.Session, msg *lightning.Message) ([]*discordgo.File, []func()) {
 	files := make([]*discordgo.File, 0, len(msg.Attachments))
+
+	functions := make([]func(), 0, len(msg.Attachments))
 
 	maxSize := getMaxFileSize(session, msg.ChannelID)
 
@@ -67,7 +48,7 @@ func lightningToDiscordFiles(session *discordgo.Session, msg *lightning.Message)
 			continue
 		}
 
-		resp, err := workaround.Do(req) //nolint:bodyclose // see cancelableReadCloser
+		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose
 		if err != nil {
 			cancel()
 
@@ -76,9 +57,11 @@ func lightningToDiscordFiles(session *discordgo.Session, msg *lightning.Message)
 
 		files = append(files, &discordgo.File{
 			Name: file.Name, ContentType: resp.Header.Get("Content-Type"),
-			Reader: cancelableReadCloser{resp.Body, cancel},
+			Reader: resp.Body,
 		})
+
+		functions = append(functions, cancel, func() { _ = resp.Body.Close() })
 	}
 
-	return files
+	return files, functions
 }

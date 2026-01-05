@@ -1,14 +1,8 @@
 // Package emoji provides name to character mapping for emojis
 package emoji
 
-// GetEmoji returns a string containing the emoji, and whether an emoji was found.
-func GetEmoji(str string) (string, bool) {
-	emoji, ok := mapping[str]
-
-	return emoji, ok
-}
-
-var mapping = map[string]string{ //nolint:gochecknoglobals
+// Emoji is a map of Discord-like emoji syntax (`:100:`) to Unicode emoji.
+var Emoji = map[string]string{ //nolint:gochecknoglobals
 	":100:": "💯", ":1234:": "🔢", ":hash:": "#️⃣", ":keycap_star:": "*️⃣", ":zero:": "0️⃣", ":one:": "1️⃣",
 	":two:": "2️⃣", ":three:": "3️⃣", ":four:": "4️⃣", ":five:": "5️⃣", ":six:": "6️⃣", ":seven:": "7️⃣",
 	":eight:": "8️⃣", ":nine:": "9️⃣", ":copyright:": "©️", ":registered:": "®️", ":mahjong:": "🀄",

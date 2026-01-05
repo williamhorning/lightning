@@ -46,7 +46,7 @@ import (
 func New(config map[string]string) (lightning.Plugin, error) {
 	telegram, err := gotgbot.NewBot(config["token"], &gotgbot.BotOpts{BotClient: newRetrier()})
 	if err != nil {
-		return nil, fmt.Errorf("telegram: failed to create bot: %w", err)
+		return nil, fmt.Errorf("failed to create bot: %w", err)
 	}
 
 	messages := make(chan *lightning.Message, 1000)
@@ -87,14 +87,16 @@ func New(config map[string]string) (lightning.Plugin, error) {
 		DropPendingUpdates: true,
 		GetUpdatesOpts:     &gotgbot.GetUpdatesOpts{Timeout: int64(defaultTimeout.Seconds())},
 	}); err != nil {
-		return nil, fmt.Errorf("telegram: failed to start polling: %w", err)
+		return nil, fmt.Errorf("failed to start polling: %w", err)
 	}
 
-	log.Printf("telegram: ready! invite me at https://t.me/%s\n", telegram.Username)
+	log.Println("telegram: ready as @" + telegram.Username + "! invite me at https://t.me/" + telegram.Username)
 
 	plugin := &telegramPlugin{messages, edits, dispatch, telegram, updater}
 
-	go startProxy(config)
+	if err = startProxy(config); err != nil {
+		return nil, err
+	}
 
 	return plugin, nil
 }
@@ -111,52 +113,32 @@ func (*telegramPlugin) SetupChannel(_ string) (map[string]string, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
-func (p *telegramPlugin) SendCommandResponse(
-	message *lightning.Message,
-	opts *lightning.SendOptions,
-	user string,
-) ([]string, error) {
-	message.ChannelID = user
-
-	return p.SendMessage(message, opts)
-}
-
 func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+	if opts.CommandResponse {
+		message.ChannelID = opts.CommandUser
+	}
+
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
 		return nil, &channelIDError{message.ChannelID}
 	}
 
-	content := lightningToTelegramMessage(message, opts)
+	content, entities := lightningToTelegramMessage(message)
 
-	sendOpts := &gotgbot.SendMessageOpts{
-		ParseMode: gotgbot.ParseModeMarkdownV2, RequestOpts: &gotgbot.RequestOpts{Timeout: defaultTimeout},
-	}
-
-	if len(message.RepliedTo) > 0 {
-		var replyID int64
-
-		replyID, err = strconv.ParseInt(message.RepliedTo[0], 10, 64)
-		if err == nil && replyID > 0 {
-			sendOpts.ReplyParameters = &gotgbot.ReplyParameters{
-				MessageId:                replyID,
-				AllowSendingWithoutReply: true,
-			}
-		}
-	}
-
-	msg, err := p.telegram.SendMessage(channel, content, sendOpts)
+	msg, err := p.telegram.SendMessage(channel, content, getSendOptions(message, entities))
 	if err != nil && strings.Contains(err.Error(), "context deadline exceeded") {
 		return []string{}, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("telegram: failed to send message: %w\n\tchannel: %s\n\tcontent: %s\n\treply: %#+v",
-			err, message.ChannelID, content, sendOpts.ReplyParameters)
+		return nil, fmt.Errorf("failed to send message: %w", err)
 	}
 
 	ids := []string{strconv.FormatInt(msg.MessageId, 10)}
 
 	for _, attachment := range message.Attachments {
-		if msg, err := p.telegram.SendDocument(channel, gotgbot.InputFileByURL(attachment.URL), nil); err == nil {
+		msg, err := p.telegram.SendDocument(channel, gotgbot.InputFileByURL(attachment.URL), nil)
+		if err != nil {
+			log.Printf("telegram: failed to send attachment: %v\n", err)
+		} else {
 			ids = append(ids, strconv.FormatInt(msg.MessageId, 10))
 		}
 	}
@@ -164,23 +146,26 @@ func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning
 	return ids, nil
 }
 
-func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
+func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, _ *lightning.SendOptions) error {
 	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
 	if err != nil {
 		return &channelIDError{message.ChannelID}
 	}
 
-	msgID, err := strconv.ParseInt(ids[0], 10, 64)
-	if err != nil {
-		return fmt.Errorf("telegram: failed to parse message ID: %w\n\tchannel: %s\n\tmessage: %s",
-			err, message.ChannelID, ids[0])
+	if len(ids) == 0 {
+		return nil
 	}
 
-	content := lightningToTelegramMessage(message, opts)
+	msgID, err := strconv.ParseInt(ids[0], 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse message ID on edit: %w", err)
+	}
+
+	content, entities := lightningToTelegramMessage(message)
 
 	_, _, err = p.telegram.EditMessageText(
 		content,
-		&gotgbot.EditMessageTextOpts{ChatId: channel, MessageId: msgID, ParseMode: gotgbot.ParseModeMarkdownV2},
+		&gotgbot.EditMessageTextOpts{ChatId: channel, MessageId: msgID, Entities: entities},
 	)
 	if err != nil &&
 		strings.Contains(err.Error(), "specified new message content and reply markup are exactly the same") {
@@ -191,8 +176,7 @@ func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, o
 		return nil
 	}
 
-	return fmt.Errorf("telegram: failed to edit message: %w\n\tchannel: %s\n\tmessage: %s",
-		err, message.ChannelID, ids[0])
+	return fmt.Errorf("failed to edit message: %w", err)
 }
 
 func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
@@ -207,8 +191,7 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 
 		msgID, err = strconv.ParseInt(id, 10, 64)
 		if err != nil {
-			return fmt.Errorf("telegram: failed to parse message ID: %w\n\tchannel: %s\n\tmessage: %d",
-				err, channelID, msgID)
+			return fmt.Errorf("failed to parse message ID on delete: %w", err)
 		}
 
 		messageIDs = append(messageIDs, msgID)
@@ -219,12 +202,10 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 		return nil
 	}
 
-	return fmt.Errorf("telegram: failed to delete message: %w\n\tchannel: %s\n\tmessage: %#+v", err, channelID, ids)
+	return fmt.Errorf("failed to delete message: %w", err)
 }
 
-func (*telegramPlugin) SetupCommands(_ map[string]*lightning.Command) error {
-	return nil
-}
+func (*telegramPlugin) SetupCommands(_ map[string]*lightning.Command) {}
 
 func (p *telegramPlugin) ListenMessages() <-chan *lightning.Message {
 	return p.messageChannel

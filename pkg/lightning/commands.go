@@ -1,6 +1,10 @@
 package lightning
 
-import "strings"
+import (
+	"log"
+	"strings"
+	"time"
+)
 
 // AddCommand takes [Command]s and registers it with the built-in
 // text command handler and platform-specific command systems.
@@ -10,11 +14,13 @@ func (b *Bot) AddCommand(commands ...Command) {
 	}
 
 	for _, plugin := range b.plugins {
-		_ = plugin.SetupCommands(b.commands)
+		plugin.SetupCommands(b.commands)
 	}
 }
 
-func handleMessageCommand(bot *Bot, event *Message) {
+// handleTextCommand checks a message, and if it starts with a prefix, it'll
+// call the command handler to take care of it.
+func handleTextCommand(bot *Bot, event *Message) {
 	if len(event.Content) <= len(bot.prefix) || event.Content[:len(bot.prefix)] != bot.prefix {
 		return
 	}
@@ -24,32 +30,32 @@ func handleMessageCommand(bot *Bot, event *Message) {
 		args = []string{"help"}
 	}
 
-	commandName := args[0]
-	options := args[1:]
-
 	reply := func(msg *Message, sensitive bool) {
-		plugin, channel, ok := bot.getPluginFromChannel(event.ChannelID)
-		if !ok {
+		plugin, channel, err := bot.getPluginFromChannel(event.ChannelID)
+		if err != nil {
+			log.Printf("pkg/lightning: failed to respond to text command: %v\n", err)
+
 			return
 		}
 
-		msg.ChannelID = channel
+		msg.BaseMessage = BaseMessage{Time: time.Now(), ChannelID: channel}
 		msg.RepliedTo = append(msg.RepliedTo, event.EventID)
 
-		if sensitive {
-			_, _ = plugin.SendCommandResponse(msg, nil, event.Author.ID)
-		} else {
-			_, _ = plugin.SendMessage(msg, nil)
+		_, err = plugin.SendMessage(msg, &SendOptions{CommandUser: event.Author.ID, CommandResponse: sensitive})
+		if err != nil {
+			log.Printf("pkg/lightning: failed to respond to text command: %v\n", err)
 		}
 	}
 
 	handleCommandEvent(bot, &CommandEvent{
-		CommandOptions: &CommandOptions{&event.BaseMessage, make(map[string]string), bot, reply, bot.prefix},
-		Command:        commandName,
-		Options:        options,
+		CommandOptions: &CommandOptions{event.BaseMessage, make(map[string]string), bot, reply, bot.prefix},
+		Command:        args[0],
+		Options:        args[1:],
 	})
 }
 
+// handleCommandEvent does what it says. take command, look for name, find in
+// map, handle positionals, and call the executor.
 func handleCommandEvent(bot *Bot, event *CommandEvent) {
 	event.Bot = bot
 

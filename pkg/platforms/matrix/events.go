@@ -20,7 +20,7 @@ func listenForEvents(
 	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		if evt.Content.AsMember().Membership == event.MembershipInvite {
 			if _, err := client.JoinRoomByID(ctx, evt.RoomID); err != nil {
-				log.Printf("matrix: failed to join room: %v\n", err)
+				log.Printf("matrix: failed to join room %q: %v\n", evt.RoomID, err)
 			}
 		}
 	})

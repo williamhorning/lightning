@@ -7,11 +7,10 @@ type PluginConstructor func(config map[string]string) (Plugin, error)
 // about platform specifics, as each Plugin handles that.
 type Plugin interface {
 	SetupChannel(channel string) (map[string]string, error)
-	SendCommandResponse(message *Message, opts *SendOptions, user string) ([]string, error)
 	SendMessage(message *Message, opts *SendOptions) ([]string, error)
 	EditMessage(message *Message, ids []string, opts *SendOptions) error
 	DeleteMessage(channel string, ids []string) error
-	SetupCommands(command map[string]*Command) error
+	SetupCommands(command map[string]*Command)
 	ListenMessages() <-chan *Message
 	ListenEdits() <-chan *EditedMessage
 	ListenDeletes() <-chan *BaseMessage
@@ -21,8 +20,8 @@ type Plugin interface {
 // AddPluginType takes in a [PluginConstructor] and registers it so you can later
 // use it. It overwrites existing plugin types if the name is a duplicate.
 func (b *Bot) AddPluginType(name string, constructor PluginConstructor) {
-	b.typesMutex.Lock()
-	defer b.typesMutex.Unlock()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	b.types[name] = constructor
 }
@@ -36,70 +35,47 @@ func (b *Bot) UsePluginType(typeName, instanceName string, config map[string]str
 		instanceName = typeName
 	}
 
-	b.pluginMutex.RLock()
+	b.mutex.RLock()
+	_, exists := b.plugins[instanceName]
+	b.mutex.RUnlock()
 
-	if _, exists := b.plugins[instanceName]; exists {
-		return PluginRegisteredError{}
+	if exists {
+		return PluginRegisteredError{instanceName}
 	}
 
-	b.pluginMutex.RUnlock()
-
-	b.typesMutex.RLock()
-
+	b.mutex.RLock()
 	constructor, ok := b.types[typeName]
-
-	b.typesMutex.RUnlock()
+	b.mutex.RUnlock()
 
 	if !ok {
-		return MissingPluginError{}
+		return MissingPluginTypeError{typeName}
 	}
 
 	instance, err := constructor(config)
 	if err != nil {
-		return err
+		return PluginMethodError{instanceName, "constructor", err}
 	}
 
-	b.pluginMutex.Lock()
-
+	b.mutex.Lock()
 	b.plugins[instanceName] = instance
+	b.mutex.Unlock()
 
-	b.pluginMutex.Unlock()
-
-	go processEventHandlers(nil, b.editChannel, &b.editHandlers, &b.editProcessorActive, b)
-	go processEventHandlers(nil, b.messageChannel, &b.messageHandlers, &b.messageProcessorActive, b)
-	go processEventHandlers(nil, b.delChannel, &b.delHandlers, &b.delProcessorActive, b)
-	go processEventHandlers(nil, b.commandChannel, &b.commandHandlers, &b.commandProcessorActive, b)
-
-	b.startPluginListeners(instanceName, instance)
+	startPluginListeners(b, instanceName, &b.messageEvents, instance.ListenMessages())
+	startPluginListeners(b, instanceName, &b.editEvents, instance.ListenEdits())
+	startPluginListeners(b, instanceName, &b.deleteEvents, instance.ListenDeletes())
+	startPluginListeners(b, instanceName, &b.commandEvents, instance.ListenCommands())
 
 	return nil
 }
 
-// startPluginListeners listens for events from a plugin and forwards them.
-// do NOT rely on the ChannelID format, treat it as an opaque string.
-func (b *Bot) startPluginListeners(name string, instance Plugin) {
+// startPluginListener listens for an event and forwards them.
+func startPluginListeners[evt interface{ setChannelID(name string) }](
+	b *Bot, name string, handler *handler[evt], events <-chan evt,
+) {
 	go func() {
-		for msg := range instance.ListenMessages() {
-			msg.ChannelID = name + "::" + msg.ChannelID
-			b.messageChannel <- msg
-		}
-	}()
-	go func() {
-		for edit := range instance.ListenEdits() {
-			edit.Message.ChannelID = name + "::" + edit.Message.ChannelID
-			b.editChannel <- edit
-		}
-	}()
-	go func() {
-		for del := range instance.ListenDeletes() {
-			del.ChannelID = name + "::" + del.ChannelID
-			b.delChannel <- del
-		}
-	}()
-	go func() {
-		for cmd := range instance.ListenCommands() {
-			cmd.ChannelID = name + "::" + cmd.ChannelID
-			b.commandChannel <- cmd
+		for evt := range events {
+			evt.setChannelID(name)
+			handler.dispatch(b, evt)
 		}
 	}()
 }

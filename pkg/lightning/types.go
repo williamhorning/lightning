@@ -16,22 +16,31 @@ type BaseMessage struct {
 	ChannelID string
 }
 
+// setChannelID exists to simplify event handlers.
+func (b *BaseMessage) setChannelID(name string) {
+	b.ChannelID = name + "::" + b.ChannelID
+}
+
 // ChannelDisabled represents whether to disable a channel due to possible errors.
 type ChannelDisabled struct {
 	Read  bool `json:"read"`
 	Write bool `json:"write"`
 }
 
+// ChannelDisabler is an interface that allows a channel to be disabled in an external system.
+type ChannelDisabler interface {
+	Disable() *ChannelDisabled
+}
+
 // A CommandArgument is a possible argument for a [Command].
 type CommandArgument struct {
 	Name        string
 	Description string
-	Required    bool
 }
 
 // CommandOptions are provided to a [Command] executor.
 type CommandOptions struct {
-	*BaseMessage
+	BaseMessage
 
 	Arguments map[string]string
 	Bot       *Bot
@@ -57,48 +66,46 @@ type CommandEvent struct {
 	Options    []string
 }
 
-// DeletedMessage is information about a deleted message.
-type DeletedMessage = BaseMessage
-
 // EditedMessage is information about an edited message.
 type EditedMessage struct {
-	Edited  time.Time
-	Message *Message
+	*Message
+
+	Edited time.Time
 }
 
 // EmbedAuthor is an author on an [Embed].
 type EmbedAuthor struct {
-	URL     string `json:"icon_url,omitempty"`
-	IconURL string `json:"name,omitempty"`
-	Name    string `json:"url,omitempty"`
+	URL     string
+	IconURL string
+	Name    string
 }
 
 // EmbedField is a field on an [Embed].
 type EmbedField struct {
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-	Inline bool   `json:"inline"`
+	Name   string
+	Value  string
+	Inline bool
 }
 
 // EmbedFooter is a footer on an [Embed].
 type EmbedFooter struct {
-	IconURL string `json:"icon_url,omitempty"`
-	Text    string `json:"text"`
+	IconURL string
+	Text    string
 }
 
 // Embed is a Discord-style embed.
 type Embed struct {
-	Author      *EmbedAuthor `json:"author,omitempty"`
-	Footer      *EmbedFooter `json:"footer,omitempty"`
-	Image       *Media       `json:"image,omitempty"`
-	Thumbnail   *Media       `json:"thumbnail,omitempty"`
-	Video       *Media       `json:"video,omitempty"`
-	Timestamp   string       `json:"timestamp,omitempty"`
-	Title       string       `json:"title,omitempty"`
-	URL         string       `json:"url,omitempty"`
-	Description string       `json:"description,omitempty"`
-	Fields      []EmbedField `json:"fields,omitempty"`
-	Color       int          `json:"color,omitempty"`
+	Author      *EmbedAuthor
+	Footer      *EmbedFooter
+	Image       *Media
+	Thumbnail   *Media
+	Video       *Media
+	Timestamp   string
+	Title       string
+	URL         string
+	Description string
+	Fields      []EmbedField
+	Color       int
 }
 
 // Emoji represents custom emoji in a [Message].
@@ -110,18 +117,17 @@ type Emoji struct {
 
 // Media represents images/videos on an [Embed].
 type Media struct {
-	URL    string `json:"url"`
-	Height int    `json:"height"`
-	Width  int    `json:"width"`
+	URL    string
+	Height int
+	Width  int
 }
 
 // MessageAuthor is an author on an [Message].
 type MessageAuthor struct {
-	ID             string `toml:"id"`
-	Nickname       string `toml:"nickname"`
-	Username       string `toml:"username"`
-	ProfilePicture string `toml:"profile_picture,omitempty"`
-	Color          string `toml:"color,omitempty"`
+	ID             string
+	Username       string
+	ProfilePicture string
+	Color          string
 }
 
 // Message is a representation of a message on a platform.
@@ -138,6 +144,8 @@ type Message struct {
 
 // SendOptions is possible options to use when sending a message.
 type SendOptions struct {
+	CommandUser        string
 	ChannelData        map[string]string
+	CommandResponse    bool
 	AllowEveryonePings bool
 }

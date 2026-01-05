@@ -1,28 +1,39 @@
 package telegram
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 )
 
-func startProxy(cfg map[string]string) {
+func startProxy(cfg map[string]string) error {
+	listener, err := net.Listen("tcp", ":"+cfg["proxy_port"])
+	if err != nil {
+		return fmt.Errorf("failed to start file proxy listener: %w", err)
+	}
+
 	server := &http.Server{
-		Addr: ":" + cfg["proxy_port"], Handler: &httputil.ReverseProxy{
-			Director: func(req *http.Request) {
-				req.URL.Scheme = "https"
-				req.URL.Host = "api.telegram.com"
-				req.URL.Path = "/file/bot" + cfg["token"] + "/" + strings.TrimPrefix(req.URL.Path, "/telegram")
-				req.Host = "api.telegram.org"
-			},
-		}, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout,
+		Addr: ":" + cfg["proxy_port"], Handler: &httputil.ReverseProxy{Director: func(req *http.Request) {
+			req.URL = &url.URL{
+				Scheme: "https", Host: "api.telegram.org",
+				Path: "/file/bot" + cfg["token"] + "/" + strings.TrimPrefix(req.URL.Path, "/telegram"),
+			}
+			req.Host = "api.telegram.org"
+		}}, ReadTimeout: defaultTimeout, WriteTimeout: defaultTimeout,
 	}
 
-	if err := server.ListenAndServe(); err != nil {
-		panic(fmt.Errorf("telegram: failed to start file proxy: %w", err))
-	}
+	go func() {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("telegram: error in file proxy serve: %v\n", err)
+		}
+	}()
 
-	log.Printf("telegram file proxy (port %s) available at %s\n", cfg["proxy_port"], cfg["proxy_url"])
+	log.Printf("telegram: file proxy listening at :%s and %s\n", cfg["proxy_port"], cfg["proxy_url"])
+
+	return nil
 }

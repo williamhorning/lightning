@@ -69,7 +69,6 @@ func matrixToLightningAuthor(
 		if msg.BeeperPerMessageProfile == nil {
 			return &lightning.MessageAuthor{
 				ID:             string(evt.Sender),
-				Nickname:       string(evt.Sender),
 				Username:       string(evt.Sender),
 				ProfilePicture: "",
 				Color:          "#ffffff",
@@ -90,10 +89,13 @@ func matrixToLightningAuthor(
 			profile = getFile(client, string(*msg.BeeperPerMessageProfile.AvatarURL))
 		}
 
+		if msg.BeeperPerMessageProfile.Displayname == "" {
+			msg.BeeperPerMessageProfile.Displayname = defaultProfile.DisplayName
+		}
+
 		return &lightning.MessageAuthor{
 			ID:             string(evt.Sender),
-			Nickname:       msg.BeeperPerMessageProfile.Displayname,
-			Username:       defaultProfile.DisplayName,
+			Username:       msg.BeeperPerMessageProfile.Displayname,
 			ProfilePicture: profile,
 			Color:          "#ffffff",
 		}
@@ -101,7 +103,6 @@ func matrixToLightningAuthor(
 
 	return &lightning.MessageAuthor{
 		ID:             string(evt.Sender),
-		Nickname:       defaultProfile.DisplayName,
 		Username:       defaultProfile.DisplayName,
 		ProfilePicture: profile,
 		Color:          "#ffffff",
@@ -120,7 +121,7 @@ func matrixToLightningReplies(msg *event.MessageEventContent) []string {
 
 func getFile(client *mautrix.Client, file string) string {
 	if len(file) < 6 || file[:6] != "mxc://" {
-		log.Printf("matrix: invalid MXC URL: %q", file)
+		log.Printf("matrix: invalid MXC URL: %q\n", file)
 
 		return ""
 	}

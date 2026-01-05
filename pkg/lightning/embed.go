@@ -1,8 +1,6 @@
 package lightning
 
-// ToMarkdown converts a lightning Embed to a Markdown string
-// and it handles every field except for the color, which can't
-// be represented in Markdown.
+// ToMarkdown transforms a Discord-style embed to markdown.
 func (embed *Embed) ToMarkdown() string {
 	if embed == nil {
 		return ""

@@ -10,12 +10,12 @@ import (
 )
 
 type discordAPIError struct {
-	message string
-	code    int
+	action string
+	err    *discordgo.RESTError
 }
 
 func (e discordAPIError) Disable() *lightning.ChannelDisabled {
-	switch e.code {
+	switch e.err.Message.Code {
 	case discordgo.ErrCodeUnknownChannel:
 		return &lightning.ChannelDisabled{Read: true, Write: true}
 	case discordgo.ErrCodeMaximumNumberOfWebhooksReached,
@@ -29,18 +29,23 @@ func (e discordAPIError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e discordAPIError) Error() string {
-	return "Discord API Error " + strconv.FormatInt(int64(e.code), 10) + ": " + e.message
+	return "failed to " + e.action + " message: Discord API Error " +
+		strconv.FormatInt(int64(e.err.Message.Code), 10) + ": " + e.err.Error()
 }
 
-func getError(err error, message string) error {
+func getError(err error, action string) error {
+	if err == nil {
+		return nil
+	}
+
 	var restErr *discordgo.RESTError
 	if errors.As(err, &restErr) {
 		if restErr.Message.Code == discordgo.ErrCodeUnknownMessage {
 			return nil
 		}
 
-		return &discordAPIError{message + ": " + restErr.Message.Message, restErr.Message.Code}
+		return &discordAPIError{action + ": " + restErr.Message.Message, restErr}
 	}
 
-	return fmt.Errorf("%s: %w", message, err)
+	return fmt.Errorf("failed to %s message: %w", action, err)
 }

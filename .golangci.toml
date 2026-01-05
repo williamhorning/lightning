@@ -1,21 +1,28 @@
 version = "2"
 
+[issues]
+max-issues-per-linter = 0
+max-same-issues = 0
+
 [run]
 build-tags = ["goolm"]
 
 [linters]
 default = "all"
-disable = ["depguard", "exhaustruct", "noctx", "noinlineerr", "mnd", "tagliatelle", "wsl"]
+disable = ["depguard", "exhaustruct", "noctx", "noinlineerr", "mnd", "perfsprint", "wsl"]
 exclusions = { presets = ["std-error-handling"] }
-settings.ireturn = { allow = ["error", "stdlib", "Plugin", "Database"] }
+settings.ireturn = { allow = ["error", "stdlib", "Plugin"] }
 settings.lll = { tab-width = 4 }
+settings.modernize.disable = ["stringsbuilder"]
 settings.revive.enable-all-rules = true
 settings.revive.rules = [
-  { name = "add-constant", disabled = true },
-  { name = "cognitive-complexity", disabled = true },
-  { name = "line-length-limit", disabled = true },
-  { name = "max-public-structs", disabled = true }
+    { name = "add-constant", disabled = true },
+    { name = "cognitive-complexity", disabled = true },
+    { name = "line-length-limit", disabled = true },
+    { name = "max-public-structs", disabled = true },
+    { name = "var-naming", disabled = true }
 ]
+settings.tagliatelle.case.rules = { json = "snake", toml = "snake"}
 
 [formatters]
 enable = ["gci", "gofmt", "gofumpt", "goimports", "golines", "swaggo"]

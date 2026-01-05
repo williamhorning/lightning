@@ -1,45 +1,46 @@
 package lightning
 
-import "sync/atomic"
+import (
+	"log"
+	"sync"
+)
 
 // AddHandler allows you to register a listener for a given event type.
 // Each handler must take in a *Bot and a pointer to a struct that corresponds
-// with the event you want to listen to.
+// with the event you want to listen to. If you provide a listener which does
+// not match a known event signature, it will be ignored.
 func (b *Bot) AddHandler(listener any) {
 	switch listener := listener.(type) {
 	case func(*Bot, *EditedMessage):
-		go processEventHandlers(&listener, b.editChannel, &b.editHandlers, &b.editProcessorActive, b)
+		b.editEvents.add(listener)
 	case func(*Bot, *Message):
-		go processEventHandlers(&listener, b.messageChannel, &b.messageHandlers, &b.messageProcessorActive, b)
+		b.messageEvents.add(listener)
 	case func(*Bot, *BaseMessage):
-		go processEventHandlers(&listener, b.delChannel, &b.delHandlers, &b.delProcessorActive, b)
+		b.deleteEvents.add(listener)
 	case func(*Bot, *CommandEvent):
-		go processEventHandlers(&listener, b.commandChannel, &b.commandHandlers, &b.commandProcessorActive, b)
+		b.commandEvents.add(listener)
+	default:
+		log.Printf("pkg/lightning: can't add unknown listener type: %T\n", listener)
 	}
 }
 
-func processEventHandlers[C any](
-	listener *func(*Bot, C),
-	incoming <-chan C,
-	handlers *atomic.Pointer[[]func(*Bot, C)],
-	store *atomic.Bool,
-	bot *Bot,
-) {
-	if listener != nil {
-		newHandlers := append(*handlers.Load(), *listener)
-		handlers.Store(&newHandlers)
+type handler[T any] struct {
+	handlers []func(*Bot, T)
+	mu       sync.RWMutex
+}
+
+func (h *handler[T]) add(handler func(*Bot, T)) {
+	h.mu.Lock()
+	h.handlers = append(h.handlers, handler)
+	h.mu.Unlock()
+}
+
+func (h *handler[T]) dispatch(bot *Bot, evt T) {
+	h.mu.RLock()
+
+	for _, handlerfunc := range h.handlers {
+		go handlerfunc(bot, evt)
 	}
 
-	if store.Swap(true) {
-		return
-	}
-
-	for msg := range incoming {
-		for _, handler := range *handlers.Load() {
-			localMsg := msg
-			go handler(bot, localMsg)
-		}
-	}
-
-	store.Store(false)
+	h.mu.RUnlock()
 }

@@ -14,6 +14,7 @@ func discordToLightning(
 	webhooks *cache.Expiring[string, bool],
 	session *discordgo.Session,
 	msg *discordgo.Message,
+	cdnHost string,
 ) *lightning.Message {
 	if msg.Type != discordgo.MessageTypeDefault &&
 		msg.Type != discordgo.MessageTypeReply &&
@@ -31,11 +32,11 @@ func discordToLightning(
 		Author:      discordToLightningAuthor(session, msg),
 		Content:     discordToLightningForward(session, msg) + discordToLightningContent(session, msg),
 		Embeds:      discordToLightningEmbeds(msg.Embeds),
-		Attachments: discordToLightningAttachments(msg.Attachments, msg.StickerItems),
+		Attachments: discordToLightningAttachments(msg.Attachments, msg.StickerItems, cdnHost),
 		RepliedTo:   discordToLightningReplies(msg.MessageReference),
 	}
 
-	message.Content = discordToLightningEmoji(message)
+	message.Content = discordToLightningEmoji(message, cdnHost)
 
 	return message
 }
@@ -43,8 +44,7 @@ func discordToLightning(
 func discordToLightningAuthor(session *discordgo.Session, msg *discordgo.Message) *lightning.MessageAuthor {
 	author := &lightning.MessageAuthor{
 		ID:             msg.Author.ID,
-		Username:       msg.Author.Username,
-		Nickname:       msg.Author.DisplayName(),
+		Username:       msg.Author.DisplayName(),
 		Color:          "#5865F2",
 		ProfilePicture: msg.Author.AvatarURL(""),
 	}
@@ -65,7 +65,7 @@ func discordToLightningAuthor(session *discordgo.Session, msg *discordgo.Message
 	}
 
 	member.User = msg.Author
-	author.Nickname = member.DisplayName()
+	author.Username = member.DisplayName()
 	author.ProfilePicture = member.AvatarURL("")
 
 	return author
@@ -98,7 +98,7 @@ var (
 
 func discordToLightningContent(session *discordgo.Session, msg *discordgo.Message) string {
 	content := defaultEmoji.ReplaceAllStringFunc(msg.Content, func(match string) string {
-		if e, ok := emoji.GetEmoji(match); ok {
+		if e, ok := emoji.Emoji[match]; ok {
 			return e
 		}
 
@@ -213,6 +213,7 @@ func discordToLightningEmbedFields(original []*discordgo.MessageEmbedField) []li
 func discordToLightningAttachments(
 	attachments []*discordgo.MessageAttachment,
 	stickers []*discordgo.StickerItem,
+	cdnHost string,
 ) []lightning.Attachment {
 	result := make([]lightning.Attachment, 0, len(attachments)+len(stickers))
 
@@ -225,7 +226,7 @@ func discordToLightningAttachments(
 	}
 
 	for _, sticker := range stickers {
-		url := "https://cdn.discordapp.com/stickers/" + sticker.ID
+		url := "https://" + cdnHost + "/stickers/" + sticker.ID
 
 		switch sticker.FormatType {
 		case discordgo.StickerFormatTypePNG, discordgo.StickerFormatTypeAPNG:
@@ -254,7 +255,7 @@ func discordToLightningReplies(reference *discordgo.MessageReference) []string {
 	return []string{reference.MessageID}
 }
 
-func discordToLightningEmoji(msg *lightning.Message) string {
+func discordToLightningEmoji(msg *lightning.Message, cdnHost string) string {
 	return emojiMention.ReplaceAllStringFunc(msg.Content, func(match string) string {
 		parts := strings.Split(match, ":")
 		if len(parts) < 3 {
@@ -264,7 +265,7 @@ func discordToLightningEmoji(msg *lightning.Message) string {
 		emojiID := parts[2]
 		emojiName := parts[1]
 
-		url := "https://cdn.discordapp.com/emojis/" + emojiID
+		url := "https://" + cdnHost + "/emojis/" + emojiID
 		if strings.HasPrefix(match, "<a") {
 			url += ".gif?size=48"
 		} else {

@@ -9,23 +9,23 @@ import (
 )
 
 type matrixError struct {
-	msg  string
-	code int
+	method string
+	code   string
 }
 
 func (e matrixError) Disable() *lightning.ChannelDisabled {
-	return &lightning.ChannelDisabled{Read: false, Write: e.code == 403 || e.code == 404}
+	return &lightning.ChannelDisabled{Read: false, Write: e.code == "M_FORBIDDEN" || e.code == "M_UNAUTHORIZED"}
 }
 
 func (e matrixError) Error() string {
-	return e.msg
+	return "failed to " + e.method + " message: "
 }
 
-func handleError(err error, msg string) error {
+func handleError(err error, method string) error {
 	var httpErr *mautrix.HTTPError
 	if !errors.As(err, &httpErr) || httpErr.RespError == nil {
-		return fmt.Errorf("matrix error: %w", err)
+		return fmt.Errorf("failed to %s message: %w", method, err)
 	}
 
-	return &matrixError{msg, httpErr.RespError.StatusCode}
+	return &matrixError{method, httpErr.RespError.ErrCode}
 }

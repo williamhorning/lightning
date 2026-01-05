@@ -13,8 +13,7 @@ func telegramToLightningMessage(bot *gotgbot.Bot, ctx *ext.Context, proxyPath st
 	msg := lightning.Message{
 		Author: &lightning.MessageAuthor{
 			ID:             strconv.FormatInt(ctx.EffectiveSender.Id(), 10),
-			Nickname:       ctx.EffectiveSender.Name(),
-			Username:       ctx.EffectiveSender.Username(),
+			Username:       ctx.EffectiveSender.Name(),
 			ProfilePicture: telegramToLightningProfilePicture(bot, ctx, proxyPath),
 			Color:          "#24A1DE",
 		},
@@ -69,7 +68,7 @@ func telegramToLightningProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxy
 		fileID = chat.Photo.BigFileId
 	case ctx.EffectiveUser != nil:
 		pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
-		if err != nil || pics.TotalCount <= 0 {
+		if err != nil || len(pics.Photos) == 0 {
 			return ""
 		}
 

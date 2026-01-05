@@ -6,9 +6,9 @@ import "strings"
 // a webhook and allows you to send messages with a different author, when
 // then return value is passed as ChannelData in [*SendOptions].
 func (b *Bot) SetupChannel(channelID string) (map[string]string, error) {
-	plugin, channel, ok := b.getPluginFromChannel(channelID)
-	if !ok {
-		return nil, MissingPluginError{}
+	plugin, channel, err := b.getPluginFromChannel(channelID)
+	if err != nil {
+		return nil, err
 	}
 
 	result, err := plugin.SetupChannel(channel)
@@ -16,44 +16,44 @@ func (b *Bot) SetupChannel(channelID string) (map[string]string, error) {
 		return result, nil
 	}
 
-	return nil, &PluginMethodError{channelID, "SetupChannel", "failed to setup channel", []error{err}}
+	return nil, &PluginMethodError{channelID, "SetupChannel", err}
 }
 
 // SendMessage allows you to send a message to the channel and plugin specified
 // on the provided [Message]. You may additionally provide [*SendOptions]. It
 // returns the IDs of the messages sent, which may be nil if an error occurs.
 func (b *Bot) SendMessage(message *Message, opts *SendOptions) ([]string, error) {
-	plugin, channel, ok := b.getPluginFromChannel(message.ChannelID)
-	if !ok {
-		return nil, MissingPluginError{}
+	plugin, channel, err := b.getPluginFromChannel(message.ChannelID)
+	if err != nil {
+		return nil, err
 	}
 
-	oldID := message.ChannelID
-	message.ChannelID = channel
+	msg := *message
+	msg.ChannelID = channel
 
-	result, err := plugin.SendMessage(message, opts)
+	result, err := plugin.SendMessage(&msg, opts)
 	if err == nil {
 		return result, nil
 	}
 
-	return nil, &PluginMethodError{oldID, "SendMessage", "failed to send message", []error{err}}
+	return nil, &PluginMethodError{message.ChannelID, "SendMessage", err}
 }
 
 // EditMessage allows you to edit a message in the channel and plugin specified.
 // The 'ids' parameter should contain the IDs of the messages to be edited, as
 // returned by SendMessage.
 func (b *Bot) EditMessage(message *Message, ids []string, opts *SendOptions) error {
-	plugin, channel, ok := b.getPluginFromChannel(message.ChannelID)
-	if !ok {
-		return MissingPluginError{}
+	plugin, channel, err := b.getPluginFromChannel(message.ChannelID)
+	if err != nil {
+		return err
 	}
 
-	oldID := message.ChannelID
-	message.ChannelID = channel
+	msg := *message
+	msg.ChannelID = channel
 
-	err := plugin.EditMessage(message, ids, opts)
+	err = plugin.EditMessage(&msg, ids, opts)
 	if err != nil {
-		return &PluginMethodError{oldID, "EditMessage", "failed to edit message", []error{err}}
+		return &PluginMethodError{message.ChannelID, "EditMessage", err}
 	}
 
 	return nil
@@ -63,28 +63,29 @@ func (b *Bot) EditMessage(message *Message, ids []string, opts *SendOptions) err
 // The 'ids' parameter should contain the IDs of the messages to be edited, as
 // returned by SendMessage.
 func (b *Bot) DeleteMessages(channelID string, ids []string) error {
-	plugin, channel, ok := b.getPluginFromChannel(channelID)
-	if !ok {
-		return MissingPluginError{}
+	plugin, channel, err := b.getPluginFromChannel(channelID)
+	if err != nil {
+		return err
 	}
 
-	err := plugin.DeleteMessage(channel, ids)
+	err = plugin.DeleteMessage(channel, ids)
 	if err != nil {
-		return &PluginMethodError{channelID, "DeleteMessages", "failed to delete messages", []error{err}}
+		return &PluginMethodError{channelID, "DeleteMessages", err}
 	}
 
 	return nil
 }
 
-func (b *Bot) getPluginFromChannel(channel string) (Plugin, string, bool) {
-	pluginName, channelName, found := strings.Cut(channel, "::")
+func (b *Bot) getPluginFromChannel(channel string) (Plugin, string, error) {
+	pluginName, channelName, _ := strings.Cut(channel, "::")
+
+	b.mutex.RLock()
+	plugin, found := b.plugins[pluginName]
+	b.mutex.RUnlock()
+
 	if !found {
-		return nil, "", false
+		return nil, "", MissingPluginInstanceError{pluginName}
 	}
 
-	b.pluginMutex.RLock()
-	plugin, found := b.plugins[pluginName]
-	b.pluginMutex.RUnlock()
-
-	return plugin, channelName, found
+	return plugin, channelName, nil
 }

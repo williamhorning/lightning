@@ -18,7 +18,6 @@ import (
 	"slices"
 	"time"
 
-	"codeberg.org/jersey/lightning/internal/stoat"
 	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
@@ -30,61 +29,62 @@ import (
 //		"token": "", // a string with your Stoat bot token
 //	}
 func New(cfg map[string]string) (lightning.Plugin, error) {
-	plugin := &stoatPlugin{session: &stoat.Session{
-		MessageDeleted: make(chan *stoat.MessageDeleteEvent, 1000),
-		MessageCreated: make(chan *stoat.Message, 1000),
-		MessageUpdated: make(chan *stoat.MessageUpdateEvent, 1000),
-		Ready:          make(chan *stoat.ReadyEvent, 100),
-		Token:          cfg["token"],
+	plugin := &stoatPlugin{session: &session{
+		messageDeleted: make(chan *stMessageDeleteEvent, 1000),
+		messageCreated: make(chan *stMessage, 1000),
+		messageUpdated: make(chan *stMessageUpdateEvent, 1000),
+		ready:          make(chan *stReadyEvent, 100),
+		token:          cfg["token"],
 	}}
 
 	var err error
 
-	plugin.self, err = stoat.Get(plugin.session, "/users/@me", "@me", &plugin.session.UserCache)
+	plugin.self, err = get(plugin.session, "/users/@me", "@me", &plugin.session.userCache)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get self: %w", err)
+		return nil, fmt.Errorf("failed to get own user: %w", err)
 	}
 
 	go func() {
-		for ready := range plugin.session.Ready {
-			log.Printf("stoat: ready as %s in %d servers!\n", plugin.self.Username, len(ready.Servers))
+		for ready := range plugin.session.ready {
+			log.Printf("stoat: ready as %s in %d servers! https://stoat.chat/bot/%s\n",
+				plugin.self.Username, len(ready.Servers), plugin.self.ID)
 		}
 	}()
 
-	if err = plugin.session.Connect(); err != nil {
-		return nil, fmt.Errorf("stoat: failed to connect to socket: %w", err)
+	if err = plugin.session.connect(); err != nil {
+		return nil, fmt.Errorf("stoat: failed to connect to websocket: %w", err)
 	}
 
 	return plugin, nil
 }
 
 type stoatPlugin struct {
-	self    *stoat.User
-	session *stoat.Session
+	self    *stUser
+	session *session
 }
 
-const correctPermissionValue = stoat.PermissionManageCustomization | stoat.PermissionManageRole |
-	stoat.PermissionChangeNickname | stoat.PermissionChangeAvatar | stoat.PermissionViewChannel |
-	stoat.PermissionReadMessageHistory | stoat.PermissionSendMessage | stoat.PermissionManageMessages |
-	stoat.PermissionInviteOthers | stoat.PermissionSendEmbeds | stoat.PermissionUploadFiles |
-	stoat.PermissionMasquerade | stoat.PermissionReact
+const correctPermissionValue = stPermissionManageCustomization | stPermissionManageRole |
+	stPermissionChangeNickname | stPermissionChangeAvatar | stPermissionViewChannel |
+	stPermissionReadMessageHistory | stPermissionSendMessage | stPermissionManageMessages |
+	stPermissionInviteOthers | stPermissionSendEmbeds | stPermissionUploadFiles |
+	stPermissionMasquerade | stPermissionReact
 
 func (p *stoatPlugin) SetupChannel(channel string) (map[string]string, error) {
-	channelData, err := stoat.Get(p.session, "/channels/"+channel, channel, &p.session.ChannelCache)
+	channelData, err := get(p.session, "/channels/"+channel, channel, &p.session.channelCache)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get channel: %w", err)
+		return nil, fmt.Errorf("failed to get current channel: %w", err)
 	}
 
 	needed := correctPermissionValue
 
-	if channelData.ChannelType == stoat.ChannelTypeGroup {
-		needed &= ^stoat.PermissionManageCustomization
-		needed &= ^stoat.PermissionManageRole
-		needed &= ^stoat.PermissionChangeNickname
-		needed &= ^stoat.PermissionChangeAvatar
+	if channelData.ChannelType == "Group" {
+		needed &= ^stPermissionManageCustomization
+		needed &= ^stPermissionManageRole
+		needed &= ^stPermissionChangeNickname
+		needed &= ^stPermissionChangeAvatar
 	}
 
-	permissions := p.session.GetPermissions(p.self, channelData)
+	permissions := p.session.getPermissions(p.self, channelData)
 
 	if permissions&needed == needed {
 		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
@@ -93,22 +93,16 @@ func (p *stoatPlugin) SetupChannel(channel string) (map[string]string, error) {
 	return nil, &stoatPermissionsError{permissions, needed}
 }
 
-func (p *stoatPlugin) SendCommandResponse(
-	message *lightning.Message,
-	opts *lightning.SendOptions,
-	user string,
-) ([]string, error) {
-	channel, err := stoat.Get(p.session, "/users/"+user+"/dm", "", &p.session.ChannelCache)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dm channel: %w", err)
+func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
+	if opts.CommandResponse {
+		channel, err := get(p.session, "/users/"+opts.CommandUser+"/dm", opts.CommandUser, &p.session.dmChannelCache)
+		if err != nil {
+			return nil, fmt.Errorf("failed to make dm channel for command response: %w", err)
+		}
+
+		message.ChannelID = channel.ID
 	}
 
-	message.ChannelID = channel.ID
-
-	return p.SendMessage(message, opts)
-}
-
-func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	msg := lightningToStoatMessage(p.session, message, opts)
 	leftover := make([]string, 0)
 
@@ -117,25 +111,21 @@ func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.Se
 		msg.Attachments = msg.Attachments[:5]
 	}
 
-	res, err := p.stoatSendMessage(message.ChannelID, msg)
+	res, err := p.session.sendMessage(message.ChannelID, &msg)
 	if err != nil {
 		return nil, err
 	}
 
 	ids := []string{res}
 
-	if len(leftover) == 0 {
-		return ids, nil
-	}
-
 	for chunk := range slices.Chunk(leftover, 5) {
-		res, err := p.stoatSendMessage(message.ChannelID, stoat.DataMessageSend{
+		res, err := p.session.sendMessage(message.ChannelID, &stDataMessageSend{
 			Attachments: chunk,
 			Masquerade:  msg.Masquerade,
 			Replies:     msg.Replies,
 		})
 		if err != nil {
-			log.Printf("failed to send leftover attachments: %v\n\tleftover: %#+v\n", err, leftover)
+			log.Printf("stoat: failed to send leftover attachments (%q): %v\n", leftover, err)
 		} else {
 			ids = append(ids, res)
 		}
@@ -144,15 +134,39 @@ func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.Se
 	return ids, nil
 }
 
-func (*stoatPlugin) SetupCommands(_ map[string]*lightning.Command) error {
+func (p *stoatPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	message.Attachments = nil
+	outgoing := lightningToStoatMessage(p.session, message, opts)
+	data := stDataEditMessage{Content: outgoing.Content, Embeds: outgoing.Embeds}
+
+	if _, err := fetch[any](p.session, "PATCH", "https://api.stoat.chat/0.8/channels/"+message.ChannelID+
+		"/messages/"+ids[0], "application/json", data); err != nil {
+		return fmt.Errorf("failed to edit message: %w", err)
+	}
+
 	return nil
 }
+
+func (p *stoatPlugin) DeleteMessage(channel string, ids []string) error {
+	if _, err := fetch[any](p.session, "DELETE", "https://api.stoat.chat/0.8/channels/"+channel+"/messages/bulk",
+		"application/json", map[string][]string{"ids": ids}); err != nil {
+		return fmt.Errorf("failed to delete messages: %w", err)
+	}
+
+	return nil
+}
+
+func (*stoatPlugin) SetupCommands(_ map[string]*lightning.Command) {}
 
 func (p *stoatPlugin) ListenMessages() <-chan *lightning.Message {
 	channel := make(chan *lightning.Message, 1000)
 
 	go func() {
-		for m := range p.session.MessageCreated {
+		for m := range p.session.messageCreated {
 			if msg := stoatToLightningMessage(p.session, p.self.ID, m); msg != nil {
 				channel <- msg
 			}
@@ -166,7 +180,7 @@ func (p *stoatPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	channel := make(chan *lightning.EditedMessage, 1000)
 
 	go func() {
-		for m := range p.session.MessageUpdated {
+		for m := range p.session.messageUpdated {
 			if msg := stoatToLightningMessage(p.session, p.self.ID, &m.Data); msg != nil {
 				channel <- &lightning.EditedMessage{Message: msg, Edited: m.Data.Edited}
 			}
@@ -180,7 +194,7 @@ func (p *stoatPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 	channel := make(chan *lightning.BaseMessage, 1000)
 
 	go func() {
-		for m := range p.session.MessageDeleted {
+		for m := range p.session.messageDeleted {
 			channel <- &lightning.BaseMessage{EventID: m.ID, ChannelID: m.Channel, Time: time.Now()}
 		}
 	}()

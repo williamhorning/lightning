@@ -5,15 +5,14 @@ import (
 	"strconv"
 	"time"
 
-	"codeberg.org/jersey/lightning/internal/stoat"
 	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/oklog/ulid/v2"
 )
 
 func stoatToLightningMessage(
-	session *stoat.Session,
+	session *session,
 	selfID string,
-	message *stoat.Message,
+	message *stMessage,
 ) *lightning.Message {
 	if message.Author == selfID && message.Masquerade.Name != "" {
 		return nil
@@ -37,7 +36,7 @@ func stoatToLightningMessage(
 	return msg
 }
 
-func stoatToLightningTime(message *stoat.Message) time.Time {
+func stoatToLightningTime(message *stMessage) time.Time {
 	if !message.Edited.IsZero() {
 		return message.Edited
 	}
@@ -50,11 +49,11 @@ func stoatToLightningTime(message *stoat.Message) time.Time {
 	return id.Timestamp()
 }
 
-func stoatToLightningAuthor(session *stoat.Session, msg *stoat.Message) *lightning.MessageAuthor {
-	author := &lightning.MessageAuthor{ID: msg.Author, Username: "StoatUser", Nickname: "Stoat User", Color: "#8C24EC"}
+func stoatToLightningAuthor(session *session, msg *stMessage) *lightning.MessageAuthor {
+	author := &lightning.MessageAuthor{ID: msg.Author, Username: "Stoat User", Color: "#8C24EC"}
 
-	if u, err := stoat.Get(session, "/users/"+msg.Author, msg.Author, &session.UserCache); err == nil {
-		author.Username, author.Nickname = u.Username, u.Username
+	if u, err := get(session, "/users/"+msg.Author, msg.Author, &session.userCache); err == nil {
+		author.Username = u.Username
 		if u.Avatar != nil {
 			author.ProfilePicture = getStoatFileURL(u.Avatar)
 		}
@@ -62,7 +61,7 @@ func stoatToLightningAuthor(session *stoat.Session, msg *stoat.Message) *lightni
 
 	if mem := getStoatMember(session, msg); mem != nil {
 		if mem.Nickname != nil {
-			author.Nickname = *mem.Nickname
+			author.Username = *mem.Nickname
 		}
 
 		if mem.Avatar != nil {
@@ -71,7 +70,7 @@ func stoatToLightningAuthor(session *stoat.Session, msg *stoat.Message) *lightni
 	}
 
 	if msg.Masquerade.Name != "" {
-		author.Nickname = msg.Masquerade.Name
+		author.Username = msg.Masquerade.Name
 	}
 
 	if msg.Masquerade.Colour != "" {
@@ -85,17 +84,17 @@ func stoatToLightningAuthor(session *stoat.Session, msg *stoat.Message) *lightni
 	return author
 }
 
-func getStoatMember(session *stoat.Session, msg *stoat.Message) *stoat.Member {
-	channel, err := stoat.Get(session, "/channels/"+msg.Channel, msg.Channel, &session.ChannelCache)
+func getStoatMember(session *session, msg *stMessage) *stMember {
+	channel, err := get(session, "/channels/"+msg.Channel, msg.Channel, &session.channelCache)
 	if err != nil || channel.Server == nil {
 		return nil
 	}
 
-	mem, err := stoat.Get(
+	mem, err := get(
 		session,
 		"/servers/"+*channel.Server+"/members/"+msg.Author,
 		*channel.Server+"-"+msg.Author,
-		&session.MemberCache,
+		&session.memberCache,
 	)
 	if err != nil {
 		return nil
@@ -104,7 +103,7 @@ func getStoatMember(session *stoat.Session, msg *stoat.Message) *stoat.Member {
 	return mem
 }
 
-func stoatToLightningAttachments(attachments []stoat.File) []lightning.Attachment {
+func stoatToLightningAttachments(attachments []stFile) []lightning.Attachment {
 	out := make([]lightning.Attachment, len(attachments))
 
 	for i, att := range attachments {
@@ -119,20 +118,17 @@ func stoatToLightningAttachments(attachments []stoat.File) []lightning.Attachmen
 }
 
 var (
-	stoatSpoilerRegex = regexp.MustCompile(`!!(.+?)!!`)
 	stoatEmojiRegex   = regexp.MustCompile(":([0-7][0-9A-HJKMNP-TV-Z]{25}):")
 	stoatMentionRegex = regexp.MustCompile("<@([0-7][0-9A-HJKMNP-TV-Z]{25})>")
 	stoatChannelRegex = regexp.MustCompile("<#([0-7][0-9A-HJKMNP-TV-Z]{25})>")
 )
 
-func stoatToLightningContent(session *stoat.Session, message *stoat.Message) string {
-	content := stoatSpoilerRegex.ReplaceAllStringFunc(message.Content, func(match string) string {
-		return "||" + match[2:len(match)-2] + "||"
-	})
+func stoatToLightningContent(session *session, message *stMessage) string {
+	content := message.Content
 
 	content = stoatEmojiRegex.ReplaceAllStringFunc(content, func(match string) string {
 		if emojiID := extractStoatID(match, stoatEmojiRegex); emojiID != "" {
-			e, err := stoat.Get(session, "/custom/emoji/"+emojiID, emojiID, &session.EmojiCache)
+			e, err := get(session, "/custom/emoji/"+emojiID, emojiID, &session.emojiCache)
 			if err == nil {
 				return ":" + e.Name + ":"
 			}
@@ -147,7 +143,7 @@ func stoatToLightningContent(session *stoat.Session, message *stoat.Message) str
 			return match
 		}
 
-		user, err := stoat.Get(session, "/users/"+userID, userID, &session.UserCache)
+		user, err := get(session, "/users/"+userID, userID, &session.userCache)
 		if err != nil {
 			return "@" + userID
 		}
@@ -165,7 +161,7 @@ func stoatToLightningContent(session *stoat.Session, message *stoat.Message) str
 			return match
 		}
 
-		ch, err := stoat.Get(session, "/channels/"+channelID, channelID, &session.ChannelCache)
+		ch, err := get(session, "/channels/"+channelID, channelID, &session.channelCache)
 		if err != nil {
 			return "#" + channelID
 		}
@@ -176,7 +172,7 @@ func stoatToLightningContent(session *stoat.Session, message *stoat.Message) str
 	return content
 }
 
-func stoatToLightningEmbeds(embeds []stoat.Embed) []lightning.Embed {
+func stoatToLightningEmbeds(embeds []stEmbed) []lightning.Embed {
 	out := make([]lightning.Embed, 0, len(embeds))
 
 	for _, embed := range embeds {
@@ -201,10 +197,10 @@ func stoatToLightningEmbeds(embeds []stoat.Embed) []lightning.Embed {
 	return out
 }
 
-func stoatToLightningEmoji(session *stoat.Session, msg *lightning.Message) string {
+func stoatToLightningEmoji(session *session, msg *lightning.Message) string {
 	return stoatEmojiRegex.ReplaceAllStringFunc(msg.Content, func(match string) string {
 		if emojiID := extractStoatID(match, stoatEmojiRegex); emojiID != "" {
-			emoji, err := stoat.Get(session, "/custom/emoji/"+emojiID, emojiID, &session.EmojiCache)
+			emoji, err := get(session, "/custom/emoji/"+emojiID, emojiID, &session.emojiCache)
 			if err == nil {
 				msg.Emoji = append(msg.Emoji, lightning.Emoji{
 					URL:  "https://cdn.stoatusercontent.com/emojis/" + emoji.ID,
@@ -220,11 +216,11 @@ func stoatToLightningEmoji(session *stoat.Session, msg *lightning.Message) strin
 	})
 }
 
-func getStoatFileURL(file *stoat.File) string {
+func getStoatFileURL(file *stFile) string {
 	return "https://cdn.stoatusercontent.com/" + file.Tag + "/" + file.ID
 }
 
-func getStoatEmbedMedia(media *stoat.Media) *lightning.Media {
+func getStoatEmbedMedia(media *stMedia) *lightning.Media {
 	if media != nil && media.URL != "" {
 		return &lightning.Media{
 			URL:    media.URL,

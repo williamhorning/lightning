@@ -8,11 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"codeberg.org/jersey/lightning/internal/app"
-	"codeberg.org/jersey/lightning/internal/data"
 	"codeberg.org/jersey/lightning/pkg/lightning"
 	"codeberg.org/jersey/lightning/pkg/platforms/discord"
-	"codeberg.org/jersey/lightning/pkg/platforms/guilded"
 	"codeberg.org/jersey/lightning/pkg/platforms/matrix"
 	"codeberg.org/jersey/lightning/pkg/platforms/stoat"
 	"codeberg.org/jersey/lightning/pkg/platforms/telegram"
@@ -20,43 +17,43 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "lightning.toml", "path to the configuration file")
+
 	flag.Parse()
 
-	config, err := app.GetConfig(*cfgPath)
+	config, err := getConfig(*cfgPath)
 	if err != nil {
-		log.Fatalf("failed to get config: %v\n", err)
+		log.Fatalf("cmd/lightning: %v\n", err)
 	}
 
-	app.SetupLogging(config.ErrorURL)
+	setupLogging(config.ErrorURL)
 
-	bot := lightning.NewBot(lightning.BotOptions{Prefix: config.CommandPrefix})
+	bot := lightning.NewBot(config.Prefix)
 
-	database, err := data.GetDatabase(config.DatabaseConfig)
+	database, err := newDatabase(config.Database)
 	if err != nil {
-		log.Fatalf("failed to setup database: %v\n", err)
+		log.Fatalf("cmd/lightning: %v\n", err)
 	}
 
-	app.RegisterCommands(bot, database, config.Username)
+	bot.AddHandler(bridgeCreate(database))
+	bot.AddHandler(bridgeEdit(database))
+	bot.AddHandler(bridgeDelete(database))
 
 	bot.AddPluginType("discord", discord.New)
-	bot.AddPluginType("guilded", guilded.New)
-	bot.AddPluginType("revolt", stoat.New)
+	bot.AddPluginType("stoat", stoat.New)
 	bot.AddPluginType("telegram", telegram.New)
 	bot.AddPluginType("matrix", matrix.New)
 
-	bot.AddHandler(app.Create(database))
-	bot.AddHandler(app.Edit(database))
-	bot.AddHandler(app.Delete(database))
-
-	for plugin, cfg := range config.Plugins {
-		if err := bot.UsePluginType(plugin, "", cfg); err != nil {
-			log.Fatalf("failed to setup plugin for %s: %v\n", plugin, err)
+	for _, plugin := range config.Plugins {
+		if err := bot.UsePluginType(plugin.Type, plugin.Name, plugin.Config); err != nil {
+			log.Fatalf("cmd/lightning: failed to setup plugin for %s instance %q: %v\n", plugin.Type, plugin.Name, err)
 		}
 	}
+
+	registerCommands(bot, database, config.Username)
 
 	quitChannel := make(chan os.Signal, 1)
 	signal.Notify(quitChannel, os.Interrupt, syscall.SIGTERM)
 	<-quitChannel
 
-	log.Println("bot stopped")
+	log.Println("cmd/lightning: bot stopped")
 }

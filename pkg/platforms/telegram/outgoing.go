@@ -1,11 +1,10 @@
 package telegram
 
 import (
-	"slices"
-	"strings"
+	"strconv"
 
-	"codeberg.org/jersey/lightning/internal/telegram"
 	"codeberg.org/jersey/lightning/pkg/lightning"
+	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
 type channelIDError struct {
@@ -17,30 +16,37 @@ func (channelIDError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e channelIDError) Error() string {
-	return "telegram: invalid channel ID: " + e.channelID
+	return "invalid channel ID: " + e.channelID
 }
 
-func lightningToTelegramMessage(message *lightning.Message, opts *lightning.SendOptions) string {
+func lightningToTelegramMessage(message *lightning.Message) (string, []gotgbot.MessageEntity) {
 	content := ""
 
-	if opts != nil && message.Author != nil {
-		content += telegram.GetMarkdownV2(message.Author.Nickname) + " » "
+	if message.Author != nil {
+		content += message.Author.Username + " » "
 	}
 
-	mdV2 := telegram.GetMarkdownV2(strings.ReplaceAll(message.Content, "\n", "\n\n"))
-
-	if len(mdV2) > 0 &&
-		slices.Contains(
-			[]string{"[", "]", "(", ")", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!", "\\."}, mdV2[:1],
-		) {
-		content += "\n"
-	}
-
-	content += mdV2
+	content += message.Content + "\n"
 
 	for _, embed := range message.Embeds {
-		content += telegram.GetMarkdownV2(embed.ToMarkdown())
+		content += "\n\n" + embed.ToMarkdown()
 	}
 
-	return content
+	return markdownToTelegram(content)
+}
+
+func getSendOptions(message *lightning.Message, entities []gotgbot.MessageEntity) *gotgbot.SendMessageOpts {
+	sendOpts := &gotgbot.SendMessageOpts{Entities: entities}
+
+	if len(message.RepliedTo) != 0 {
+		replyID, err := strconv.ParseInt(message.RepliedTo[0], 10, 64)
+		if err == nil && replyID > 0 {
+			sendOpts.ReplyParameters = &gotgbot.ReplyParameters{
+				MessageId:                replyID,
+				AllowSendingWithoutReply: true,
+			}
+		}
+	}
+
+	return sendOpts
 }

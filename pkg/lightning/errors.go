@@ -1,42 +1,43 @@
 package lightning
 
-// ChannelDisabler is an interface that allows a channel to be disabled in an external system.
-type ChannelDisabler interface {
-	Disable() *ChannelDisabled
-}
-
 // PluginRegisteredError only occurs when a plugin is already registered and can't be registered again.
-type PluginRegisteredError struct{}
-
-func (PluginRegisteredError) Error() string {
-	return "plugin already registered: this is a bug or misconfiguration"
+type PluginRegisteredError struct {
+	Name string
 }
 
-// MissingPluginError only occurs when a plugin/type is not found.
-type MissingPluginError struct{}
+func (p PluginRegisteredError) Error() string {
+	return "a plugin with the name " + p.Name + " has already been registered"
+}
 
-func (MissingPluginError) Error() string {
-	return "plugin not found internally: this is a bug or misconfiguration"
+// MissingPluginTypeError only occurs when a plugin type is not found.
+type MissingPluginTypeError struct {
+	Name string
+}
+
+func (p MissingPluginTypeError) Error() string {
+	return "can't make an instance of plugin type " + p.Name + " because it has not been registered"
+}
+
+// MissingPluginInstanceError only occurs when a plugin is not found.
+type MissingPluginInstanceError struct {
+	Name string
+}
+
+func (p MissingPluginInstanceError) Error() string {
+	return "can't call a method for plugin " + p.Name + " because it does not exist"
 }
 
 // PluginMethodError is a wrapped error that occurs when a plugin method fails.
 type PluginMethodError struct {
-	ID      string
-	Method  string
-	Message string
-	err     []error
+	ID     string
+	Method string
+	err    error
 }
 
 func (p PluginMethodError) Error() string {
-	str := "plugin " + p.ID + " method " + p.Method + " failed: " + p.Message + ": "
-
-	for _, err := range p.err {
-		str += "\n\t" + err.Error()
-	}
-
-	return str
+	return p.Method + " failed in " + p.ID + ": " + p.err.Error()
 }
 
-func (p PluginMethodError) Unwrap() []error {
+func (p PluginMethodError) Unwrap() error {
 	return p.err
 }

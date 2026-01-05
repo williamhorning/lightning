@@ -31,12 +31,12 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 
 		message.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{
 			ID:          msg.Author.ID,
-			Displayname: msg.Author.Nickname,
+			Displayname: msg.Author.Username,
 			AvatarURL:   url,
 		}
 	}
 
-	if opts != nil && !opts.AllowEveryonePings {
+	if !opts.AllowEveryonePings {
 		message.Body = strings.ReplaceAll(message.Body, "@room", "@\u200Broom")
 		message.FormattedBody = strings.ReplaceAll(message.FormattedBody, "@room", "@\u200Broom")
 	}
@@ -73,7 +73,7 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 		return &curl
 	}
 
-	log.Printf("matrix: upload failed for %s: %v", url, err)
+	log.Printf("matrix: upload failed for %s: %v\n", url, err)
 
 	return nil
 }
