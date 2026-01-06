@@ -33,7 +33,7 @@ func handleTextCommand(bot *Bot, event *Message) {
 	reply := func(msg *Message, sensitive bool) {
 		plugin, channel, err := bot.getPluginFromChannel(event.ChannelID)
 		if err != nil {
-			log.Printf("pkg/lightning: failed to respond to text command: %v\n", err)
+			log.Printf("lightning: failed to respond to text command: %v\n", err)
 
 			return
 		}
@@ -43,7 +43,7 @@ func handleTextCommand(bot *Bot, event *Message) {
 
 		_, err = plugin.SendMessage(msg, &SendOptions{CommandUser: event.Author.ID, CommandResponse: sensitive})
 		if err != nil {
-			log.Printf("pkg/lightning: failed to respond to text command: %v\n", err)
+			log.Printf("lightning: failed to respond to text command: %v\n", err)
 		}
 	}
 

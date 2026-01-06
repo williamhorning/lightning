@@ -40,7 +40,7 @@ func (p *database) createBridge(bridge bridge) error {
 
 	defer func() {
 		if err := txn.Rollback(context.Background()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			log.Printf("cmd/lightning: failed to rollback txn: %v\n", err)
+			log.Printf("bridge: failed to rollback txn: %v\n", err)
 		}
 	}()
 

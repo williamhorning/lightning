@@ -22,7 +22,7 @@ func main() {
 
 	config, err := getConfig(*cfgPath)
 	if err != nil {
-		log.Fatalf("cmd/lightning: %v\n", err)
+		log.Fatalf("bridge: %v\n", err)
 	}
 
 	setupLogging(config.ErrorURL)
@@ -31,7 +31,7 @@ func main() {
 
 	database, err := newDatabase(config.Database)
 	if err != nil {
-		log.Fatalf("cmd/lightning: %v\n", err)
+		log.Fatalf("bridge: %v\n", err)
 	}
 
 	bot.AddHandler(bridgeCreate(database))
@@ -45,7 +45,7 @@ func main() {
 
 	for _, plugin := range config.Plugins {
 		if err := bot.UsePluginType(plugin.Type, plugin.Name, plugin.Config); err != nil {
-			log.Fatalf("cmd/lightning: failed to setup plugin for %s instance %q: %v\n", plugin.Type, plugin.Name, err)
+			log.Fatalf("bridge: failed to setup plugin for %s instance %q: %v\n", plugin.Type, plugin.Name, err)
 		}
 	}
 
@@ -55,5 +55,5 @@ func main() {
 	signal.Notify(quitChannel, os.Interrupt, syscall.SIGTERM)
 	<-quitChannel
 
-	log.Println("cmd/lightning: bot stopped")
+	log.Println("bridge: bot stopped")
 }

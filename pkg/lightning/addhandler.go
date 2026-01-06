@@ -20,7 +20,7 @@ func (b *Bot) AddHandler(listener any) {
 	case func(*Bot, *CommandEvent):
 		b.commandEvents.add(listener)
 	default:
-		log.Printf("pkg/lightning: can't add unknown listener type: %T\n", listener)
+		log.Printf("lightning: can't add unknown listener type: %T\n", listener)
 	}
 }
 
