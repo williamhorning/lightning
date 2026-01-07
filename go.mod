@@ -9,7 +9,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/yuin/goldmark v1.7.14
+	github.com/yuin/goldmark v1.7.16
 	maunium.net/go/mautrix v0.26.1
 )
 
