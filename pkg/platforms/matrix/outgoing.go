@@ -3,9 +3,12 @@ package matrix
 import (
 	"context"
 	"log"
+	"net/http"
 	"strings"
+	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
+	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
@@ -41,8 +44,6 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 		message.FormattedBody = strings.ReplaceAll(message.FormattedBody, "@room", "@\u200Broom")
 	}
 
-	message.AddPerMessageProfileFallback()
-
 	if len(msg.Attachments) == 0 || len(ids) != 0 {
 		return []*event.MessageEventContent{&message}
 	}
@@ -52,10 +53,16 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	for _, attachment := range msg.Attachments {
 		if mxc := p.uploadFile(attachment.URL); mxc != nil {
 			messages = append(messages, &event.MessageEventContent{
-				MsgType: event.MsgFile,
-				URL:     *mxc,
+				FileName:                attachment.Name,
+				BeeperPerMessageProfile: message.BeeperPerMessageProfile,
+				MsgType:                 event.MsgFile,
+				URL:                     *mxc,
 			})
 		}
+	}
+
+	for _, mxSend := range messages {
+		mxSend.AddPerMessageProfileFallback()
 	}
 
 	return messages
@@ -66,14 +73,33 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 		return &cached
 	}
 
-	resp, err := p.client.UploadLink(context.Background(), url)
-	if err == nil {
-		curl := id.ContentURIString("mxc://" + resp.ContentURI.Homeserver + "/" + resp.ContentURI.FileID)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-		return &curl
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil
 	}
 
-	log.Printf("matrix: upload failed for %s: %v\n", url, err)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil
+	}
 
-	return nil
+	defer resp.Body.Close()
+
+	mxc, err := p.client.UploadAsync(context.Background(), mautrix.ReqUploadMedia{
+		Content:       resp.Body,
+		ContentLength: resp.ContentLength,
+	})
+	if err != nil {
+		log.Printf("matrix: upload failed for %s: %v\n", url, err)
+
+		return nil
+	}
+
+	curl := mxc.ContentURI.CUString()
+
+	return &curl
 }

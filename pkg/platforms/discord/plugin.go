@@ -51,7 +51,7 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 
 	session.Client.Transport = transport
 	session.Identify.Intents |= discordgo.IntentMessageContent
-	session.UserAgent += " lightning/0.8.0-rc.9"
+	session.UserAgent += " lightning/0.8.0-rc.10"
 
 	if err = session.Open(); err != nil {
 		return nil, fmt.Errorf("failed to open Discord session: %w", err)

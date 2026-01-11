@@ -159,14 +159,14 @@ func getPriorMessage(database *database, base *lightning.BaseMessage) (*bridge, 
 		return nil, nil, false
 	}
 
-	prior, err := database.getMessage(base.ChannelID)
+	prior, err := database.getMessage(base.EventID)
 	if err != nil {
 		log.Printf("bridge: failed to get message collection for previously sent message: %v\n", err)
 
 		return nil, nil, false
 	}
 
-	if prior.ID == "" || len(prior.Messages) < 2 {
+	if prior.ID == "" {
 		return nil, nil, false
 	}
 

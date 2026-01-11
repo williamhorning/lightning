@@ -180,10 +180,12 @@ func lightningToDiscordComponents(session *discordgo.Session, msg *lightning.Mes
 		return []discordgo.MessageComponent{}
 	}
 
-	replyMessage, err := session.State.Message(msg.ChannelID, msg.RepliedTo[0])
+	replyMessage, err := session.ChannelMessage(msg.ChannelID, msg.RepliedTo[0])
 	if err != nil {
 		return []discordgo.MessageComponent{}
 	}
+
+	author := discordToLightningAuthor(session, replyMessage)
 
 	baseURL := "https://discord.com/channels/"
 
@@ -193,7 +195,7 @@ func lightningToDiscordComponents(session *discordgo.Session, msg *lightning.Mes
 
 	return []discordgo.MessageComponent{
 		&discordgo.ActionsRow{Components: []discordgo.MessageComponent{&discordgo.Button{
-			Label: "↪️ " + replyMessage.Member.DisplayName() + " > " +
+			Label: "↪️ " + author.Username + " > " +
 				replyMessage.ContentWithMentionsReplaced()[:min(len(replyMessage.ContentWithMentionsReplaced()), 42)],
 			Style: discordgo.LinkButton,
 			URL:   baseURL + replyMessage.GuildID + "/" + replyMessage.ChannelID + "/" + replyMessage.ID,
