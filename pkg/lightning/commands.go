@@ -10,7 +10,7 @@ import (
 // text command handler and platform-specific command systems.
 func (b *Bot) AddCommand(commands ...Command) {
 	for _, command := range commands {
-		b.commands[command.Name] = &command
+		b.commands[command.Name] = command
 	}
 
 	for _, plugin := range b.plugins {
@@ -71,7 +71,7 @@ func handleCommandEvent(bot *Bot, event *CommandEvent) {
 
 	if event.Subcommand != nil {
 		if cmd, ok := command.Subcommands[*event.Subcommand]; ok {
-			command = &cmd
+			command = cmd
 		}
 	}
 

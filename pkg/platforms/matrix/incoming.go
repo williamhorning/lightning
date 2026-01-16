@@ -16,6 +16,10 @@ func matrixToLightningMessage(
 	evt *event.Event,
 	client *mautrix.Client,
 ) *lightning.Message {
+	if evt.Type != event.EventMessage {
+		return nil
+	}
+
 	msg := evt.Content.AsMessage()
 
 	if string(evt.Sender) == string(client.UserID) && msg.BeeperPerMessageProfile != nil {
@@ -62,51 +66,32 @@ func matrixToLightningAuthor(
 	evt *event.Event,
 	msg *event.MessageEventContent,
 ) *lightning.MessageAuthor {
-	defaultProfile, err := client.GetProfile(ctx, evt.Sender)
-	if err != nil {
-		log.Printf("matrix: failed to get default message profile: %v\n", err)
-
-		if msg.BeeperPerMessageProfile == nil {
-			return &lightning.MessageAuthor{
-				ID:             string(evt.Sender),
-				Username:       string(evt.Sender),
-				ProfilePicture: "",
-				Color:          "#ffffff",
-			}
-		}
+	author := &lightning.MessageAuthor{
+		ID:             string(evt.Sender),
+		Username:       string(evt.Sender),
+		ProfilePicture: "",
+		Color:          "#ffffff",
 	}
 
-	var profile string
-
-	if err == nil {
-		if !defaultProfile.AvatarURL.IsEmpty() {
-			profile = getFile(client, "mxc://"+defaultProfile.AvatarURL.Homeserver+"/"+defaultProfile.AvatarURL.FileID)
+	globalProfile, err := client.GetProfile(ctx, evt.Sender)
+	if err == nil && globalProfile != nil {
+		author.Username = globalProfile.DisplayName
+		if !globalProfile.AvatarURL.IsEmpty() {
+			author.ProfilePicture = getFile(client, globalProfile.AvatarURL.String())
 		}
 	}
 
 	if msg.BeeperPerMessageProfile != nil {
+		if msg.BeeperPerMessageProfile.Displayname != "" {
+			author.Username = msg.BeeperPerMessageProfile.Displayname
+		}
+
 		if msg.BeeperPerMessageProfile.AvatarURL != nil && *msg.BeeperPerMessageProfile.AvatarURL != "" {
-			profile = getFile(client, string(*msg.BeeperPerMessageProfile.AvatarURL))
-		}
-
-		if msg.BeeperPerMessageProfile.Displayname == "" {
-			msg.BeeperPerMessageProfile.Displayname = defaultProfile.DisplayName
-		}
-
-		return &lightning.MessageAuthor{
-			ID:             string(evt.Sender),
-			Username:       msg.BeeperPerMessageProfile.Displayname,
-			ProfilePicture: profile,
-			Color:          "#ffffff",
+			author.ProfilePicture = getFile(client, string(*msg.BeeperPerMessageProfile.AvatarURL))
 		}
 	}
 
-	return &lightning.MessageAuthor{
-		ID:             string(evt.Sender),
-		Username:       defaultProfile.DisplayName,
-		ProfilePicture: profile,
-		Color:          "#ffffff",
-	}
+	return author
 }
 
 func matrixToLightningReplies(msg *event.MessageEventContent) []string {

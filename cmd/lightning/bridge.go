@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"log"
+	"runtime/debug"
+	"slices"
 	"sync"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -36,7 +38,7 @@ func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) {
 
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("bridge: panic on message create in channel %q: %v\n", channel.ID, r)
+						log.Printf("bridge: panic on create in %q: %v %s\n", channel.ID, r, debug.Stack())
 					}
 				}()
 
@@ -77,10 +79,13 @@ func bridgeEdit(database *database) func(*lightning.Bot, *lightning.EditedMessag
 		}
 
 		repliedTo := getRepliedToMessage(database, message.Message)
+		messages := []channelMessage{{ChannelID: message.ChannelID, MessageIDs: []string{message.EventID}}}
+		results := make(chan channelMessage, len(bridge.Channels))
 		wait := sync.WaitGroup{}
 
 		for _, channel := range bridge.Channels {
-			if channel.ID == message.ChannelID || channel.Disabled.Write {
+			if channel.ID == message.ChannelID || channel.Disabled.Write ||
+				slices.Contains(prior.getChannelMessageIDs(channel.ID), message.EventID) {
 				continue
 			}
 
@@ -90,23 +95,36 @@ func bridgeEdit(database *database) func(*lightning.Bot, *lightning.EditedMessag
 
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("bridge: panic on message edit in channel %q: %v\n", channel.ID, r)
+						log.Printf("bridge: panic on edit in %q: %v %s\n", channel.ID, r, debug.Stack())
 					}
 				}()
 
 				msg.ChannelID = channel.ID
 				msg.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID)
 
-				if err := bot.EditMessage(&msg, prior.getChannelMessageIDs(channel.ID),
-					&lightning.SendOptions{
-						AllowEveryonePings: bridge.Settings.AllowEveryone, ChannelData: channel.Data,
-					}); err != nil {
+				ids, err := bot.EditMessage(&msg, prior.getChannelMessageIDs(channel.ID), &lightning.SendOptions{
+					AllowEveryonePings: bridge.Settings.AllowEveryone, ChannelData: channel.Data,
+				})
+				if err == nil {
+					results <- channelMessage{ChannelID: channel.ID, MessageIDs: ids}
+				} else {
 					handleError(database, bridge, channel.ID, "edit", err)
 				}
 			})
 		}
 
 		wait.Wait()
+		close(results)
+
+		for msg := range results {
+			messages = append(messages, msg)
+		}
+
+		if err := database.createMessage(bridgeMessageCollection{
+			ID: message.EventID, BridgeID: bridge.ID, Messages: messages,
+		}); err != nil {
+			log.Printf("bridge: failed to update message collection: %v\n", err)
+		}
 	}
 }
 
@@ -129,7 +147,7 @@ func bridgeDelete(database *database) func(*lightning.Bot, *lightning.BaseMessag
 
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("bridge: panic on message delete in channel %q: %v\n", channel.ChannelID, r)
+						log.Printf("bridge: panic on delete in %q: %v %s\n", channel.ChannelID, r, debug.Stack())
 					}
 				}()
 

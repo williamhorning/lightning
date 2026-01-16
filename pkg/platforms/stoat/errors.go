@@ -8,13 +8,13 @@ import (
 )
 
 type stError struct {
-	ErrorType string `json:"error_type"`
+	ErrorType string `json:"type"`
 	Location  string `json:"location"`
 }
 
 func (e *stError) Disable() *lightning.ChannelDisabled {
 	switch e.ErrorType {
-	case "UnknownChannel", "NotFound":
+	case "UnknownChannel":
 		return &lightning.ChannelDisabled{Read: true, Write: true}
 	case "MissingPermission", "MissingUserPermission", "NotElevated", "NotPrivileged", "NotOwner",
 		"CannotGiveMissingPermissions", "Banned", "Blocked", "BlockedByOther":
@@ -25,8 +25,8 @@ func (e *stError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stError) Error() string {
-	return e.ErrorType + " (https://github.com/stoatchat/stoatchat/blob/main/" +
-		(strings.Replace(e.Location, ":", "#L", 1)) + ")"
+	return e.ErrorType + " ( https://github.com/stoatchat/stoatchat/blob/main/" +
+		(strings.Replace(e.Location, ":", "#L", 1)) + " )"
 }
 
 type stoatPermissionsError struct {

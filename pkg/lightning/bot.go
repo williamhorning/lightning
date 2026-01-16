@@ -11,7 +11,7 @@ type Bot struct {
 	deleteEvents  handler[*BaseMessage]
 	commandEvents handler[*CommandEvent]
 
-	commands map[string]*Command
+	commands map[string]Command
 	plugins  map[string]Plugin
 	types    map[string]PluginConstructor
 	mutex    sync.RWMutex
@@ -22,7 +22,7 @@ type Bot struct {
 // NewBot creates a new *Bot based on the [BotOptions] provided to it.
 func NewBot(prefix string) *Bot {
 	bot := &Bot{
-		commands: make(map[string]*Command),
+		commands: make(map[string]Command),
 		plugins:  make(map[string]Plugin),
 		types:    make(map[string]PluginConstructor),
 		prefix:   prefix,

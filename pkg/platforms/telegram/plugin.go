@@ -123,60 +123,64 @@ func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning
 		return nil, &channelIDError{message.ChannelID}
 	}
 
-	content, entities := lightningToTelegramMessage(message)
+	chunks := lightningToTelegramMessage(message)
 
-	msg, err := p.telegram.SendMessage(channel, content, getSendOptions(message, entities))
-	if err != nil && strings.Contains(err.Error(), "context deadline exceeded") {
-		return []string{}, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to send message: %w", err)
+	res := make([]string, 0, len(message.Attachments)+len(chunks))
+
+	for _, data := range chunks {
+		msg, err := p.telegram.SendMessage(channel, data.content, getSendOptions(message, data.entities))
+		if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
+			return res, fmt.Errorf("failed to send message: %w", err)
+		}
+
+		res = append(res, strconv.FormatInt(msg.MessageId, 10))
 	}
-
-	ids := []string{strconv.FormatInt(msg.MessageId, 10)}
 
 	for _, attachment := range message.Attachments {
 		msg, err := p.telegram.SendDocument(channel, gotgbot.InputFileByURL(attachment.URL), nil)
 		if err != nil {
 			log.Printf("telegram: failed to send attachment: %v\n", err)
 		} else {
-			ids = append(ids, strconv.FormatInt(msg.MessageId, 10))
+			res = append(res, strconv.FormatInt(msg.MessageId, 10))
+		}
+	}
+
+	return res, nil
+}
+
+func (p *telegramPlugin) EditMessage(
+	message *lightning.Message, ids []string, opts *lightning.SendOptions,
+) ([]string, error) {
+	if opts.CommandResponse {
+		message.ChannelID = opts.CommandUser
+	}
+
+	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
+	if err != nil {
+		return nil, &channelIDError{message.ChannelID}
+	}
+
+	for idx, data := range lightningToTelegramMessage(message) {
+		telegramID, err := strconv.ParseInt(ids[idx], 10, 64)
+		if err != nil {
+			return ids, fmt.Errorf("failed to parse message ID on edit: %w", err)
+		}
+
+		_, _, err = p.telegram.EditMessageText(
+			data.content,
+			&gotgbot.EditMessageTextOpts{
+				ChatId:    channel,
+				MessageId: telegramID,
+				Entities:  data.entities,
+			},
+		)
+		if err != nil && !strings.Contains(err.Error(),
+			"specified new message content and reply markup are exactly the same") {
+			return ids, fmt.Errorf("failed to edit message: %w", err)
 		}
 	}
 
 	return ids, nil
-}
-
-func (p *telegramPlugin) EditMessage(message *lightning.Message, ids []string, _ *lightning.SendOptions) error {
-	channel, err := strconv.ParseInt(message.ChannelID, 10, 64)
-	if err != nil {
-		return &channelIDError{message.ChannelID}
-	}
-
-	if len(ids) == 0 {
-		return nil
-	}
-
-	msgID, err := strconv.ParseInt(ids[0], 10, 64)
-	if err != nil {
-		return fmt.Errorf("failed to parse message ID on edit: %w", err)
-	}
-
-	content, entities := lightningToTelegramMessage(message)
-
-	_, _, err = p.telegram.EditMessageText(
-		content,
-		&gotgbot.EditMessageTextOpts{ChatId: channel, MessageId: msgID, Entities: entities},
-	)
-	if err != nil &&
-		strings.Contains(err.Error(), "specified new message content and reply markup are exactly the same") {
-		return nil
-	}
-
-	if err == nil {
-		return nil
-	}
-
-	return fmt.Errorf("failed to edit message: %w", err)
 }
 
 func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
@@ -205,7 +209,7 @@ func (p *telegramPlugin) DeleteMessage(channelID string, ids []string) error {
 	return fmt.Errorf("failed to delete message: %w", err)
 }
 
-func (*telegramPlugin) SetupCommands(_ map[string]*lightning.Command) {}
+func (*telegramPlugin) SetupCommands(_ map[string]lightning.Command) {}
 
 func (p *telegramPlugin) ListenMessages() <-chan *lightning.Message {
 	return p.messageChannel

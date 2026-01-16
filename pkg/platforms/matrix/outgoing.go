@@ -44,7 +44,13 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 		message.FormattedBody = strings.ReplaceAll(message.FormattedBody, "@room", "@\u200Broom")
 	}
 
-	if len(msg.Attachments) == 0 || len(ids) != 0 {
+	if len(msg.RepliedTo) != 0 {
+		message.RelatesTo = &event.RelatesTo{Type: "m.m.in_reply_to", EventID: id.EventID(msg.RepliedTo[0])}
+	}
+
+	if len(ids) != 0 {
+		message.AddPerMessageProfileFallback()
+
 		return []*event.MessageEventContent{&message}
 	}
 
@@ -53,6 +59,7 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	for _, attachment := range msg.Attachments {
 		if mxc := p.uploadFile(attachment.URL); mxc != nil {
 			messages = append(messages, &event.MessageEventContent{
+				RelatesTo:               message.RelatesTo,
 				FileName:                attachment.Name,
 				BeeperPerMessageProfile: message.BeeperPerMessageProfile,
 				MsgType:                 event.MsgFile,
@@ -89,7 +96,7 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 
 	defer resp.Body.Close()
 
-	mxc, err := p.client.UploadAsync(context.Background(), mautrix.ReqUploadMedia{
+	mxc, err := p.client.UploadMedia(context.Background(), mautrix.ReqUploadMedia{
 		Content:       resp.Body,
 		ContentLength: resp.ContentLength,
 	})

@@ -89,13 +89,56 @@ func (tb *textBuilder) handleNode(n ast.Node) (string, string, string) { //nolin
 	}
 }
 
-func markdownToTelegram(md string) (string, []gotgbot.MessageEntity) {
+func markdownToTelegram(md string) []entityContentPair {
 	parser := goldmark.New(goldmark.WithExtensions(extension.Strikethrough)).Parser()
 	src := []byte(md)
 	root := parser.Parse(text.NewReader(src))
 
-	tb := &textBuilder{src: src}
-	tb.walk(root)
+	builder := &textBuilder{src: src}
+	builder.walk(root)
 
-	return strings.TrimSuffix(tb.out.String(), "\n"), tb.entities
+	pairs := []entityContentPair{}
+
+	var currentText strings.Builder
+
+	var currentEntities []gotgbot.MessageEntity
+
+	var currentLength int64
+
+	var lastEntityIndex int
+
+	for _, r := range builder.out.String() {
+		currentText.WriteRune(r)
+		currentLength += int64(utf16.RuneLen(r))
+
+		for idx := lastEntityIndex; idx < len(builder.entities); idx++ {
+			entity := builder.entities[idx]
+
+			if entity.Offset <= currentLength && entity.Offset+entity.Length > currentLength {
+				currentEntities = append(currentEntities, entity)
+			}
+
+			if entity.Offset+entity.Length > currentLength {
+				lastEntityIndex = idx
+
+				break
+			}
+		}
+
+		if currentLength > 4096 {
+			pairs = append(pairs, entityContentPair{currentText.String(), currentEntities})
+
+			currentText.Reset()
+
+			currentEntities = nil
+			currentLength = 0
+			lastEntityIndex = 0
+		}
+	}
+
+	if currentText.Len() > 0 {
+		pairs = append(pairs, entityContentPair{currentText.String(), currentEntities})
+	}
+
+	return pairs
 }

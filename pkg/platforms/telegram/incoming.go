@@ -111,7 +111,7 @@ func getFileDetails(ctx *ext.Context) (string, string) { //nolint:revive,cyclop
 }
 
 func getBestPhoto(size []gotgbot.PhotoSize) string {
-	var bestPhoto *gotgbot.PhotoSize
+	bestPhoto := &size[0]
 
 	for _, photo := range size {
 		if bestPhoto == nil || photo.Width > bestPhoto.Width {

@@ -6,20 +6,24 @@ import (
 	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 )
 
-func getMaxFileSize(session *discordgo.Session, channel string) int64 {
+func getMaxFileSize(session *bot.Client, channel string) int64 {
 	maxFileSize := int64(10485760)
 
-	if ch, err := session.State.Channel(channel); err == nil && ch.GuildID != "" {
-		if guild, err := session.State.Guild(ch.GuildID); err == nil {
-			switch guild.PremiumTier { //nolint:exhaustive
-			case discordgo.PremiumTier2:
-				maxFileSize = 52428800
-			case discordgo.PremiumTier3:
-				maxFileSize = 104857600
-			default:
+	if id, err := snowflake.Parse(channel); err == nil {
+		if ch, ok := session.Caches.Channel(id); ok {
+			if guild, ok := session.Caches.Guild(ch.GuildID()); ok {
+				switch guild.PremiumTier { //nolint:exhaustive
+				case discord.PremiumTier2:
+					maxFileSize = 52428800
+				case discord.PremiumTier3:
+					maxFileSize = 104857600
+				default:
+				}
 			}
 		}
 	}
@@ -27,8 +31,8 @@ func getMaxFileSize(session *discordgo.Session, channel string) int64 {
 	return maxFileSize
 }
 
-func lightningToDiscordFiles(session *discordgo.Session, msg *lightning.Message) ([]*discordgo.File, []func()) {
-	files := make([]*discordgo.File, 0, len(msg.Attachments))
+func lightningToDiscordFiles(session *bot.Client, msg *lightning.Message) ([]*discord.File, []func()) {
+	files := make([]*discord.File, 0, len(msg.Attachments))
 
 	functions := make([]func(), 0, len(msg.Attachments))
 
@@ -55,10 +59,7 @@ func lightningToDiscordFiles(session *discordgo.Session, msg *lightning.Message)
 			continue
 		}
 
-		files = append(files, &discordgo.File{
-			Name: file.Name, ContentType: resp.Header.Get("Content-Type"),
-			Reader: resp.Body,
-		})
+		files = append(files, &discord.File{Name: file.Name, Reader: resp.Body})
 
 		functions = append(functions, cancel, func() { _ = resp.Body.Close() })
 	}

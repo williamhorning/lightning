@@ -95,20 +95,21 @@ func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 	return ids, nil
 }
 
-func (p *matrixPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
+func (p *matrixPlugin) EditMessage(
+	message *lightning.Message, ids []string, opts *lightning.SendOptions,
+) ([]string, error) {
 	for idx, msg := range p.lightningToMatrixMessage(message, ids, opts) {
-		msg.RelatesTo.Type = "m.replace"
-		msg.RelatesTo.EventID = id.EventID(ids[idx])
+		msg.RelatesTo = &event.RelatesTo{Type: "m.replace", EventID: id.EventID(ids[idx])}
 
 		_, err := p.client.SendMessageEvent(
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
 		)
 		if err != nil {
-			return handleError(err, "edit")
+			return nil, handleError(err, "edit")
 		}
 	}
 
-	return nil
+	return ids, nil
 }
 
 func (p *matrixPlugin) DeleteMessage(channel string, ids []string) error {
@@ -123,7 +124,7 @@ func (p *matrixPlugin) DeleteMessage(channel string, ids []string) error {
 	return nil
 }
 
-func (*matrixPlugin) SetupCommands(_ map[string]*lightning.Command) {}
+func (*matrixPlugin) SetupCommands(_ map[string]lightning.Command) {}
 
 func (p *matrixPlugin) ListenMessages() <-chan *lightning.Message {
 	return p.msgChannel

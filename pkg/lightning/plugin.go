@@ -8,9 +8,9 @@ type PluginConstructor func(config map[string]string) (Plugin, error)
 type Plugin interface {
 	SetupChannel(channel string) (map[string]string, error)
 	SendMessage(message *Message, opts *SendOptions) ([]string, error)
-	EditMessage(message *Message, ids []string, opts *SendOptions) error
+	EditMessage(message *Message, ids []string, opts *SendOptions) ([]string, error)
 	DeleteMessage(channel string, ids []string) error
-	SetupCommands(command map[string]*Command)
+	SetupCommands(command map[string]Command)
 	ListenMessages() <-chan *Message
 	ListenEdits() <-chan *EditedMessage
 	ListenDeletes() <-chan *BaseMessage

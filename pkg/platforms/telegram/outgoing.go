@@ -19,7 +19,12 @@ func (e channelIDError) Error() string {
 	return "invalid channel ID: " + e.channelID
 }
 
-func lightningToTelegramMessage(message *lightning.Message) (string, []gotgbot.MessageEntity) {
+type entityContentPair struct {
+	content  string
+	entities []gotgbot.MessageEntity
+}
+
+func lightningToTelegramMessage(message *lightning.Message) []entityContentPair {
 	content := ""
 
 	if message.Author != nil {

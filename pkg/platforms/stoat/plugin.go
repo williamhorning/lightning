@@ -15,7 +15,6 @@ package stoat
 import (
 	"fmt"
 	"log"
-	"slices"
 	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -103,52 +102,46 @@ func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.Se
 		message.ChannelID = channel.ID
 	}
 
-	msg := lightningToStoatMessage(p.session, message, opts)
-	leftover := make([]string, 0)
+	chunks := lightningToStoatMessage(p.session, message, opts)
+	ids := make([]string, 0, len(chunks))
 
-	if len(msg.Attachments) > 5 {
-		leftover = msg.Attachments[5:]
-		msg.Attachments = msg.Attachments[:5]
-	}
-
-	res, err := p.session.sendMessage(message.ChannelID, &msg)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := []string{res}
-
-	for chunk := range slices.Chunk(leftover, 5) {
-		res, err := p.session.sendMessage(message.ChannelID, &stDataMessageSend{
-			Attachments: chunk,
-			Masquerade:  msg.Masquerade,
-			Replies:     msg.Replies,
-		})
+	for _, chunk := range chunks {
+		res, err := p.session.sendMessage(message.ChannelID, &chunk)
 		if err != nil {
-			log.Printf("stoat: failed to send leftover attachments (%q): %v\n", leftover, err)
-		} else {
-			ids = append(ids, res)
+			return ids, err
 		}
+
+		ids = append(ids, res)
 	}
 
 	return ids, nil
 }
 
-func (p *stoatPlugin) EditMessage(message *lightning.Message, ids []string, opts *lightning.SendOptions) error {
-	if len(ids) == 0 {
-		return nil
+func (p *stoatPlugin) EditMessage(
+	message *lightning.Message, ids []string, opts *lightning.SendOptions,
+) ([]string, error) {
+	if opts.CommandResponse {
+		channel, err := get(p.session, "/users/"+opts.CommandUser+"/dm", opts.CommandUser, &p.session.dmChannelCache)
+		if err != nil {
+			return nil, fmt.Errorf("failed to make dm channel for command response: %w", err)
+		}
+
+		message.ChannelID = channel.ID
 	}
 
 	message.Attachments = nil
-	outgoing := lightningToStoatMessage(p.session, message, opts)
-	data := stDataEditMessage{Content: outgoing.Content, Embeds: outgoing.Embeds}
 
-	if _, err := fetch[any](p.session, "PATCH", "https://api.stoat.chat/0.8/channels/"+message.ChannelID+
-		"/messages/"+ids[0], "application/json", data); err != nil {
-		return fmt.Errorf("failed to edit message: %w", err)
+	chunks := lightningToStoatMessage(p.session, message, opts)
+
+	for idx, chunk := range chunks {
+		if _, err := fetch[any](p.session, "PATCH", "https://api.stoat.chat/0.8/channels/"+message.ChannelID+
+			"/messages/"+ids[idx], "application/json",
+			stDataEditMessage{Content: chunk.Content, Embeds: chunk.Embeds}); err != nil {
+			return ids, fmt.Errorf("failed to edit message: %w", err)
+		}
 	}
 
-	return nil
+	return ids, nil
 }
 
 func (p *stoatPlugin) DeleteMessage(channel string, ids []string) error {
@@ -160,7 +153,7 @@ func (p *stoatPlugin) DeleteMessage(channel string, ids []string) error {
 	return nil
 }
 
-func (*stoatPlugin) SetupCommands(_ map[string]*lightning.Command) {}
+func (*stoatPlugin) SetupCommands(_ map[string]lightning.Command) {}
 
 func (p *stoatPlugin) ListenMessages() <-chan *lightning.Message {
 	channel := make(chan *lightning.Message, 1000)

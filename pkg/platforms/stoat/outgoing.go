@@ -16,7 +16,7 @@ func lightningToStoatMessage(
 	session *session,
 	message *lightning.Message,
 	opts *lightning.SendOptions,
-) stDataMessageSend {
+) []stDataMessageSend {
 	content := stoatOutgoingEmojiRegex.ReplaceAllStringFunc(message.Content,
 		func(match string) string { return replaceStoatOutgoingEmoji(session, message, match) },
 	)
@@ -24,10 +24,6 @@ func lightningToStoatMessage(
 	if !opts.AllowEveryonePings {
 		content = strings.ReplaceAll(content, "@everyone", "@\u2800everyone")
 		content = strings.ReplaceAll(content, "@online", "@\u2800online")
-	}
-
-	if len(content) > 2000 {
-		content = content[:1997] + "..."
 	}
 
 	msg := stDataMessageSend{
@@ -45,7 +41,45 @@ func lightningToStoatMessage(
 		msg.Masquerade = lightningToStoatMasquerade(*message.Author)
 	}
 
-	return msg
+	return splitMessageSend(msg)
+}
+
+func splitMessageSend(msg stDataMessageSend) []stDataMessageSend { //nolint:cyclop,revive
+	chunks, content, embeds, attachments := []stDataMessageSend{}, []rune(msg.Content), msg.Embeds, msg.Attachments
+
+	for len(content) > 0 || len(embeds) > 0 || len(attachments) > 0 {
+		chunk := stDataMessageSend{Masquerade: msg.Masquerade, Replies: msg.Replies}
+		budget := 2000
+		take := min(len(content), budget)
+		chunk.Content, content, budget = string(content[:take]), content[take:], budget-take
+
+		for len(embeds) > 0 && len(chunk.Embeds) < 5 && budget > 0 {
+			desc := []rune(embeds[0].Description)
+
+			if len(desc) <= budget {
+				chunk.Embeds = append(chunk.Embeds, embeds[0])
+				budget -= len(desc)
+				embeds = embeds[1:]
+			} else {
+				split := embeds[0]
+				split.Description = string(desc[:budget])
+				chunk.Embeds = append(chunk.Embeds, split)
+				embeds[0].Description = string(desc[budget:])
+				budget = 0
+			}
+		}
+
+		chunk.Attachments = append([]string(nil), attachments[:min(len(attachments), 5)]...)
+		attachments = attachments[min(len(attachments), 5):]
+
+		if chunk.Content == "" && len(chunk.Embeds) == 0 && len(chunk.Attachments) == 0 {
+			break
+		}
+
+		chunks = append(chunks, chunk)
+	}
+
+	return chunks
 }
 
 func replaceStoatOutgoingEmoji(session *session, message *lightning.Message, match string) string {
@@ -84,7 +118,7 @@ func lightningToStoatAttachments(session *session, attachments []lightning.Attac
 		if err == nil {
 			out = append(out, file)
 		} else {
-			log.Printf("stoat: %v\n", err) // TODO
+			log.Printf("stoat: %v\n", err)
 		}
 	}
 
@@ -93,6 +127,8 @@ func lightningToStoatAttachments(session *session, attachments []lightning.Attac
 
 func lightningToStoatEmbeds(embeds []lightning.Embed) []stSendableEmbed {
 	out := make([]stSendableEmbed, 0, len(embeds))
+
+	embeds = embeds[:min(len(embeds), 10)]
 
 	for _, e := range embeds {
 		out = append(out, lightningToStoatEmbed(e))

@@ -40,6 +40,7 @@ func (c *Expiring[K, V]) Get(key K) (V, bool) { //nolint:nolintlint,ireturn
 	}
 
 	if time.Now().After(item.ExpiresAt) {
+		c.mu.RUnlock()
 		c.mu.Lock()
 		delete(c.items, key)
 		c.mu.Unlock()

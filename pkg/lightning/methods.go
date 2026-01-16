@@ -41,22 +41,23 @@ func (b *Bot) SendMessage(message *Message, opts *SendOptions) ([]string, error)
 
 // EditMessage allows you to edit a message in the channel and plugin specified.
 // The 'ids' parameter should contain the IDs of the messages to be edited, as
-// returned by SendMessage.
-func (b *Bot) EditMessage(message *Message, ids []string, opts *SendOptions) error {
+// returned by SendMessage. It will return the message IDs left after editing,
+// which may differ from the original message IDs in content and length.
+func (b *Bot) EditMessage(message *Message, ids []string, opts *SendOptions) ([]string, error) {
 	plugin, channel, err := b.getPluginFromChannel(message.ChannelID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	msg := *message
 	msg.ChannelID = channel
 
-	err = plugin.EditMessage(&msg, ids, opts)
+	result, err := plugin.EditMessage(&msg, ids, opts)
 	if err != nil {
-		return &PluginMethodError{message.ChannelID, "EditMessage", err}
+		return result, &PluginMethodError{message.ChannelID, "EditMessage", err}
 	}
 
-	return nil
+	return result, nil
 }
 
 // DeleteMessages allows you to delete messages in the channel and plugin specified.
