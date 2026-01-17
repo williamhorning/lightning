@@ -16,9 +16,8 @@ type BaseMessage struct {
 	ChannelID string
 }
 
-// setChannelID exists to simplify event handlers.
-func (b *BaseMessage) setChannelID(name string) {
-	b.ChannelID = name + "::" + b.ChannelID
+func (b *BaseMessage) setChannelID(id string) {
+	b.ChannelID = id + "::" + b.ChannelID
 }
 
 // ChannelDisabled represents whether to disable a channel due to possible errors.

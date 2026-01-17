@@ -17,11 +17,12 @@ func getMaxFileSize(session *bot.Client, channel string) int64 {
 	if id, err := snowflake.Parse(channel); err == nil {
 		if ch, ok := session.Caches.Channel(id); ok {
 			if guild, ok := session.Caches.Guild(ch.GuildID()); ok {
-				switch guild.PremiumTier { //nolint:exhaustive
+				switch guild.PremiumTier {
 				case discord.PremiumTier2:
 					maxFileSize = 52428800
 				case discord.PremiumTier3:
 					maxFileSize = 104857600
+				case discord.PremiumTierNone, discord.PremiumTier1:
 				default:
 				}
 			}
@@ -45,7 +46,7 @@ func lightningToDiscordFiles(session *bot.Client, msg *lightning.Message) ([]*di
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, file.URL, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, file.URL, http.NoBody)
 		if err != nil {
 			cancel()
 

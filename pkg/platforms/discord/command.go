@@ -11,7 +11,7 @@ import (
 )
 
 func lightningToDiscordCommands(original map[string]lightning.Command) []discord.ApplicationCommandCreate {
-	var cmds []discord.ApplicationCommandCreate //nolint:prealloc
+	cmds := make([]discord.ApplicationCommandCreate, 0, len(original))
 
 	for _, cmd := range original {
 		cmds = append(cmds, discord.SlashCommandCreate{
@@ -25,7 +25,7 @@ func lightningToDiscordCommands(original map[string]lightning.Command) []discord
 }
 
 func lightningToDiscordCommandOptions(cmd *lightning.Command) []discord.ApplicationCommandOption {
-	var options []discord.ApplicationCommandOption //nolint:prealloc
+	var options []discord.ApplicationCommandOption
 
 	if len(cmd.Subcommands) == 0 {
 		for _, arg := range cmd.Arguments {

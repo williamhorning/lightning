@@ -99,8 +99,8 @@ func discordToLightningForward(session *bot.Client, msg *discord.Message) string
 
 	out := ""
 
-	for _, snapshot := range msg.MessageSnapshots {
-		content := discordToLightningContent(session, snapshot.Message.Content, nil)
+	for idx := range msg.MessageSnapshots {
+		content := discordToLightningContent(session, msg.MessageSnapshots[idx].Message.Content, nil)
 		out += "> " + strings.ReplaceAll(content, "\n", "\n> ")
 	}
 
@@ -175,30 +175,30 @@ func discordToLightningContent( //nolint:cyclop,revive
 
 func discordToLightningEmbeds(embeds []discord.Embed) []lightning.Embed {
 	out := make([]lightning.Embed, 0, len(embeds))
-	for _, original := range embeds {
+	for idx := range embeds {
 		embed := lightning.Embed{
-			Footer: discordToLightningEmbedFooter(original.Footer),
-			Author: discordToLightningEmbedAuthor(original.Author),
-			Fields: discordToLightningEmbedFields(original.Fields),
+			Footer: discordToLightningEmbedFooter(embeds[idx].Footer),
+			Author: discordToLightningEmbedAuthor(embeds[idx].Author),
+			Fields: discordToLightningEmbedFields(embeds[idx].Fields),
 			Timestamp: func() string {
-				if original.Timestamp != nil {
-					return original.Timestamp.Format(time.RFC3339)
+				if embeds[idx].Timestamp != nil {
+					return embeds[idx].Timestamp.Format(time.RFC3339)
 				}
 
 				return ""
 			}(),
-			Title:       original.Title,
-			URL:         original.URL,
-			Description: original.Description,
-			Color:       original.Color,
+			Title:       embeds[idx].Title,
+			URL:         embeds[idx].URL,
+			Description: embeds[idx].Description,
+			Color:       embeds[idx].Color,
 		}
 
-		if original.Image != nil && original.Image.URL != "" {
-			embed.Image = &lightning.Media{URL: original.Image.URL}
+		if embeds[idx].Image != nil && embeds[idx].Image.URL != "" {
+			embed.Image = &lightning.Media{URL: embeds[idx].Image.URL}
 		}
 
-		if original.Thumbnail != nil && original.Thumbnail.URL != "" {
-			embed.Thumbnail = &lightning.Media{URL: original.Thumbnail.URL}
+		if embeds[idx].Thumbnail != nil && embeds[idx].Thumbnail.URL != "" {
+			embed.Thumbnail = &lightning.Media{URL: embeds[idx].Thumbnail.URL}
 		}
 
 		out = append(out, embed)
@@ -249,11 +249,11 @@ func discordToLightningAttachments(
 ) []lightning.Attachment {
 	result := make([]lightning.Attachment, 0, len(attachments)+len(stickers))
 
-	for _, a := range attachments {
+	for idx := range attachments {
 		result = append(result, lightning.Attachment{
-			URL:  a.URL,
-			Name: a.Filename,
-			Size: int64(a.Size),
+			URL:  attachments[idx].URL,
+			Name: attachments[idx].Filename,
+			Size: int64(attachments[idx].Size),
 		})
 	}
 

@@ -6,7 +6,6 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// config is the configuration for the bridge bot.
 type config struct {
 	Database string         `toml:"database"`
 	ErrorURL string         `toml:"error_url"`
@@ -15,7 +14,6 @@ type config struct {
 	Plugins  []pluginConfig `toml:"plugins"`
 }
 
-// pluginConfig is the configuration for a given plugin.
 type pluginConfig struct {
 	Name   string            `toml:"name,omitempty"`
 	Type   string            `toml:"type"`

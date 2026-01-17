@@ -84,7 +84,7 @@ func telegramToLightningProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxy
 	return ""
 }
 
-func getFileDetails(ctx *ext.Context) (string, string) { //nolint:revive,cyclop
+func getFileDetails(ctx *ext.Context) (string, string) { //nolint:cyclop,revive
 	switch {
 	case len(ctx.EffectiveMessage.NewChatPhoto) != 0:
 		return getBestPhoto(ctx.EffectiveMessage.NewChatPhoto), "photo.jpg"

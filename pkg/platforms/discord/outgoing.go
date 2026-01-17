@@ -77,8 +77,8 @@ var sendableEmojiRegex = regexp.MustCompile(`:\w+:`)
 
 func lightningToDiscordContent(session *bot.Client, msg *lightning.Message) string {
 	return sendableEmojiRegex.ReplaceAllStringFunc(msg.Content, func(match string) string {
-		if emoji, ok := emoji.Emoji[match]; ok {
-			return emoji
+		if name, ok := emoji.Emoji[match]; ok {
+			return name
 		}
 
 		match = strings.ReplaceAll(match, ":", "")
@@ -95,9 +95,9 @@ func lightningToDiscordContent(session *bot.Client, msg *lightning.Message) stri
 
 		channel, ok := session.Caches.Channel(channelID)
 		if ok {
-			emoji, ok := session.Caches.Emoji(channel.GuildID(), matchID)
+			cached, ok := session.Caches.Emoji(channel.GuildID(), matchID)
 			if ok {
-				return emoji.Mention()
+				return cached.Mention()
 			}
 		}
 
@@ -122,37 +122,41 @@ func lightningToDiscordEmbeds(src []lightning.Embed) []discord.Embed {
 
 	embeds := make([]discord.Embed, len(src))
 
-	for idx, embed := range src {
+	for idx := range src {
+		embed := src[idx]
 		embeds[idx] = discord.Embed{
-			URL: embed.URL, Title: embed.Title, Description: embed.Description, Timestamp: func() *time.Time {
-				if t, err := time.Parse(time.RFC3339, embed.Timestamp); err == nil {
+			URL: src[idx].URL, Title: src[idx].Title, Description: src[idx].Description, Timestamp: func() *time.Time {
+				if t, err := time.Parse(time.RFC3339, src[idx].Timestamp); err == nil {
 					return &t
 				}
 
 				return nil
 			}(),
-			Color: embed.Color, Image: toImage(embed.Image), Thumbnail: toImage(embed.Thumbnail),
+			Color: src[idx].Color, Image: toImage(src[idx].Image), Thumbnail: toImage(src[idx].Thumbnail),
 			Video: toImage(embed.Video), Footer: func() *discord.EmbedFooter {
-				if embed.Footer == nil {
+				if src[idx].Footer == nil {
 					return nil
 				}
 
-				return &discord.EmbedFooter{Text: embed.Footer.Text, IconURL: embed.Footer.IconURL}
+				return &discord.EmbedFooter{Text: src[idx].Footer.Text, IconURL: src[idx].Footer.IconURL}
 			}(),
 			Author: func() *discord.EmbedAuthor {
-				if embed.Author == nil {
+				if src[idx].Author == nil {
 					return nil
 				}
 
 				return &discord.EmbedAuthor{
-					Name: embed.Author.Name, URL: embed.Author.URL, IconURL: embed.Author.IconURL,
+					Name: src[idx].Author.Name, URL: src[idx].Author.URL, IconURL: src[idx].Author.IconURL,
 				}
 			}(),
 			Fields: func() []discord.EmbedField {
-				out := make([]discord.EmbedField, len(embed.Fields))
+				out := make([]discord.EmbedField, len(src[idx].Fields))
 
-				for i, f := range embed.Fields {
-					out[i] = discord.EmbedField{Name: f.Name, Value: f.Value, Inline: &f.Inline}
+				for i := range src[idx].Fields {
+					out[i] = discord.EmbedField{
+						Name: src[idx].Fields[i].Name, Value: src[idx].Fields[i].Value,
+						Inline: &src[idx].Fields[i].Inline,
+					}
 				}
 
 				return out
@@ -233,7 +237,10 @@ func lightningToDiscordReference(msg *lightning.Message) *discord.MessageReferen
 	}
 }
 
-func (p *discordPlugin) getOutgoingChannel(message *lightning.Message, opts *lightning.SendOptions) (snowflake.ID, error) {
+func (p *discordPlugin) getOutgoingChannel(
+	message *lightning.Message,
+	opts *lightning.SendOptions,
+) (snowflake.ID, error) {
 	if opts.ChannelData != nil {
 		whID, err := snowflake.Parse(opts.ChannelData["id"])
 		if err != nil {

@@ -18,8 +18,6 @@ func (b *Bot) AddCommand(commands ...Command) {
 	}
 }
 
-// handleTextCommand checks a message, and if it starts with a prefix, it'll
-// call the command handler to take care of it.
 func handleTextCommand(bot *Bot, event *Message) {
 	if len(event.Content) <= len(bot.prefix) || event.Content[:len(bot.prefix)] != bot.prefix {
 		return
@@ -54,8 +52,6 @@ func handleTextCommand(bot *Bot, event *Message) {
 	})
 }
 
-// handleCommandEvent does what it says. take command, look for name, find in
-// map, handle positionals, and call the executor.
 func handleCommandEvent(bot *Bot, event *CommandEvent) {
 	event.Bot = bot
 

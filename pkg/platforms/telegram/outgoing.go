@@ -33,8 +33,8 @@ func lightningToTelegramMessage(message *lightning.Message) []entityContentPair 
 
 	content += message.Content + "\n"
 
-	for _, embed := range message.Embeds {
-		content += "\n\n" + embed.ToMarkdown()
+	for idx := range message.Embeds {
+		content += "\n\n" + message.Embeds[idx].ToMarkdown()
 	}
 
 	return markdownToTelegram(content)

@@ -18,6 +18,7 @@ settings.revive.enable-all-rules = true
 settings.revive.rules = [
     { name = "add-constant", disabled = true },
     { name = "cognitive-complexity", disabled = true },
+    { name = "identical-switch-branches", disabled = true },
     { name = "line-length-limit", disabled = true },
     { name = "max-public-structs", disabled = true },
     { name = "var-naming", disabled = true }

@@ -137,7 +137,7 @@ func (session *session) uploadFile(srcURL, filename string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srcURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srcURL, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create download request: %w", err)
 	}

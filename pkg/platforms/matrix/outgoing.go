@@ -19,8 +19,8 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	ids []string,
 	opts *lightning.SendOptions,
 ) []*event.MessageEventContent {
-	for _, embed := range msg.Embeds {
-		msg.Content += "\n\n" + embed.ToMarkdown()
+	for idx := range msg.Embeds {
+		msg.Content += "\n\n" + msg.Embeds[idx].ToMarkdown()
 	}
 
 	message := format.RenderMarkdown(msg.Content, true, false)
@@ -84,7 +84,7 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil
 	}

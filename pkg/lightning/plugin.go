@@ -68,7 +68,6 @@ func (b *Bot) UsePluginType(typeName, instanceName string, config map[string]str
 	return nil
 }
 
-// startPluginListener listens for an event and forwards them.
 func startPluginListeners[evt interface{ setChannelID(name string) }](
 	b *Bot, name string, handler *handler[evt], events <-chan evt,
 ) {

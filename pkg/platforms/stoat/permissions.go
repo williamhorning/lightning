@@ -109,10 +109,8 @@ func getMemberPermissions(member *stMember, server *stServer, channel *stChannel
 	return permissions
 }
 
-// stPermission type.
 type stPermission uint64
 
-// Individual permission flags.
 const (
 	stPermissionManageChannel stPermission = 1 << iota
 	stPermissionManageServer
@@ -155,7 +153,6 @@ const (
 	stPermissionSet3 stPermission = stPermissionViewChannel | stPermissionReadMessageHistory
 )
 
-// stPermissionNames is a map of individual permission names.
 var stPermissionNames = map[stPermission]string{ //nolint:gochecknoglobals
 	stPermissionManageChannel:       "Manage Channel",
 	stPermissionManageServer:        "Manage Server",

@@ -94,7 +94,7 @@ func New(config map[string]string) (lightning.Plugin, error) {
 
 	plugin := &telegramPlugin{messages, edits, dispatch, telegram, updater}
 
-	if err = startProxy(config); err != nil {
+	if err := startProxy(config); err != nil {
 		return nil, err
 	}
 
@@ -110,7 +110,7 @@ type telegramPlugin struct {
 }
 
 func (*telegramPlugin) SetupChannel(_ string) (map[string]string, error) {
-	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
+	return nil, nil //nolint:nilnil
 }
 
 func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {

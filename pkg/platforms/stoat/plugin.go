@@ -86,7 +86,7 @@ func (p *stoatPlugin) SetupChannel(channel string) (map[string]string, error) {
 	permissions := p.session.getPermissions(p.self, channelData)
 
 	if permissions&needed == needed {
-		return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
+		return nil, nil //nolint:nilnil
 	}
 
 	return nil, &stoatPermissionsError{permissions, needed}

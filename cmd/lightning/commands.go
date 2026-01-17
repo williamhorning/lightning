@@ -58,13 +58,14 @@ func getExecutor[T string | func(*lightning.CommandOptions) string](
 	return func(opts *lightning.CommandOptions) {
 		opts.Reply(&lightning.Message{Embeds: []lightning.Embed{{
 			Title: title, URL: url, Description: (func() string {
-				if str, ok := any(description).(string); ok {
-					return str
-				} else if fn, ok := any(description).(func(*lightning.CommandOptions) string); ok {
-					return fn(opts)
+				switch v := any(description).(type) {
+				case string:
+					return v
+				case func(*lightning.CommandOptions) string:
+					return v(opts)
+				default:
+					return ""
 				}
-
-				return ""
 			})(), Color: 0x487c7e,
 			Footer: &lightning.EmbedFooter{
 				Text:    "powered by lightning",

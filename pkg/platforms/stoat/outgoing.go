@@ -33,7 +33,7 @@ func lightningToStoatMessage(
 		Replies:     lightningToStoatReplies(message.RepliedTo),
 	}
 
-	if len(content) == 0 && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
+	if content != "" && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
 		msg.Content = "\u200B"
 	}
 
@@ -41,10 +41,10 @@ func lightningToStoatMessage(
 		msg.Masquerade = lightningToStoatMasquerade(*message.Author)
 	}
 
-	return splitMessageSend(msg)
+	return splitMessageSend(&msg)
 }
 
-func splitMessageSend(msg stDataMessageSend) []stDataMessageSend { //nolint:cyclop,revive
+func splitMessageSend(msg *stDataMessageSend) []stDataMessageSend { //nolint:cyclop,revive
 	chunks, content, embeds, attachments := []stDataMessageSend{}, []rune(msg.Content), msg.Embeds, msg.Attachments
 
 	for len(content) > 0 || len(embeds) > 0 || len(attachments) > 0 {
@@ -130,14 +130,14 @@ func lightningToStoatEmbeds(embeds []lightning.Embed) []stSendableEmbed {
 
 	embeds = embeds[:min(len(embeds), 10)]
 
-	for _, e := range embeds {
-		out = append(out, lightningToStoatEmbed(e))
+	for idx := range embeds {
+		out = append(out, lightningToStoatEmbed(&embeds[idx]))
 	}
 
 	return out
 }
 
-func lightningToStoatEmbed(embed lightning.Embed) stSendableEmbed {
+func lightningToStoatEmbed(embed *lightning.Embed) stSendableEmbed {
 	newEmbed := stSendableEmbed{
 		Title:       embed.Title,
 		Description: *stoatEmbedDescription(embed),
@@ -160,7 +160,7 @@ func lightningToStoatEmbed(embed lightning.Embed) stSendableEmbed {
 	return newEmbed
 }
 
-func stoatEmbedDescription(embed lightning.Embed) *string {
+func stoatEmbedDescription(embed *lightning.Embed) *string {
 	if len(embed.Fields) == 0 {
 		return &embed.Description
 	}
@@ -180,7 +180,7 @@ func stoatEmbedDescription(embed lightning.Embed) *string {
 	return &embed.Description
 }
 
-func setStoatEmbedMedia(sEmbed *stSendableEmbed, embed lightning.Embed) {
+func setStoatEmbedMedia(sEmbed *stSendableEmbed, embed *lightning.Embed) {
 	if embed.Image != nil {
 		sEmbed.Media = embed.Image.URL
 	}
@@ -189,7 +189,7 @@ func setStoatEmbedMedia(sEmbed *stSendableEmbed, embed lightning.Embed) {
 		sEmbed.Media = embed.Video.URL
 	}
 
-	if embed.Thumbnail != nil && len(embed.Thumbnail.URL) > 0 && len(embed.Thumbnail.URL) <= 128 {
+	if embed.Thumbnail != nil && embed.Thumbnail.URL != "" && len(embed.Thumbnail.URL) <= 128 {
 		sEmbed.IconURL = embed.Thumbnail.URL
 	}
 }

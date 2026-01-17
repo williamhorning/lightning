@@ -62,11 +62,11 @@ func (p *database) createBridge(bridge bridge) error {
 		return fmt.Errorf("failed deleting old channels: %w", err)
 	}
 
-	if err = setChannels(bridge, txn); err != nil {
+	if err := setChannels(bridge, txn); err != nil {
 		return err
 	}
 
-	if err = txn.Commit(context.Background()); err != nil {
+	if err := txn.Commit(context.Background()); err != nil {
 		return fmt.Errorf("failed committing txn: %w", err)
 	}
 

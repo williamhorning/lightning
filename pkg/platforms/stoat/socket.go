@@ -116,7 +116,7 @@ func handleEvent(session *session, message []byte) {
 
 func handleBulkEvent(session *session, message []byte) {
 	var bulk struct {
-		V []json.RawMessage `json:"v"` // slice of other events
+		V []json.RawMessage `json:"v"`
 	}
 	if err := json.Unmarshal(message, &bulk); err != nil {
 		log.Printf("stoat: failed unmarshalling bulk socket event (%q) %v\n", string(message), err)
