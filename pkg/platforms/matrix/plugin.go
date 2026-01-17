@@ -40,7 +40,7 @@ func New(config map[string]string) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	client.UserAgent += " lightning/0.8.0-rc.11"
+	client.UserAgent += " lightning/0.8.0-rc.12"
 
 	syncer, ok := client.Syncer.(*mautrix.DefaultSyncer)
 	if !ok {
