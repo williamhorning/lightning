@@ -1,6 +1,7 @@
 package stoat
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 type stError struct {
 	ErrorType string `json:"type"`
 	Location  string `json:"location"`
+	data      any
 }
 
 func (e *stError) Disable() *lightning.ChannelDisabled {
@@ -26,7 +28,7 @@ func (e *stError) Disable() *lightning.ChannelDisabled {
 
 func (e *stError) Error() string {
 	return e.ErrorType + " ( https://github.com/stoatchat/stoatchat/blob/main/" +
-		(strings.Replace(e.Location, ":", "#L", 1)) + " )"
+		(strings.Replace(e.Location, ":", "#L", 1)) + " ) with request body: " + fmt.Sprintf("%#v", e.data)
 }
 
 type stoatPermissionsError struct {
