@@ -129,6 +129,10 @@ func (p *stoatPlugin) EditMessage(
 		message.ChannelID = channel.ID
 	}
 
+	if len(ids) == 0 {
+		return ids, nil
+	}
+
 	message.Attachments = nil
 
 	chunks := lightningToStoatMessage(p.session, message, opts)

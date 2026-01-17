@@ -15,9 +15,7 @@ import (
 )
 
 func (p *matrixPlugin) lightningToMatrixMessage(
-	msg *lightning.Message,
-	ids []string,
-	opts *lightning.SendOptions,
+	msg *lightning.Message, opts *lightning.SendOptions,
 ) []*event.MessageEventContent {
 	for idx := range msg.Embeds {
 		msg.Content += "\n\n" + msg.Embeds[idx].ToMarkdown()
@@ -45,14 +43,10 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	}
 
 	if len(msg.RepliedTo) != 0 {
-		message.RelatesTo = &event.RelatesTo{Type: "m.m.in_reply_to", EventID: id.EventID(msg.RepliedTo[0])}
+		message.RelatesTo = &event.RelatesTo{Type: "m.in_reply_to", EventID: id.EventID(msg.RepliedTo[0])}
 	}
 
-	if len(ids) != 0 {
-		message.AddPerMessageProfileFallback()
-
-		return []*event.MessageEventContent{&message}
-	}
+	message.AddPerMessageProfileFallback()
 
 	messages := make([]*event.MessageEventContent, 0, len(msg.Attachments)+1)
 
@@ -107,6 +101,8 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 	}
 
 	curl := mxc.ContentURI.CUString()
+
+	p.mxcCache.Set(url, curl)
 
 	return &curl
 }

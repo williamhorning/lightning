@@ -1,4 +1,5 @@
 // Package matrix provides a [lightning.Plugin] implementation for Matrix.
+// Note that this implementation may not be
 // To use Matrix support with lightning, see [New]
 //
 //	bot := lightning.NewBot(lightning.BotOptions{
@@ -40,7 +41,7 @@ func New(config map[string]string) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	client.UserAgent += " lightning/0.8.0-rc.12"
+	client.UserAgent += " lightning/0.8.0"
 
 	syncer, ok := client.Syncer.(*mautrix.DefaultSyncer)
 	if !ok {
@@ -81,7 +82,7 @@ func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
 func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	ids := make([]string, 0, len(message.Attachments)+1)
 
-	for _, msg := range p.lightningToMatrixMessage(message, nil, opts) {
+	for _, msg := range p.lightningToMatrixMessage(message, opts) {
 		resp, err := p.client.SendMessageEvent(
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
 		)
@@ -98,7 +99,9 @@ func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.S
 func (p *matrixPlugin) EditMessage(
 	message *lightning.Message, ids []string, opts *lightning.SendOptions,
 ) ([]string, error) {
-	for idx, msg := range p.lightningToMatrixMessage(message, ids, opts) {
+	message.Attachments = nil
+
+	for idx, msg := range p.lightningToMatrixMessage(message, opts) {
 		msg.RelatesTo = &event.RelatesTo{Type: "m.replace", EventID: id.EventID(ids[idx])}
 
 		_, err := p.client.SendMessageEvent(

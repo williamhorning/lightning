@@ -33,7 +33,7 @@ func lightningToStoatMessage(
 		Replies:     lightningToStoatReplies(message.RepliedTo),
 	}
 
-	if content != "" && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
+	if content == "" && len(msg.Embeds) == 0 && len(msg.Attachments) == 0 {
 		msg.Content = "\u200B"
 	}
 

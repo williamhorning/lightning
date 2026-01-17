@@ -11,6 +11,7 @@ import (
 type matrixError struct {
 	method string
 	code   string
+	err    error
 }
 
 func (e matrixError) Disable() *lightning.ChannelDisabled {
@@ -18,7 +19,7 @@ func (e matrixError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e matrixError) Error() string {
-	return "failed to " + e.method + " message: "
+	return "failed to " + e.method + " message: " + e.err.Error()
 }
 
 func handleError(err error, method string) error {
@@ -27,5 +28,5 @@ func handleError(err error, method string) error {
 		return fmt.Errorf("failed to %s message: %w", method, err)
 	}
 
-	return &matrixError{method, httpErr.RespError.ErrCode}
+	return &matrixError{method, httpErr.RespError.ErrCode, err}
 }

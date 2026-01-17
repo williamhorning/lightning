@@ -56,7 +56,7 @@ func fetch[T any](session *session, method, endpoint, content string, data any) 
 	req.Header = map[string][]string{
 		"Accept":      {"application/json"},
 		"X-Bot-Token": {session.token},
-		"User-Agent":  {"rvapi/0.8.0-rc.12"},
+		"User-Agent":  {"rvapi/0.8.0"},
 	}
 
 	if content != "" {
@@ -99,6 +99,8 @@ func requestLoop[T any](
 		if err := json.NewDecoder(resp.Body).Decode(&stoatError); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %w", err)
 		}
+
+		stoatError.data = data
 
 		return nil, &stoatError
 	}

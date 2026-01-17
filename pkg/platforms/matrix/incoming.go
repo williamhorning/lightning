@@ -112,7 +112,7 @@ func getFile(client *mautrix.Client, file string) string {
 	}
 
 	return client.HomeserverURL.JoinPath(
-		"_matrix/client/v1/media/download",
-		file[5:],
+		"_matrix/client/v1/media/download/",
+		file[6:],
 	).String()
 }

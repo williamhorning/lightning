@@ -11,6 +11,7 @@ import (
 type stError struct {
 	ErrorType string `json:"type"`
 	Location  string `json:"location"`
+	ErrorInfo string `json:"error"`
 	data      any
 }
 
@@ -28,7 +29,7 @@ func (e *stError) Disable() *lightning.ChannelDisabled {
 
 func (e *stError) Error() string {
 	return e.ErrorType + " ( https://github.com/stoatchat/stoatchat/blob/main/" +
-		(strings.Replace(e.Location, ":", "#L", 1)) + " ) with request body: " + fmt.Sprintf("%#v", e.data)
+		(strings.Replace(e.Location, ":", "#L", 1)) + " ) with info: " + e.ErrorInfo + ":" + fmt.Sprintf("%#v", e.data)
 }
 
 type stoatPermissionsError struct {
