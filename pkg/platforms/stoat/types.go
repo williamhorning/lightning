@@ -15,13 +15,13 @@ type stChannel struct {
 }
 
 type stDataEditMessage struct {
-	Content string            `json:"content"`
+	Content string            `json:"content,omitempty"`
 	Embeds  []stSendableEmbed `json:"embeds,omitempty"`
 }
 
 type stDataMessageSend struct {
 	Masquerade  *stMasquerade     `json:"masquerade,omitempty"`
-	Content     string            `json:"content"`
+	Content     string            `json:"content,omitempty"`
 	Attachments []string          `json:"attachments,omitempty"`
 	Replies     []stReplyIntent   `json:"replies,omitempty"`
 	Embeds      []stSendableEmbed `json:"embeds,omitempty"`

@@ -29,7 +29,7 @@ func lightningToStoatMessage(
 	msg := stDataMessageSend{
 		Attachments: lightningToStoatAttachments(session, message.Attachments),
 		Content:     content,
-		Embeds:      lightningToStoatEmbeds(message.Embeds),
+		Embeds:      lightningToStoatEmbeds(session, message.Embeds),
 		Replies:     lightningToStoatReplies(message.RepliedTo),
 	}
 
@@ -125,19 +125,19 @@ func lightningToStoatAttachments(session *session, attachments []lightning.Attac
 	return out
 }
 
-func lightningToStoatEmbeds(embeds []lightning.Embed) []stSendableEmbed {
+func lightningToStoatEmbeds(session *session, embeds []lightning.Embed) []stSendableEmbed {
 	out := make([]stSendableEmbed, 0, len(embeds))
 
 	embeds = embeds[:min(len(embeds), 10)]
 
 	for idx := range embeds {
-		out = append(out, lightningToStoatEmbed(&embeds[idx]))
+		out = append(out, lightningToStoatEmbed(session, &embeds[idx]))
 	}
 
 	return out
 }
 
-func lightningToStoatEmbed(embed *lightning.Embed) stSendableEmbed {
+func lightningToStoatEmbed(session *session, embed *lightning.Embed) stSendableEmbed {
 	newEmbed := stSendableEmbed{
 		Title:       embed.Title,
 		Description: *stoatEmbedDescription(embed),
@@ -155,7 +155,7 @@ func lightningToStoatEmbed(embed *lightning.Embed) stSendableEmbed {
 		newEmbed.Colour = "#" + strconv.FormatInt(int64(embed.Color), 16)
 	}
 
-	setStoatEmbedMedia(&newEmbed, embed)
+	setStoatEmbedMedia(session, &newEmbed, embed)
 
 	return newEmbed
 }
@@ -180,13 +180,19 @@ func stoatEmbedDescription(embed *lightning.Embed) *string {
 	return &embed.Description
 }
 
-func setStoatEmbedMedia(sEmbed *stSendableEmbed, embed *lightning.Embed) {
-	if embed.Image != nil {
-		sEmbed.Media = embed.Image.URL
-	}
-
+func setStoatEmbedMedia(session *session, sEmbed *stSendableEmbed, embed *lightning.Embed) {
 	if embed.Video != nil {
-		sEmbed.Media = embed.Video.URL
+		name := strings.Split(embed.Video.URL, "/")
+
+		if id, err := session.uploadFile(embed.Video.URL, name[len(name)-1]); err == nil {
+			sEmbed.Media = id
+		}
+	} else if embed.Image != nil {
+		name := strings.Split(embed.Image.URL, "/")
+
+		if id, err := session.uploadFile(embed.Image.URL, name[len(name)-1]); err == nil {
+			sEmbed.Media = id
+		}
 	}
 
 	if embed.Thumbnail != nil && embed.Thumbnail.URL != "" && len(embed.Thumbnail.URL) <= 128 {
