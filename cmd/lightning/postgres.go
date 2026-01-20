@@ -213,7 +213,7 @@ func (p *database) setupDatabase() error {
 
 		CREATE TABLE IF NOT EXISTS bridge_channels (
 			bridge_id TEXT NOT NULL REFERENCES bridges(id) ON DELETE CASCADE,
-			channel_id TEXT NOT NULL,
+			channel_id TEXT NOT NULL UNIQUE,
 			data JSONB DEFAULT '{}'::jsonb,
 			disabled JSONB NOT NULL DEFAULT '{"read": false, "write": false}'::jsonb,
 			PRIMARY KEY (bridge_id, channel_id)
