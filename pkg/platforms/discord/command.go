@@ -5,16 +5,14 @@ import (
 	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
-	"github.com/disgoorg/disgo/bot"
-	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/disgo/events"
 )
 
-func lightningToDiscordCommands(original map[string]lightning.Command) []discord.ApplicationCommandCreate {
-	cmds := make([]discord.ApplicationCommandCreate, 0, len(original))
+func lightningToDiscordCommands(original map[string]lightning.Command) []applicationCommand {
+	cmds := make([]applicationCommand, 0, len(original))
 
 	for _, cmd := range original {
-		cmds = append(cmds, discord.SlashCommandCreate{
+		cmds = append(cmds, applicationCommand{
+			Type:        commandTypeChatInput,
 			Name:        cmd.Name,
 			Description: cmd.Description,
 			Options:     lightningToDiscordCommandOptions(&cmd),
@@ -24,12 +22,13 @@ func lightningToDiscordCommands(original map[string]lightning.Command) []discord
 	return cmds
 }
 
-func lightningToDiscordCommandOptions(cmd *lightning.Command) []discord.ApplicationCommandOption {
-	var options []discord.ApplicationCommandOption
+func lightningToDiscordCommandOptions(cmd *lightning.Command) []commandOption {
+	var options []commandOption
 
 	if len(cmd.Subcommands) == 0 {
 		for _, arg := range cmd.Arguments {
-			options = append(options, discord.ApplicationCommandOptionString{
+			options = append(options, commandOption{
+				Type:        optString,
 				Name:        arg.Name,
 				Description: arg.Description,
 				Required:    true,
@@ -38,7 +37,8 @@ func lightningToDiscordCommandOptions(cmd *lightning.Command) []discord.Applicat
 	}
 
 	for _, sub := range cmd.Subcommands {
-		options = append(options, discord.ApplicationCommandOptionSubCommand{
+		options = append(options, commandOption{
+			Type:        optSubCommand,
 			Name:        sub.Name,
 			Description: sub.Description,
 			Options:     lightningToDiscordCommandOptions(&sub),
@@ -49,48 +49,53 @@ func lightningToDiscordCommandOptions(cmd *lightning.Command) []discord.Applicat
 }
 
 func discordToLightningCommand(
-	session *bot.Client,
-	interaction *events.ApplicationCommandInteractionCreate,
-	cdn string,
+	client *client,
+	interaction *interactionCreateEvent,
 ) *lightning.CommandEvent {
-	if interaction.Type() != discord.InteractionTypeApplicationCommand {
+	if interaction.Type != interactionApplicationCommand {
 		return nil
 	}
 
 	args := make(map[string]string)
-	data := interaction.SlashCommandInteractionData()
 
-	for _, option := range data.Options {
-		if option.Type == discord.ApplicationCommandOptionTypeString {
-			args[option.Name] = string(option.Value)
+	var subcommand *string
+
+	for _, option := range interaction.Data.Options {
+		switch option.Type {
+		case optString:
+			args[option.Name] = option.Value
+		case optSubCommand:
+			val := option.Value
+			subcommand = &val
+
+			for _, subopt := range option.Options {
+				args[subopt.Name] = subopt.Value
+			}
+		default:
 		}
 	}
 
 	return &lightning.CommandEvent{
 		CommandOptions: &lightning.CommandOptions{
 			Arguments: args, BaseMessage: lightning.BaseMessage{
-				EventID:   interaction.ID().String(),
-				ChannelID: interaction.Channel().String(), Time: interaction.CreatedAt(),
+				EventID:   string(interaction.ID),
+				ChannelID: string(*interaction.ChannelID), Time: time.Now(),
 			}, Prefix: "/",
 			Reply: func(message *lightning.Message, sensitive bool) {
-				message.BaseMessage = lightning.BaseMessage{Time: time.Now(), ChannelID: interaction.Channel().String()}
-				msg := lightningToDiscordSendable(session, message, &lightning.SendOptions{}, cdn)
-
-				defer func() {
-					for _, cancel := range msg.cancels {
-						cancel()
-					}
-				}()
+				message.BaseMessage = lightning.BaseMessage{Time: time.Now(), ChannelID: string(*interaction.ChannelID)}
+				msg := lightningToDiscordSendable(client, message, &lightning.SendOptions{})
 
 				if sensitive {
-					msg.Flags = discord.MessageFlagEphemeral
+					msg.Flags = messageFlagsEphemeral
 				}
 
-				if err := interaction.Respond(discord.InteractionResponseTypeCreateMessage, msg); err != nil {
-					log.Printf("discord: failed responding to command: %v\n", err)
+				if err := client.respondInteraction(interaction.ID, interaction.Token, &interactionResponse{
+					Type: respChannelMessageWithSource, Data: msg.toInteraction(),
+				}); err != nil {
+					log.Printf("%s: failed responding to command: %v\n", client.product, err)
 				}
 			},
 		},
-		Command: data.CommandName(), Subcommand: data.SubCommandName,
+		Command: interaction.Data.Name, Subcommand: subcommand,
 	}
 }

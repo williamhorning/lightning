@@ -6,25 +6,20 @@ import (
 	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
-	"github.com/disgoorg/disgo/bot"
-	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/snowflake/v2"
 )
 
-func getMaxFileSize(session *bot.Client, channel string) int64 {
+func getMaxFileSize(client *client, channel string) int64 {
 	maxFileSize := int64(10485760)
 
-	if id, err := snowflake.Parse(channel); err == nil {
-		if ch, ok := session.Caches.Channel(id); ok {
-			if guild, ok := session.Caches.Guild(ch.GuildID()); ok {
-				switch guild.PremiumTier {
-				case discord.PremiumTier2:
-					maxFileSize = 52428800
-				case discord.PremiumTier3:
-					maxFileSize = 104857600
-				case discord.PremiumTierNone, discord.PremiumTier1:
-				default:
-				}
+	if ch, ok := client.getChannel(channel); ok {
+		if guild, ok := client.getGuild(ch.GuildID); ok {
+			switch guild.PremiumTier {
+			case premium2:
+				maxFileSize = 52428800
+			case premium3:
+				maxFileSize = 104857600
+			case premium1, premiumNone:
+			default:
 			}
 		}
 	}
@@ -32,21 +27,18 @@ func getMaxFileSize(session *bot.Client, channel string) int64 {
 	return maxFileSize
 }
 
-func lightningToDiscordFiles(session *bot.Client, msg *lightning.Message) ([]*discord.File, []func()) {
-	files := make([]*discord.File, 0, len(msg.Attachments))
+func lightningToDiscordFiles(client *client, msg *lightning.Message) []file {
+	files := make([]file, 0, len(msg.Attachments))
+	maxSize := getMaxFileSize(client, msg.ChannelID)
 
-	functions := make([]func(), 0, len(msg.Attachments))
-
-	maxSize := getMaxFileSize(session, msg.ChannelID)
-
-	for _, file := range msg.Attachments {
-		if file.Size > maxSize {
+	for _, original := range msg.Attachments {
+		if original.Size > maxSize {
 			continue
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, file.URL, http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, original.URL, http.NoBody)
 		if err != nil {
 			cancel()
 
@@ -60,10 +52,12 @@ func lightningToDiscordFiles(session *bot.Client, msg *lightning.Message) ([]*di
 			continue
 		}
 
-		files = append(files, &discord.File{Name: file.Name, Reader: resp.Body})
+		files = append(files, file{Name: original.Name, Reader: resp.Body, Cancel: func() {
+			_ = resp.Body.Close()
 
-		functions = append(functions, cancel, func() { _ = resp.Body.Close() })
+			cancel()
+		}})
 	}
 
-	return files, functions
+	return files
 }

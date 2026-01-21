@@ -7,39 +7,28 @@ import (
 
 	"codeberg.org/jersey/lightning/internal/emoji"
 	"codeberg.org/jersey/lightning/pkg/lightning"
-	"github.com/disgoorg/disgo/bot"
-	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/snowflake/v2"
 )
 
 type discordSendable struct {
-	discord.MessageCreate
+	messageSend
 
 	Username  string
 	AvatarURL string
-
-	cancels []func()
 }
 
 func lightningToDiscordSendable(
-	session *bot.Client,
+	bot *client,
 	msg *lightning.Message,
 	opts *lightning.SendOptions,
-	cdn string,
 ) discordSendable {
-	files, cancels := lightningToDiscordFiles(session, msg)
-
-	toSend := discordSendable{
-		MessageCreate: discord.MessageCreate{
-			Content:          lightningToDiscordContent(session, msg),
-			Embeds:           lightningToDiscordEmbeds(msg.Embeds),
-			AllowedMentions:  lightningToDiscordAllowedMentions(opts),
-			Components:       lightningToDiscordComponents(session, msg, cdn),
-			MessageReference: lightningToDiscordReference(msg),
-			Files:            files,
-		},
-		cancels: cancels,
-	}
+	toSend := discordSendable{messageSend: messageSend{
+		Content:         lightningToDiscordContent(bot, msg),
+		Embeds:          lightningToDiscordEmbeds(msg.Embeds),
+		AllowedMentions: lightningToDiscordAllowedMentions(opts),
+		Components:      lightningToDiscordComponents(bot, msg, opts),
+		Reference:       lightningToDiscordReference(msg),
+		Files:           lightningToDiscordFiles(bot, msg),
+	}}
 
 	if msg.Author != nil {
 		toSend.AvatarURL = msg.Author.ProfilePicture
@@ -53,29 +42,36 @@ func lightningToDiscordSendable(
 	return toSend
 }
 
-func (msg *discordSendable) toWebhook() discord.WebhookMessageCreate {
-	return discord.WebhookMessageCreate{
+func (msg *discordSendable) toWebhook() *webhookExecutePayload {
+	return &webhookExecutePayload{
 		Content: msg.Content, Username: msg.Username, AvatarURL: msg.AvatarURL, Embeds: msg.Embeds,
 		Components: msg.Components, Files: msg.Files, AllowedMentions: msg.AllowedMentions, Flags: msg.Flags,
 	}
 }
 
-func (msg *discordSendable) toEdit() discord.MessageUpdate {
-	return discord.MessageUpdate{
-		Content: &msg.Content, Embeds: &msg.Embeds, Components: &msg.Components,
-		AllowedMentions: msg.AllowedMentions, Flags: &msg.Flags,
+func (msg *discordSendable) toInteraction() *interactionResponseData {
+	return &interactionResponseData{
+		Content: msg.Content, Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions,
+		Flags: msg.Flags,
 	}
 }
 
-func (msg *discordSendable) toWebhookEdit() discord.WebhookMessageUpdate {
-	return discord.WebhookMessageUpdate{
-		Content: &msg.Content, Embeds: &msg.Embeds, Components: &msg.Components, AllowedMentions: msg.AllowedMentions,
+func (msg *discordSendable) toEdit() *messageEdit {
+	return &messageEdit{
+		Content: &msg.Content, Embeds: &msg.Embeds, Components: &msg.Components,
+		AllowedMentions: msg.AllowedMentions, Flags: msg.Flags,
+	}
+}
+
+func (msg *discordSendable) toWebhookEdit() *webhookEditMessagePayload {
+	return &webhookEditMessagePayload{
+		Content: &msg.Content, Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions,
 	}
 }
 
 var sendableEmojiRegex = regexp.MustCompile(`:\w+:`)
 
-func lightningToDiscordContent(session *bot.Client, msg *lightning.Message) string {
+func lightningToDiscordContent(bot *client, msg *lightning.Message) string {
 	return sendableEmojiRegex.ReplaceAllStringFunc(msg.Content, func(match string) string {
 		if name, ok := emoji.Emoji[match]; ok {
 			return name
@@ -83,21 +79,14 @@ func lightningToDiscordContent(session *bot.Client, msg *lightning.Message) stri
 
 		match = strings.ReplaceAll(match, ":", "")
 
-		matchID, err := snowflake.Parse(msg.RepliedTo[0])
-		if err != nil {
-			return match
-		}
-
-		channelID, err := snowflake.Parse(msg.ChannelID)
-		if err != nil {
-			return match
-		}
-
-		channel, ok := session.Caches.Channel(channelID)
-		if ok {
-			cached, ok := session.Caches.Emoji(channel.GuildID(), matchID)
+		if guild, ok := bot.getGuild((*snowflake)(&msg.ChannelID)); ok {
+			cached, ok := bot.getEmojiByName(&guild.ID, match)
 			if ok {
-				return cached.Mention()
+				if cached.Animated {
+					return "<a:" + string(cached.ID) + ":>"
+				}
+
+				return "<:" + string(cached.ID) + ":>"
 			}
 		}
 
@@ -111,20 +100,19 @@ func lightningToDiscordContent(session *bot.Client, msg *lightning.Message) stri
 	})
 }
 
-func lightningToDiscordEmbeds(src []lightning.Embed) []discord.Embed {
-	toImage := func(media *lightning.Media) *discord.EmbedResource {
+func lightningToDiscordEmbeds(src []lightning.Embed) []embed {
+	toImage := func(media *lightning.Media) *embedMedia {
 		if media == nil {
 			return nil
 		}
 
-		return &discord.EmbedResource{URL: media.URL, Width: media.Width, Height: media.Height}
+		return &embedMedia{URL: media.URL, Width: &media.Width, Height: &media.Height}
 	}
 
-	embeds := make([]discord.Embed, len(src))
+	embeds := make([]embed, len(src))
 
 	for idx := range src {
-		embed := src[idx]
-		embeds[idx] = discord.Embed{
+		embeds[idx] = embed{
 			URL: src[idx].URL, Title: src[idx].Title, Description: src[idx].Description, Timestamp: func() *time.Time {
 				if t, err := time.Parse(time.RFC3339, src[idx].Timestamp); err == nil {
 					return &t
@@ -133,29 +121,29 @@ func lightningToDiscordEmbeds(src []lightning.Embed) []discord.Embed {
 				return nil
 			}(),
 			Color: src[idx].Color, Image: toImage(src[idx].Image), Thumbnail: toImage(src[idx].Thumbnail),
-			Video: toImage(embed.Video), Footer: func() *discord.EmbedFooter {
+			Video: toImage(src[idx].Video), Footer: func() *embedFooter {
 				if src[idx].Footer == nil {
 					return nil
 				}
 
-				return &discord.EmbedFooter{Text: src[idx].Footer.Text, IconURL: src[idx].Footer.IconURL}
+				return &embedFooter{Text: src[idx].Footer.Text, IconURL: src[idx].Footer.IconURL}
 			}(),
-			Author: func() *discord.EmbedAuthor {
+			Author: func() *embedAuthor {
 				if src[idx].Author == nil {
 					return nil
 				}
 
-				return &discord.EmbedAuthor{
+				return &embedAuthor{
 					Name: src[idx].Author.Name, URL: src[idx].Author.URL, IconURL: src[idx].Author.IconURL,
 				}
 			}(),
-			Fields: func() []discord.EmbedField {
-				out := make([]discord.EmbedField, len(src[idx].Fields))
+			Fields: func() []embedField {
+				out := make([]embedField, len(src[idx].Fields))
 
 				for i := range src[idx].Fields {
-					out[i] = discord.EmbedField{
+					out[i] = embedField{
 						Name: src[idx].Fields[i].Name, Value: src[idx].Fields[i].Value,
-						Inline: &src[idx].Fields[i].Inline,
+						Inline: src[idx].Fields[i].Inline,
 					}
 				}
 
@@ -167,111 +155,66 @@ func lightningToDiscordEmbeds(src []lightning.Embed) []discord.Embed {
 	return embeds
 }
 
-func lightningToDiscordAllowedMentions(opts *lightning.SendOptions) *discord.AllowedMentions {
+func lightningToDiscordAllowedMentions(opts *lightning.SendOptions) *allowedMentions {
 	if opts.AllowEveryonePings {
 		return nil
 	}
 
-	return &discord.AllowedMentions{
-		Parse: []discord.AllowedMentionType{discord.AllowedMentionTypeRoles, discord.AllowedMentionTypeUsers},
+	return &allowedMentions{
+		Parse: []allowedMentionsType{allowedMentionRoles, allowedMentionUsers},
 	}
 }
 
-func lightningToDiscordComponents(session *bot.Client, msg *lightning.Message, cdn string) []discord.LayoutComponent {
-	if len(msg.RepliedTo) == 0 {
-		return []discord.LayoutComponent{}
+func lightningToDiscordComponents(
+	bot *client,
+	msg *lightning.Message,
+	opts *lightning.SendOptions,
+) []component {
+	if len(msg.RepliedTo) == 0 || opts.ChannelData == nil {
+		return []component{}
 	}
 
-	replyID, err := snowflake.Parse(msg.RepliedTo[0])
-	if err != nil {
-		return []discord.LayoutComponent{}
+	replyMessage, ok := bot.getMessage(msg.ChannelID, msg.RepliedTo[0])
+	if !ok {
+		return []component{}
 	}
 
-	channelID, err := snowflake.Parse(msg.ChannelID)
-	if err != nil {
-		return []discord.LayoutComponent{}
+	if replyMessage.GuildID == nil {
+		if ch, ok := bot.getChannel(string(replyMessage.ChannelID)); ok && ch.GuildID != nil {
+			replyMessage.GuildID = ch.GuildID
+		} else {
+			me := snowflake("@me")
+			replyMessage.GuildID = &me
+		}
 	}
 
-	replyMessage, err := session.Rest.GetMessage(channelID, replyID)
-	if err != nil {
-		return []discord.LayoutComponent{}
-	}
+	author := discordToLightningAuthor(bot, replyMessage)
 
-	author := discordToLightningAuthor(session, replyMessage, cdn)
+	url := "https://discord.com/channels/" + string(*replyMessage.GuildID) + "/" + msg.ChannelID + "/" +
+		msg.RepliedTo[0]
 
-	url := replyMessage.JumpURL()
-
-	if cdn != "cdn.discordapp.com" {
+	if bot.spacebar {
 		url = strings.ReplaceAll(url, "discord.com", "fermi.chat")
 	}
 
-	return []discord.LayoutComponent{
-		discord.ActionRowComponent{Components: []discord.InteractiveComponent{discord.ButtonComponent{
-			Label: "↪️ " + author.Username + " > " +
-				replyMessage.Content[:min(len(replyMessage.Content), 42)],
-			Style: discord.ButtonStyleLink, URL: url,
-		}}},
-	}
+	btn := btnLink
+	text := "↪️ " + author.Username + " > " +
+		replyMessage.Content[:min(len(replyMessage.Content), 42)]
+
+	return []component{{Type: compActionRow, Components: []component{{
+		Type: compButton, Label: &text, Style: &btn, URL: &url,
+	}}}}
 }
 
-func lightningToDiscordReference(msg *lightning.Message) *discord.MessageReference {
+func lightningToDiscordReference(msg *lightning.Message) *messageReference {
 	if len(msg.RepliedTo) == 0 {
 		return nil
 	}
 
-	replyID, err := snowflake.Parse(msg.RepliedTo[0])
-	if err != nil {
-		return nil
-	}
-
-	channelID, err := snowflake.Parse(msg.ChannelID)
-	if err != nil {
-		return nil
-	}
-
-	return &discord.MessageReference{
-		Type:            discord.MessageReferenceTypeDefault,
-		MessageID:       &replyID,
-		ChannelID:       &channelID,
+	return &messageReference{
+		Type:            defaultReference,
+		MessageID:       snowflake(msg.RepliedTo[0]),
+		ChannelID:       snowflake(msg.ChannelID),
 		FailIfNotExists: false,
 	}
-}
-
-func (p *discordPlugin) getOutgoingChannel(
-	message *lightning.Message,
-	opts *lightning.SendOptions,
-) (snowflake.ID, error) {
-	if opts.ChannelData != nil {
-		whID, err := snowflake.Parse(opts.ChannelData["id"])
-		if err != nil {
-			return 0, &snowflakeError{opts.ChannelData["id"], true}
-		}
-
-		p.webhooks.Set(whID, true)
-
-		return whID, nil
-	}
-
-	if opts.CommandResponse {
-		id, err := snowflake.Parse(opts.CommandUser)
-		if err != nil {
-			return 0, &snowflakeError{opts.CommandUser, true}
-		}
-
-		channel, err := p.session.Rest.CreateDMChannel(id)
-		if err != nil {
-			return 0, getError(err, "Failed to create DM channel for "+opts.CommandUser+" in command response")
-		}
-
-		message.RepliedTo = nil
-
-		return channel.ID(), nil
-	}
-
-	channelID, err := snowflake.Parse(message.ChannelID)
-	if err != nil {
-		return 0, &snowflakeError{message.ChannelID, true}
-	}
-
-	return channelID, nil
 }

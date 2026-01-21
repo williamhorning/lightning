@@ -5,65 +5,53 @@ import (
 	"strings"
 	"time"
 
-	"codeberg.org/jersey/lightning/internal/cache"
 	"codeberg.org/jersey/lightning/internal/emoji"
 	"codeberg.org/jersey/lightning/pkg/lightning"
-	"github.com/disgoorg/disgo/bot"
-	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/snowflake/v2"
 )
 
 func discordToLightning(
-	webhooks *cache.Expiring[snowflake.ID, bool],
-	session *bot.Client,
-	msg *discord.Message,
-	cdn string,
+	bot *client,
+	msg *message,
 ) *lightning.Message {
-	if msg.Type != discord.MessageTypeDefault &&
-		msg.Type != discord.MessageTypeReply &&
-		msg.Type != discord.MessageTypeSlashCommand &&
-		msg.Type != discord.MessageTypeContextMenuCommand {
+	if msg.Type != messageTypeDefault &&
+		msg.Type != messageTypeReply &&
+		msg.Type != messageTypeChatInputCommand &&
+		msg.Type != messageTypeContextMenuCommand {
 		return nil
 	}
 
 	if msg.WebhookID == nil {
-		t := snowflake.ID(1234567890)
+		t := snowflake("")
 		msg.WebhookID = &t
 	}
 
-	if exists, _ := webhooks.Get(*msg.WebhookID); exists {
+	if webhook, ok := bot.getWebhook(msg.WebhookID); ok && webhook.ApplicationID == bot.application.ID {
 		return nil
 	}
 
 	message := &lightning.Message{
 		BaseMessage: lightning.BaseMessage{
-			EventID: msg.ID.String(), ChannelID: msg.ChannelID.String(), Time: msg.ID.Time(),
+			EventID: string(msg.ID), ChannelID: string(msg.ChannelID), Time: msg.Timestamp,
 		},
-		Author: discordToLightningAuthor(session, msg, cdn),
-		Content: discordToLightningForward(session, msg) +
-			discordToLightningContent(session, msg.Content, msg.GuildID),
+		Author: discordToLightningAuthor(bot, msg),
+		Content: discordToLightningForward(bot, msg) +
+			discordToLightningContent(bot, msg.Content, msg.GuildID),
 		Embeds:      discordToLightningEmbeds(msg.Embeds),
-		Attachments: discordToLightningAttachments(msg.Attachments, msg.StickerItems, cdn),
+		Attachments: discordToLightningAttachments(bot, msg.Attachments, msg.StickerItems),
 		RepliedTo:   discordToLightningReplies(msg.MessageReference),
 	}
 
-	message.Content = discordToLightningEmoji(message, cdn)
+	message.Content = discordToLightningEmoji(bot, message)
 
 	return message
 }
 
-func discordToLightningAuthor(session *bot.Client, msg *discord.Message, cdn string) *lightning.MessageAuthor {
+func discordToLightningAuthor(bot *client, msg *message) *lightning.MessageAuthor {
 	author := &lightning.MessageAuthor{
-		ID:             msg.Author.ID.String(),
-		Username:       msg.Author.EffectiveName(),
+		ID:             string(msg.Author.ID),
+		Username:       msg.Author.displayName(),
+		ProfilePicture: msg.Author.avatarURL(bot),
 		Color:          "#5865F2",
-		ProfilePicture: msg.Author.EffectiveAvatarURL(),
-	}
-
-	if cdn != "" {
-		author.ProfilePicture = strings.ReplaceAll(
-			strings.ReplaceAll(author.ProfilePicture, "cdn.discordapp.com", cdn), "media.discordapp.net", cdn,
-		)
 	}
 
 	if msg.GuildID == nil {
@@ -72,35 +60,30 @@ func discordToLightningAuthor(session *bot.Client, msg *discord.Message, cdn str
 
 	member := msg.Member
 	if member == nil {
-		if m, ok := session.Caches.Member(*msg.GuildID, msg.Author.ID); ok {
-			member = &m
-		}
+		member, _ = bot.getMember(msg.GuildID, msg.Author.ID)
 	}
 
 	if member == nil {
 		return author
 	}
 
-	member.User = msg.Author
-	author.Username = member.EffectiveName()
-	author.ProfilePicture = member.EffectiveAvatarURL()
-	author.ProfilePicture = strings.ReplaceAll(
-		strings.ReplaceAll(author.ProfilePicture, "cdn.discordapp.com", cdn), "media.discordapp.net", cdn,
-	)
+	member.User = &msg.Author
+	author.Username = member.displayName()
+	author.ProfilePicture = member.avatarURL(bot, *msg.GuildID)
 
 	return author
 }
 
-func discordToLightningForward(session *bot.Client, msg *discord.Message) string {
-	if msg.MessageReference == nil || msg.MessageReference.MessageID == nil ||
-		msg.MessageReference.Type != discord.MessageReferenceTypeForward || len(msg.MessageSnapshots) == 0 {
+func discordToLightningForward(bot *client, msg *message) string {
+	if msg.MessageReference == nil || msg.MessageReference.MessageID == "" ||
+		msg.MessageReference.Type != forwardReference || len(msg.MessageSnapshots) == 0 {
 		return ""
 	}
 
 	out := ""
 
 	for idx := range msg.MessageSnapshots {
-		content := discordToLightningContent(session, msg.MessageSnapshots[idx].Message.Content, nil)
+		content := discordToLightningContent(bot, msg.MessageSnapshots[idx].Content, nil)
 		out += "> " + strings.ReplaceAll(content, "\n", "\n> ")
 	}
 
@@ -108,7 +91,6 @@ func discordToLightningForward(session *bot.Client, msg *discord.Message) string
 }
 
 var (
-	tenorURL       = regexp.MustCompile(`https://tenor\.com/view/[^/]+-(\d+).*`)
 	userMention    = regexp.MustCompile(`<@!?(\d+)>`)
 	channelMention = regexp.MustCompile(`<#(\d+)>`)
 	roleMention    = regexp.MustCompile(`<@&(\d+)>`)
@@ -116,8 +98,8 @@ var (
 	defaultEmoji   = regexp.MustCompile(`(?:^|[^<])(:[^:\s]*(?:::[^:\s]*)*:)`)
 )
 
-func discordToLightningContent( //nolint:cyclop,revive
-	session *bot.Client, content string, guildID *snowflake.ID,
+func discordToLightningContent(
+	bot *client, content string, guildID *snowflake,
 ) string {
 	content = defaultEmoji.ReplaceAllStringFunc(content, func(match string) string {
 		if e, ok := emoji.Emoji[match]; ok {
@@ -127,44 +109,29 @@ func discordToLightningContent( //nolint:cyclop,revive
 		return match
 	})
 
-	content = tenorURL.ReplaceAllStringFunc(content, func(match string) string {
-		return "https://tenor.com/view/" + tenorURL.FindStringSubmatch(match)[1] + ".gif"
-	})
-
 	content = userMention.ReplaceAllStringFunc(content, func(match string) string {
-		userID, err := snowflake.Parse(userMention.FindStringSubmatch(match)[1])
-		if err == nil {
-			if guildID != nil {
-				if m, ok := session.Caches.Member(*guildID, userID); ok {
-					return "@" + m.EffectiveName()
-				}
-			}
+		if member, ok := bot.getMember(guildID, snowflake(match)); ok {
+			return "@" + member.displayName()
+		}
 
-			if u, err := session.Rest.GetUser(userID); err == nil {
-				return "@" + u.EffectiveName()
-			}
+		if u, ok := bot.getUser(match); ok {
+			return "@" + u.displayName()
 		}
 
 		return "@" + userMention.FindStringSubmatch(match)[1]
 	})
 
 	content = channelMention.ReplaceAllStringFunc(content, func(match string) string {
-		channelID, err := snowflake.Parse(channelMention.FindStringSubmatch(match)[1])
-		if err == nil {
-			if ch, ok := session.Caches.Channel(channelID); ok {
-				return "#" + ch.Name()
-			}
+		if ch, ok := bot.getChannel(match); ok {
+			return "#" + ch.Name
 		}
 
 		return "#" + channelMention.FindStringSubmatch(match)[1]
 	})
 
 	content = roleMention.ReplaceAllStringFunc(content, func(match string) string {
-		roleID, err := snowflake.Parse(roleMention.FindStringSubmatch(match)[1])
-		if err == nil && guildID != nil {
-			if r, ok := session.Caches.Role(*guildID, roleID); ok {
-				return "@" + r.Name
-			}
+		if r, ok := bot.getRole(guildID, match); ok {
+			return "@" + r.Name
 		}
 
 		return "@&" + roleMention.FindStringSubmatch(match)[1]
@@ -173,7 +140,7 @@ func discordToLightningContent( //nolint:cyclop,revive
 	return content
 }
 
-func discordToLightningEmbeds(embeds []discord.Embed) []lightning.Embed {
+func discordToLightningEmbeds(embeds []embed) []lightning.Embed {
 	out := make([]lightning.Embed, 0, len(embeds))
 	for idx := range embeds {
 		embed := lightning.Embed{
@@ -207,7 +174,7 @@ func discordToLightningEmbeds(embeds []discord.Embed) []lightning.Embed {
 	return out
 }
 
-func discordToLightningEmbedFooter(original *discord.EmbedFooter) *lightning.EmbedFooter {
+func discordToLightningEmbedFooter(original *embedFooter) *lightning.EmbedFooter {
 	if original == nil {
 		return nil
 	}
@@ -215,7 +182,7 @@ func discordToLightningEmbedFooter(original *discord.EmbedFooter) *lightning.Emb
 	return &lightning.EmbedFooter{Text: original.Text, IconURL: original.IconURL}
 }
 
-func discordToLightningEmbedAuthor(original *discord.EmbedAuthor) *lightning.EmbedAuthor {
+func discordToLightningEmbedAuthor(original *embedAuthor) *lightning.EmbedAuthor {
 	if original == nil {
 		return nil
 	}
@@ -223,19 +190,14 @@ func discordToLightningEmbedAuthor(original *discord.EmbedAuthor) *lightning.Emb
 	return &lightning.EmbedAuthor{Name: original.Name, URL: original.URL, IconURL: original.URL}
 }
 
-func discordToLightningEmbedFields(original []discord.EmbedField) []lightning.EmbedField {
+func discordToLightningEmbedFields(original []embedField) []lightning.EmbedField {
 	fields := make([]lightning.EmbedField, len(original))
 
 	for idx, field := range original {
-		if field.Inline == nil {
-			t := false
-			field.Inline = &t
-		}
-
 		fields[idx] = lightning.EmbedField{
 			Name:   field.Name,
 			Value:  field.Value,
-			Inline: *field.Inline,
+			Inline: field.Inline,
 		}
 	}
 
@@ -243,9 +205,9 @@ func discordToLightningEmbedFields(original []discord.EmbedField) []lightning.Em
 }
 
 func discordToLightningAttachments(
-	attachments []discord.Attachment,
-	stickers []discord.MessageSticker,
-	cdn string,
+	bot *client,
+	attachments []attachment,
+	stickers []stickerItem,
 ) []lightning.Attachment {
 	result := make([]lightning.Attachment, 0, len(attachments)+len(stickers))
 
@@ -258,15 +220,15 @@ func discordToLightningAttachments(
 	}
 
 	for _, sticker := range stickers {
-		url := "https://" + cdn + "/stickers/" + sticker.ID.String()
+		url := "https://" + bot.cdnHost + "/stickers/" + sticker.ID
 
 		switch sticker.FormatType {
-		case discord.StickerFormatTypePNG, discord.StickerFormatTypeAPNG:
+		case stickerPNG, stickerAPNG:
 			url += ".png"
-		case discord.StickerFormatTypeGIF:
+		case stickerGIF:
 			url += ".gif"
 			url = strings.ReplaceAll(url, "cdn.discordapp.com", "media.discordapp.net")
-		case discord.StickerFormatTypeLottie:
+		case stickerLottie:
 			url += ".json"
 		default:
 		}
@@ -280,15 +242,15 @@ func discordToLightningAttachments(
 	return result
 }
 
-func discordToLightningReplies(reference *discord.MessageReference) []string {
-	if reference == nil || reference.MessageID == nil || reference.Type != discord.MessageReferenceTypeDefault {
+func discordToLightningReplies(reference *messageReference) []string {
+	if reference == nil || reference.MessageID == "" || reference.Type != defaultReference {
 		return nil
 	}
 
-	return []string{reference.MessageID.String()}
+	return []string{string(reference.MessageID)}
 }
 
-func discordToLightningEmoji(msg *lightning.Message, cdn string) string {
+func discordToLightningEmoji(bot *client, msg *lightning.Message) string {
 	return emojiMention.ReplaceAllStringFunc(msg.Content, func(match string) string {
 		parts := strings.Split(match, ":")
 		if len(parts) < 3 {
@@ -298,7 +260,7 @@ func discordToLightningEmoji(msg *lightning.Message, cdn string) string {
 		emojiID := parts[2]
 		emojiName := parts[1]
 
-		url := "https://" + cdn + "/emojis/" + emojiID
+		url := "https://" + bot.cdnHost + "/emojis/" + emojiID
 		if strings.HasPrefix(match, "<a") {
 			url += ".gif?size=48"
 		} else {
