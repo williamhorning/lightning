@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -51,6 +53,7 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 		messages    = make(chan struct {
 			data []byte
 			err  error
+			s    *websocket.Conn
 		})
 		backoff      int
 		seq          int64
@@ -65,7 +68,7 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 
 			socket, heartbeat, err = bot.connectOnce(gateway, reconnectURL, sessionID, seq)
 			if err != nil {
-				state = bot.closeAndTransition(socket, err)
+				state = bot.closeAndTransition(socket, &seq, &sessionID, &reconnectURL, err)
 
 				continue
 			}
@@ -74,35 +77,40 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 			nextBeat = time.After(1 * time.Second)
 			state = stateConnected
 		case stateConnected:
-			go func() {
-				_, data, err := socket.ReadMessage()
+			go func(sock *websocket.Conn) {
+				_, data, err := sock.ReadMessage()
 
 				messages <- struct {
 					data []byte
 					err  error
-				}{data, err}
-			}()
+					s    *websocket.Conn
+				}{data, err, sock}
+			}(socket)
 
 			select {
 			case <-requestBeat:
 				if err := bot.sendHeartbeat(socket, &seq); err != nil {
-					state = bot.closeAndTransition(socket, err)
+					state = bot.closeAndTransition(socket, &seq, &sessionID, &reconnectURL, err)
 
 					continue
 				}
 			case <-nextBeat:
 				if err := bot.sendHeartbeat(socket, &seq); err != nil {
-					state = bot.closeAndTransition(socket, err)
+					state = bot.closeAndTransition(socket, &seq, &sessionID, &reconnectURL, err)
 
 					continue
 				}
 
 				nextBeat = time.After(heartbeat)
 			case msg := <-messages:
-				_ = socket.SetReadDeadline(time.Now().Add(heartbeat))
+				_ = socket.SetReadDeadline(time.Now().Add(heartbeat * 2))
+
+				if msg.s != socket && msg.err != nil {
+					continue
+				}
 
 				if msg.err != nil {
-					state = bot.closeAndTransition(socket, msg.err)
+					state = bot.closeAndTransition(socket, &seq, &sessionID, &reconnectURL, msg.err)
 
 					continue
 				}
@@ -122,15 +130,16 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 }
 
 func (bot *client) connectOnce( //nolint:revive,cyclop
-	gateway, reconnectURL, sessionID string,
-	seq int64,
+	gateway, reconnectURL, sessionID string, seq int64,
 ) (*websocket.Conn, time.Duration, error) {
 	url := gateway
 	if reconnectURL != "" {
 		url = reconnectURL
 	}
 
-	socket, resp, err := websocket.DefaultDialer.Dial(url+"?v="+bot.version+"&encoding=json", nil)
+	socket, resp, err := websocket.DefaultDialer.Dial(url+"?v="+bot.version+"&encoding=json", http.Header{
+		"User-Agent": []string{"DiscordBot (https://williamhorn.ing/lightning, 0.8.1)"},
+	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to dial websocket: %w", err)
 	}
@@ -247,6 +256,10 @@ func (bot *client) dispatch( //nolint:revive,cyclop,funlen
 		*sessionID = ready.SessionID
 		*reconnectURL = ready.ResumeURL
 		payload = &ready
+	case eventResumed:
+		log.Printf("%s: connection resumed", bot.product)
+
+		return
 	case eventMessageCreate, eventMessageEdit:
 		var msg message
 		if json.Unmarshal(data, &msg) != nil {
@@ -314,15 +327,27 @@ func (bot *client) dispatch( //nolint:revive,cyclop,funlen
 	}
 }
 
-func (*client) closeAndTransition(socket *websocket.Conn, err error) connState {
+func (bot *client) closeAndTransition(
+	socket *websocket.Conn, seq *int64, sessionID, reconnectURL *string, err error,
+) connState {
 	_ = socket.Close()
 
 	var closeErr *websocket.CloseError
 	if !errors.As(err, &closeErr) {
+		log.Printf("%s: socket error, will try reconnecting: %v", bot.product, err)
+
 		return stateReconnecting
 	}
 
+	log.Printf("%s: socket close, will try reconnecting: %v", bot.product, err)
+
 	switch closeErr.Code {
+	case 4009:
+		*seq = 0
+		*sessionID = ""
+		*reconnectURL = ""
+
+		return stateReconnecting
 	case 4004, 4010, 4011, 4012, 4013, 4014:
 		return stateTerminal
 	default:

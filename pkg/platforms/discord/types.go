@@ -201,6 +201,7 @@ type eventType string
 
 const (
 	eventReady             eventType = "READY"
+	eventResumed           eventType = "RESUMED"
 	eventChannelCreate     eventType = "CHANNEL_CREATE"
 	eventChannelUpdate     eventType = "CHANNEL_UPDATE"
 	eventGuildCreate       eventType = "GUILD_CREATE"
