@@ -3,6 +3,7 @@ package matrix
 import (
 	"context"
 	"log"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -90,9 +91,12 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 
 	defer resp.Body.Close()
 
+	parts := strings.Split(url, ".")
+
 	mxc, err := p.client.UploadMedia(context.Background(), mautrix.ReqUploadMedia{
 		Content:       resp.Body,
 		ContentLength: resp.ContentLength,
+		ContentType:   mime.TypeByExtension(parts[len(parts)-1]),
 	})
 	if err != nil {
 		log.Printf("matrix: upload failed for %s: %v\n", url, err)

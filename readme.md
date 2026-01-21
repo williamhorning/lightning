@@ -14,7 +14,7 @@ framework itself usable by other developers, to create their own bots, and to
 make the bridge easy to self-host, while also supporting the principles of:
 
 - **Connecting communities**: the Lightning bridge connects Discord, Stoat,
-and Telegram, allowing communities to connect, wherever they are
+Matrix, and Telegram, allowing communities to connect, wherever they are
 - **Extensibility**: the Lightning framework uses plugins to make it easy to
 add new features, while keeping the core simple. The bridge is also designed to
 be flexible, with options to disable pings, setup subscribe-only channels, and
@@ -38,7 +38,7 @@ what do you do, what options do you have?
 
 **Bridging!** Everyone can use their favorite app, gets the same messages, and
 is on the same page. Lightning is an easy to use bridge bot that supports
-Discord, Stoat, and Telegram. To get started, check out the
+Discord, Stoat, Matrix, and Telegram. To get started, check out the
 [getting started guide](https://williamhorning.dev/lightning/bridge/users),
 which will walk you through using Bolt, the hosted version of the Lightning
 bot. If you want to self-host, read the [self-hosting guide](./bridge/hosting)

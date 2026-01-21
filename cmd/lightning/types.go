@@ -56,5 +56,5 @@ func (b *bridge) getChannelDisabled(channelID string) lightning.ChannelDisabled 
 type unsupportedDatabaseVersionError struct{}
 
 func (unsupportedDatabaseVersionError) Error() string {
-	return "unsupported database version, must be from a version greater than v0.8.0-beta.9"
+	return "unsupported database version, must be from a lightning version greater than v0.8.0-beta.9"
 }
