@@ -50,6 +50,7 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 		state       = stateConnected
 		nextBeat    <-chan time.Time
 		requestBeat = make(chan struct{}, 1)
+		readReady   = make(chan struct{}, 1)
 		messages    = make(chan struct {
 			data []byte
 			err  error
@@ -60,6 +61,8 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 		sessionID    string
 		reconnectURL string
 	)
+
+	readReady <- struct{}{}
 
 	for {
 		switch state {
@@ -78,6 +81,8 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 			state = stateConnected
 		case stateConnected:
 			go func(sock *websocket.Conn) {
+				<-readReady
+
 				_, data, err := sock.ReadMessage()
 
 				messages <- struct {
@@ -85,6 +90,8 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 					err  error
 					s    *websocket.Conn
 				}{data, err, sock}
+
+				readReady <- struct{}{}
 			}(socket)
 
 			select {
