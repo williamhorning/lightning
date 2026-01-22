@@ -3,10 +3,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
 	"codeberg.org/jersey/lightning/pkg/platforms/discord"
@@ -44,9 +46,17 @@ func main() {
 	bot.AddPluginType("matrix", matrix.New)
 
 	for _, plugin := range config.Plugins {
-		if err := bot.UsePluginType(plugin.Type, plugin.Name, plugin.Config); err != nil {
-			log.Fatalf("bridge: failed to setup plugin for %s instance %q: %v\n", plugin.Type, plugin.Name, err)
-		}
+		go func() {
+			err = setupPlugin(bot, &plugin)
+
+			for err != nil {
+				log.Println(err.Error())
+
+				time.Sleep(time.Second)
+
+				err = setupPlugin(bot, &plugin)
+			}
+		}()
 	}
 
 	registerCommands(bot, database, config.Username)
@@ -56,4 +66,12 @@ func main() {
 	<-quitChannel
 
 	log.Println("bridge: bot stopped")
+}
+
+func setupPlugin(bot *lightning.Bot, plugin *pluginConfig) error {
+	if err := bot.UsePluginType(plugin.Type, plugin.Name, plugin.Config); err != nil {
+		return fmt.Errorf("bridge: failed to setup plugin for %s instance %q: %w", plugin.Type, plugin.Name, err)
+	}
+
+	return nil
 }

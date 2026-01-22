@@ -13,6 +13,9 @@ func (b *Bot) AddCommand(commands ...Command) {
 		b.commands[command.Name] = command
 	}
 
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	for _, plugin := range b.plugins {
 		plugin.SetupCommands(b.commands)
 	}
