@@ -76,6 +76,20 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 				continue
 			}
 
+			go func(sock *websocket.Conn) {
+				<-readReady
+
+				_, data, err := sock.ReadMessage()
+
+				messages <- struct {
+					data []byte
+					err  error
+					s    *websocket.Conn
+				}{data, err, sock}
+
+				readReady <- struct{}{}
+			}(socket)
+
 			backoff = 0
 			nextBeat = time.After(1 * time.Second)
 			state = stateConnected
@@ -111,10 +125,6 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 				nextBeat = time.After(heartbeat)
 			case msg := <-messages:
 				_ = socket.SetReadDeadline(time.Now().Add(heartbeat * 2))
-
-				if msg.s != socket && msg.err != nil {
-					continue
-				}
 
 				if msg.err != nil {
 					state = bot.closeAndTransition(socket, &seq, &sessionID, &reconnectURL, msg.err)
