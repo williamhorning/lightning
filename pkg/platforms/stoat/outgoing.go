@@ -115,9 +115,9 @@ func lightningToStoatAttachments(session *session, attachments []lightning.Attac
 	out := make([]string, 0, len(attachments))
 	for _, att := range attachments {
 		file, err := session.uploadFile(att.URL, att.Name)
-		if err == nil {
+		if err == nil && file != "" {
 			out = append(out, file)
-		} else {
+		} else if err != nil {
 			log.Printf("stoat: %v\n", err)
 		}
 	}

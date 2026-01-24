@@ -151,6 +151,10 @@ func (session *session) uploadFile(srcURL, filename string) (string, error) {
 
 	defer resp.Body.Close()
 
+	if resp.ContentLength == 0 {
+		return "", nil
+	}
+
 	var buf bytes.Buffer
 
 	writer := multipart.NewWriter(&buf)
