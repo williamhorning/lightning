@@ -20,7 +20,7 @@ func (e *stError) Disable() *lightning.ChannelDisabled {
 	case "UnknownChannel":
 		return &lightning.ChannelDisabled{Read: true, Write: true}
 	case "MissingPermission", "MissingUserPermission", "NotElevated", "NotPrivileged", "NotOwner",
-		"CannotGiveMissingPermissions", "Banned", "Blocked", "BlockedByOther":
+		"CannotGiveMissingPermissions", "Banned", "Blocked", "BlockedByOther", "NotFound":
 		return &lightning.ChannelDisabled{Read: false, Write: true}
 	default:
 		return &lightning.ChannelDisabled{Read: false, Write: false}

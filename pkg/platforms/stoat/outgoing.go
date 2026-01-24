@@ -139,8 +139,15 @@ func lightningToStoatEmbeds(session *session, embeds []lightning.Embed) []stSend
 
 func lightningToStoatEmbed(session *session, embed *lightning.Embed) stSendableEmbed {
 	newEmbed := stSendableEmbed{
-		Title:       embed.Title,
 		Description: *stoatEmbedDescription(embed),
+	}
+
+	if embed.Title != "" {
+		if len(embed.Title) > 100 {
+			embed.Title = embed.Title[:100]
+		}
+
+		newEmbed.Title = embed.Title
 	}
 
 	if embed.URL != "" {
