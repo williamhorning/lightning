@@ -44,12 +44,14 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	}
 
 	if len(msg.RepliedTo) != 0 {
-		message.RelatesTo = &event.RelatesTo{Type: "m.in_reply_to", EventID: id.EventID(msg.RepliedTo[0])}
+		message.RelatesTo = &event.RelatesTo{InReplyTo: &event.InReplyTo{EventID: id.EventID(msg.RepliedTo[0])}}
 	}
 
 	message.AddPerMessageProfileFallback()
 
 	messages := make([]*event.MessageEventContent, 0, len(msg.Attachments)+1)
+
+	messages = append(messages, &message)
 
 	for _, attachment := range msg.Attachments {
 		if mxc := p.uploadFile(attachment.URL); mxc != nil {
@@ -96,7 +98,7 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 	mxc, err := p.client.UploadMedia(context.Background(), mautrix.ReqUploadMedia{
 		Content:       resp.Body,
 		ContentLength: resp.ContentLength,
-		ContentType:   mime.TypeByExtension(parts[len(parts)-1]),
+		ContentType:   mime.TypeByExtension("." + parts[len(parts)-1]),
 	})
 	if err != nil {
 		log.Printf("matrix: upload failed for %s: %v\n", url, err)

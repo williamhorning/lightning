@@ -103,6 +103,7 @@ func (p *matrixPlugin) EditMessage(
 
 	for idx, msg := range p.lightningToMatrixMessage(message, opts) {
 		msg.RelatesTo = &event.RelatesTo{Type: "m.replace", EventID: id.EventID(ids[idx])}
+		msg.NewContent = msg
 
 		_, err := p.client.SendMessageEvent(
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
