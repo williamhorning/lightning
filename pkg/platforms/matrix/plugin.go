@@ -17,7 +17,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"codeberg.org/jersey/lightning/internal/cache"
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -51,8 +50,14 @@ func New(config map[string]string) (lightning.Plugin, error) {
 
 	msgChannel := make(chan *lightning.Message, 1000)
 	editChannel := make(chan *lightning.EditedMessage, 1000)
+	deleteChannel := make(chan *lightning.BaseMessage, 1000)
 
-	listenForEvents(syncer, client, msgChannel, editChannel)
+	syncer.OnSync(client.DontProcessOldEvents)
+
+	listenForEvents(
+		syncer.OnEventType, client.JoinRoomByID, client, string(client.UserID),
+		msgChannel, editChannel, deleteChannel,
+	)
 
 	go func() {
 		for {
@@ -64,15 +69,17 @@ func New(config map[string]string) (lightning.Plugin, error) {
 
 	log.Println("matrix: ready at https://matrix.to/#/" + config["mxid"])
 
-	return &matrixPlugin{client: client, syncer: syncer, msgChannel: msgChannel, editChannel: editChannel}, nil
+	return &matrixPlugin{
+		client: client, msgChannel: msgChannel, editChannel: editChannel, deleteChannel: deleteChannel,
+	}, nil
 }
 
 type matrixPlugin struct {
-	client      *mautrix.Client
-	syncer      *mautrix.DefaultSyncer
-	msgChannel  chan *lightning.Message
-	editChannel chan *lightning.EditedMessage
-	mxcCache    cache.Expiring[string, id.ContentURIString]
+	client        *mautrix.Client
+	msgChannel    chan *lightning.Message
+	editChannel   chan *lightning.EditedMessage
+	deleteChannel chan *lightning.BaseMessage
+	mxcCache      cache.Expiring[string, id.ContentURIString]
 }
 
 func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
@@ -82,7 +89,7 @@ func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
 func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	ids := make([]string, 0, len(message.Attachments)+1)
 
-	for _, msg := range p.lightningToMatrixMessage(message, opts) {
+	for _, msg := range p.lightningToMatrixMessage(p.client, message, opts) {
 		resp, err := p.client.SendMessageEvent(
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
 		)
@@ -101,7 +108,7 @@ func (p *matrixPlugin) EditMessage(
 ) ([]string, error) {
 	message.Attachments = nil
 
-	for idx, msg := range p.lightningToMatrixMessage(message, opts) {
+	for idx, msg := range p.lightningToMatrixMessage(p.client, message, opts) {
 		msg.RelatesTo = &event.RelatesTo{Type: "m.replace", EventID: id.EventID(ids[idx])}
 		msg.NewContent = msg
 
@@ -139,17 +146,7 @@ func (p *matrixPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 }
 
 func (p *matrixPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
-	channel := make(chan *lightning.BaseMessage, 1000)
-
-	p.syncer.OnEventType(event.EventRedaction, func(_ context.Context, evt *event.Event) {
-		channel <- &lightning.BaseMessage{
-			Time:      time.UnixMilli(evt.Timestamp),
-			EventID:   string(evt.Content.AsRedaction().Redacts),
-			ChannelID: string(evt.RoomID),
-		}
-	})
-
-	return channel
+	return p.deleteChannel
 }
 
 func (*matrixPlugin) ListenCommands() <-chan *lightning.CommandEvent {

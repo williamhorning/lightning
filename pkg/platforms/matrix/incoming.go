@@ -3,6 +3,7 @@ package matrix
 import (
 	"context"
 	"log"
+	"regexp"
 	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -15,6 +16,7 @@ func matrixToLightningMessage(
 	ctx context.Context,
 	evt *event.Event,
 	client *mautrix.Client,
+	regex string,
 ) *lightning.Message {
 	if evt.Type != event.EventMessage {
 		return nil
@@ -22,7 +24,7 @@ func matrixToLightningMessage(
 
 	msg := evt.Content.AsMessage()
 
-	if string(evt.Sender) == string(client.UserID) && msg.BeeperPerMessageProfile != nil {
+	if msg.BeeperPerMessageProfile != nil && regexp.MustCompile(regex).Match([]byte(evt.Sender)) {
 		return nil
 	}
 

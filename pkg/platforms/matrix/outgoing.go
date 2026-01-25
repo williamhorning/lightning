@@ -16,7 +16,7 @@ import (
 )
 
 func (p *matrixPlugin) lightningToMatrixMessage(
-	msg *lightning.Message, opts *lightning.SendOptions,
+	client *mautrix.Client, msg *lightning.Message, opts *lightning.SendOptions,
 ) []*event.MessageEventContent {
 	for idx := range msg.Embeds {
 		msg.Content += "\n\n" + msg.Embeds[idx].ToMarkdown()
@@ -28,7 +28,7 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 
 	if msg.Author != nil {
 		if msg.Author.ProfilePicture != "" {
-			url = p.uploadFile(msg.Author.ProfilePicture)
+			url = p.uploadFile(client, msg.Author.ProfilePicture)
 		}
 
 		message.BeeperPerMessageProfile = &event.BeeperPerMessageProfile{
@@ -54,7 +54,7 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	messages = append(messages, &message)
 
 	for _, attachment := range msg.Attachments {
-		if mxc := p.uploadFile(attachment.URL); mxc != nil {
+		if mxc := p.uploadFile(client, attachment.URL); mxc != nil {
 			messages = append(messages, &event.MessageEventContent{
 				RelatesTo:               message.RelatesTo,
 				FileName:                attachment.Name,
@@ -72,7 +72,7 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	return messages
 }
 
-func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
+func (p *matrixPlugin) uploadFile(client *mautrix.Client, url string) *id.ContentURIString {
 	if cached, ok := p.mxcCache.Get(url); ok {
 		return &cached
 	}
@@ -95,7 +95,7 @@ func (p *matrixPlugin) uploadFile(url string) *id.ContentURIString {
 
 	parts := strings.Split(url, ".")
 
-	mxc, err := p.client.UploadMedia(context.Background(), mautrix.ReqUploadMedia{
+	mxc, err := client.UploadMedia(context.Background(), mautrix.ReqUploadMedia{
 		Content:       resp.Body,
 		ContentLength: resp.ContentLength,
 		ContentType:   mime.TypeByExtension("." + parts[len(parts)-1]),

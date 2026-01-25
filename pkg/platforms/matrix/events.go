@@ -9,35 +9,33 @@ import (
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
+	"maunium.net/go/mautrix/id"
 )
 
 func listenForEvents(
-	syncer *mautrix.DefaultSyncer,
+	onEvent func(eventType event.Type, callback mautrix.EventHandler),
+	joinRoom func(ctx context.Context, roomID id.RoomID) (resp *mautrix.RespJoinRoom, err error),
 	client *mautrix.Client,
+	regex string,
 	msgChannel chan *lightning.Message,
 	editChannel chan *lightning.EditedMessage,
+	deleteChannel chan *lightning.BaseMessage,
 ) {
-	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
+	onEvent(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		if evt.Content.AsMember().Membership == event.MembershipInvite {
-			if _, err := client.JoinRoomByID(ctx, evt.RoomID); err != nil {
+			if _, err := joinRoom(ctx, evt.RoomID); err != nil {
 				log.Printf("matrix: failed to join room %q: %v\n", evt.RoomID, err)
 			}
 		}
 	})
 
-	syncer.OnSync(func(ctx context.Context, resp *mautrix.RespSync, since string) bool {
-		return since != "" || client.DontProcessOldEvents(ctx, resp, since)
-	})
-
-	syncer.OnEventType(event.EventMessage, mautrix.EventHandler(func(ctx context.Context, evt *event.Event) {
-		msg := matrixToLightningMessage(ctx, evt, client)
-
+	onEvent(event.EventMessage, func(ctx context.Context, evt *event.Event) {
+		msg := matrixToLightningMessage(ctx, evt, client, regex)
 		if msg == nil {
 			return
 		}
 
 		edit := evt.Content.AsMessage().NewContent
-
 		if edit == nil {
 			msgChannel <- msg
 
@@ -52,5 +50,13 @@ func listenForEvents(
 		msg.Content = newContent
 
 		editChannel <- &lightning.EditedMessage{Edited: time.UnixMilli(evt.Timestamp), Message: msg}
-	}))
+	})
+
+	onEvent(event.EventRedaction, func(_ context.Context, evt *event.Event) {
+		deleteChannel <- &lightning.BaseMessage{
+			Time:      time.UnixMilli(evt.Timestamp),
+			EventID:   string(evt.Content.AsRedaction().Redacts),
+			ChannelID: string(evt.RoomID),
+		}
+	})
 }
