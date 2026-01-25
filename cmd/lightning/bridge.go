@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"sync"
+	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
 )
@@ -166,6 +167,8 @@ func bridgeDelete(database *database) func(*lightning.Bot, *lightning.BaseMessag
 }
 
 func getPriorMessage(database *database, base *lightning.BaseMessage) (*bridge, *bridgeMessageCollection, bool) {
+	time.Sleep(150 * time.Millisecond)
+
 	bridge, err := database.getBridgeByChannel(base.ChannelID)
 	if err != nil {
 		log.Printf("bridge: failed to get bridge for previously sent message: %v\n", err)

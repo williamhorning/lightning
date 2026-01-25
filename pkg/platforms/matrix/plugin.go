@@ -15,12 +15,11 @@ package matrix
 
 import (
 	"context"
-	"fmt"
-	"log"
 
 	"codeberg.org/jersey/lightning/internal/cache"
 	"codeberg.org/jersey/lightning/pkg/lightning"
 	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
@@ -29,52 +28,25 @@ import (
 //
 // It only takes in a map with the following structure:
 //
-//	map[string]string{
-//		"access_token": "", // a string with your Matrix bot token
-//		"homeserver": "",   // a string with your Matrix homeserver URL
-//		"mxid": "",         // a string with your Matrix bot ID
-//	}
+//		map[string]string{
+//			"access_token": "", // a string with your Matrix bot token, sets up a bot using MSC4144 if specified
+//	 		"as_url": "",       // a string with the URL your appservice is at
+//	 		"as_token": "",     // a string with the random token your appservice will use
+//	 		"as_local": "",     // a string with the localpart your appservice will use
+//	 		"hs_token": "",     // a string with the random token your homeserver will use
+//			"homeserver": "",   // a string with your Matrix homeserver URL
+//			"mxid": "",         // a string with your Matrix bot ID
+//		}
 func New(config map[string]string) (lightning.Plugin, error) {
-	client, err := mautrix.NewClient(config["homeserver"], id.UserID(config["mxid"]), config["access_token"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
+	if config["access_token"] != "" {
+		return getBot(config)
 	}
 
-	client.UserAgent += " lightning/0.8.4"
-
-	syncer, ok := client.Syncer.(*mautrix.DefaultSyncer)
-	if !ok {
-		syncer = mautrix.NewDefaultSyncer()
-		client.Syncer = syncer
-	}
-
-	msgChannel := make(chan *lightning.Message, 1000)
-	editChannel := make(chan *lightning.EditedMessage, 1000)
-	deleteChannel := make(chan *lightning.BaseMessage, 1000)
-
-	syncer.OnSync(client.DontProcessOldEvents)
-
-	listenForEvents(
-		syncer.OnEventType, client.JoinRoomByID, client, string(client.UserID),
-		msgChannel, editChannel, deleteChannel,
-	)
-
-	go func() {
-		for {
-			if err := client.Sync(); err != nil {
-				log.Printf("matrix: sync stopped, will retry: %v\n", err)
-			}
-		}
-	}()
-
-	log.Println("matrix: ready at https://matrix.to/#/" + config["mxid"])
-
-	return &matrixPlugin{
-		client: client, msgChannel: msgChannel, editChannel: editChannel, deleteChannel: deleteChannel,
-	}, nil
+	return getAppsvc(config)
 }
 
 type matrixPlugin struct {
+	appsvc        *appservice.AppService
 	client        *mautrix.Client
 	msgChannel    chan *lightning.Message
 	editChannel   chan *lightning.EditedMessage
@@ -88,9 +60,10 @@ func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
 
 func (p *matrixPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {
 	ids := make([]string, 0, len(message.Attachments)+1)
+	client, fallback := p.getClient(message)
 
-	for _, msg := range p.lightningToMatrixMessage(p.client, message, opts) {
-		resp, err := p.client.SendMessageEvent(
+	for _, msg := range p.lightningToMatrixMessage(client, message, opts, fallback) {
+		resp, err := client.SendMessageEvent(
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
 		)
 		if err != nil {
@@ -107,12 +80,13 @@ func (p *matrixPlugin) EditMessage(
 	message *lightning.Message, ids []string, opts *lightning.SendOptions,
 ) ([]string, error) {
 	message.Attachments = nil
+	client, fallback := p.getClient(message)
 
-	for idx, msg := range p.lightningToMatrixMessage(p.client, message, opts) {
+	for idx, msg := range p.lightningToMatrixMessage(client, message, opts, fallback) {
 		msg.RelatesTo = &event.RelatesTo{Type: "m.replace", EventID: id.EventID(ids[idx])}
 		msg.NewContent = msg
 
-		_, err := p.client.SendMessageEvent(
+		_, err := client.SendMessageEvent(
 			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
 		)
 		if err != nil {
@@ -124,8 +98,10 @@ func (p *matrixPlugin) EditMessage(
 }
 
 func (p *matrixPlugin) DeleteMessage(channel string, ids []string) error {
+	client, _ := p.getClient(nil)
+
 	for _, msgID := range ids {
-		if _, err := p.client.RedactEvent(
+		if _, err := client.RedactEvent(
 			context.Background(), id.RoomID(channel), id.EventID(msgID), mautrix.ReqRedact{Reason: "deleted in bridge"},
 		); err != nil {
 			return handleError(err, "redact")

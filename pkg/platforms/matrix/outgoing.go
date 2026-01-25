@@ -16,7 +16,7 @@ import (
 )
 
 func (p *matrixPlugin) lightningToMatrixMessage(
-	client *mautrix.Client, msg *lightning.Message, opts *lightning.SendOptions,
+	client *mautrix.Client, msg *lightning.Message, opts *lightning.SendOptions, fallback bool,
 ) []*event.MessageEventContent {
 	for idx := range msg.Embeds {
 		msg.Content += "\n\n" + msg.Embeds[idx].ToMarkdown()
@@ -47,8 +47,6 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 		message.RelatesTo = &event.RelatesTo{InReplyTo: &event.InReplyTo{EventID: id.EventID(msg.RepliedTo[0])}}
 	}
 
-	message.AddPerMessageProfileFallback()
-
 	messages := make([]*event.MessageEventContent, 0, len(msg.Attachments)+1)
 
 	messages = append(messages, &message)
@@ -66,7 +64,9 @@ func (p *matrixPlugin) lightningToMatrixMessage(
 	}
 
 	for _, mxSend := range messages {
-		mxSend.AddPerMessageProfileFallback()
+		if fallback {
+			mxSend.AddPerMessageProfileFallback()
+		}
 	}
 
 	return messages
