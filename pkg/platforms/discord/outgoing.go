@@ -188,7 +188,7 @@ func lightningToDiscordComponents(
 		}
 	}
 
-	author := discordToLightningAuthor(bot, replyMessage)
+	author := discordToLightningAuthor(bot, &replyMessage.Author, replyMessage.Member, replyMessage.GuildID)
 
 	url := "https://discord.com/channels/" + string(*replyMessage.GuildID) + "/" + msg.ChannelID + "/" +
 		msg.RepliedTo[0]

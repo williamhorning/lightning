@@ -63,11 +63,11 @@ func fetch[T any](session *session, method, endpoint, content string, data any) 
 		req.Header["Content-Type"] = []string{content}
 	}
 
-	return requestLoop[T](session, req, content, data)
+	return requestLoop[T](session, req, content, data, 0)
 }
 
 func requestLoop[T any](
-	session *session, req *http.Request, content string, data any,
+	session *session, req *http.Request, content string, data any, retry int,
 ) (*T, error) {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -87,7 +87,7 @@ func requestLoop[T any](
 
 		return &val, nil
 	case http.StatusTooManyRequests:
-		if content == "application/json" {
+		if content == "application/json" && retry < 5 {
 			time.Sleep(time.Second)
 
 			return fetch[T](session, req.Method, req.URL.String(), content, data)

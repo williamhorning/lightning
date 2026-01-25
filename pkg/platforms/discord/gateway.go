@@ -50,19 +50,17 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 		state       = stateConnected
 		nextBeat    <-chan time.Time
 		requestBeat = make(chan struct{}, 1)
-		readReady   = make(chan struct{}, 1)
 		messages    = make(chan struct {
 			data []byte
 			err  error
-			s    *websocket.Conn
-		})
+		}, 16)
 		backoff      int
 		seq          int64
 		sessionID    string
 		reconnectURL string
 	)
 
-	readReady <- struct{}{}
+	go startListener(messages, socket)
 
 	for {
 		switch state {
@@ -76,38 +74,12 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 				continue
 			}
 
-			go func(sock *websocket.Conn) {
-				<-readReady
-
-				_, data, err := sock.ReadMessage()
-
-				messages <- struct {
-					data []byte
-					err  error
-					s    *websocket.Conn
-				}{data, err, sock}
-
-				readReady <- struct{}{}
-			}(socket)
+			go startListener(messages, socket)
 
 			backoff = 0
 			nextBeat = time.After(1 * time.Second)
 			state = stateConnected
 		case stateConnected:
-			go func(sock *websocket.Conn) {
-				<-readReady
-
-				_, data, err := sock.ReadMessage()
-
-				messages <- struct {
-					data []byte
-					err  error
-					s    *websocket.Conn
-				}{data, err, sock}
-
-				readReady <- struct{}{}
-			}(socket)
-
 			select {
 			case <-requestBeat:
 				if err := bot.sendHeartbeat(socket, &seq); err != nil {
@@ -143,6 +115,25 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 			return
 		default:
 		}
+	}
+}
+
+func startListener(messages chan struct {
+	data []byte
+	err  error
+}, socket *websocket.Conn,
+) {
+	var data []byte
+
+	var err error
+
+	for err == nil {
+		_, data, err = socket.ReadMessage()
+
+		messages <- struct {
+			data []byte
+			err  error
+		}{data, err}
 	}
 }
 
@@ -304,6 +295,10 @@ func (bot *client) dispatch( //nolint:revive,cyclop,funlen
 		var gui guild
 		if json.Unmarshal(data, &gui) != nil || gui.Unavailable {
 			return
+		}
+
+		for idx := range gui.Roles {
+			bot.roles.Set(string(gui.Roles[idx].ID), &gui.Roles[idx])
 		}
 
 		bot.guilds.Set(gui.ID, &gui)

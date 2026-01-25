@@ -254,6 +254,7 @@ type guild struct {
 	ID          snowflake   `json:"id"`
 	Unavailable bool        `json:"unavailable,omitempty"`
 	PremiumTier premiumTier `json:"premium_tier,omitempty"`
+	Roles       []role      `json:"roles,omitempty"`
 }
 
 type intent int
@@ -290,11 +291,26 @@ const (
 )
 
 type interactionCreateEvent struct {
+	User      *user            `json:"user,omitempty"`
+	Member    *member          `json:"member,omitempty"`
 	ChannelID *snowflake       `json:"channel_id,omitempty"`
+	GuildID   *snowflake       `json:"guild_id,omitempty"`
 	Data      *interactionData `json:"data,omitempty"`
 	ID        snowflake        `json:"id"`
 	Token     string           `json:"token"`
 	Type      interactionType  `json:"type"`
+}
+
+func (i *interactionCreateEvent) getUser() *user {
+	if i.User != nil {
+		return i.User
+	}
+
+	if i.Member != nil && i.Member.User != nil {
+		return i.Member.User
+	}
+
+	return nil
 }
 
 type interactionData struct {
@@ -332,9 +348,10 @@ type interactionType int
 const interactionApplicationCommand interactionType = 2
 
 type member struct {
-	Avatar *string `json:"avatar,omitempty"`
-	Nick   *string `json:"nick,omitempty"`
-	User   *user   `json:"user,omitempty"`
+	Avatar *string  `json:"avatar,omitempty"`
+	Nick   *string  `json:"nick,omitempty"`
+	User   *user    `json:"user,omitempty"`
+	Roles  []string `json:"roles,omitempty"`
 }
 
 func (m *member) avatarURL(client *client, guild snowflake) string {
@@ -463,8 +480,9 @@ type readyEvent struct {
 }
 
 type role struct {
-	ID   snowflake `json:"id"`
-	Name string    `json:"name"`
+	ID          snowflake `json:"id"`
+	Name        string    `json:"name"`
+	Permissions string    `json:"permissions"`
 }
 
 type roleEvent struct {

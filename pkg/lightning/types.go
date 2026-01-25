@@ -42,6 +42,7 @@ type CommandOptions struct {
 	BaseMessage
 
 	Arguments map[string]string
+	Author    *MessageAuthor
 	Bot       *Bot
 	Reply     func(message *Message, sensitive bool)
 	Prefix    string

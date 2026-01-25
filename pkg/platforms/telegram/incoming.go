@@ -59,13 +59,6 @@ func telegramToLightningProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxy
 	var fileID string
 
 	switch {
-	case ctx.EffectiveChat != nil:
-		chat, err := ctx.EffectiveChat.Get(bot, nil)
-		if err != nil || chat.Photo == nil {
-			return ""
-		}
-
-		fileID = chat.Photo.BigFileId
 	case ctx.EffectiveUser != nil:
 		pics, err := ctx.EffectiveUser.GetProfilePhotos(bot, nil)
 		if err != nil || len(pics.Photos) == 0 {
@@ -73,6 +66,13 @@ func telegramToLightningProfilePicture(bot *gotgbot.Bot, ctx *ext.Context, proxy
 		}
 
 		fileID = getBestPhoto(pics.Photos[0])
+	case ctx.EffectiveChat != nil:
+		chat, err := ctx.EffectiveChat.Get(bot, nil)
+		if err != nil || chat.Photo == nil {
+			return ""
+		}
+
+		fileID = chat.Photo.BigFileId
 	default:
 		return ""
 	}
@@ -97,8 +97,8 @@ func getFileDetails(ctx *ext.Context) (string, string) { //nolint:cyclop,revive
 	case ctx.EffectiveMessage.Audio != nil:
 		return ctx.EffectiveMessage.Audio.FileId, ctx.EffectiveMessage.Audio.FileName
 	case ctx.EffectiveMessage.Sticker != nil:
-		return ctx.EffectiveMessage.Sticker.FileId, ctx.ChannelPost.Sticker.SetName +
-			getStickerExtension(ctx.ChannelPost.Sticker)
+		return ctx.EffectiveMessage.Sticker.FileId, ctx.EffectiveMessage.Sticker.SetName +
+			getStickerExtension(ctx.EffectiveMessage.Sticker)
 	case ctx.EffectiveMessage.Video != nil:
 		return ctx.EffectiveMessage.Video.FileId, ctx.EffectiveMessage.Video.FileName
 	case ctx.EffectiveMessage.VideoNote != nil:

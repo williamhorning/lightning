@@ -49,9 +49,11 @@ func handleTextCommand(bot *Bot, event *Message) {
 	}
 
 	handleCommandEvent(bot, &CommandEvent{
-		CommandOptions: &CommandOptions{event.BaseMessage, make(map[string]string), bot, reply, bot.prefix},
-		Command:        args[0],
-		Options:        args[1:],
+		CommandOptions: &CommandOptions{
+			event.BaseMessage, make(map[string]string), event.Author, bot, reply, bot.prefix,
+		},
+		Command: args[0],
+		Options: args[1:],
 	})
 }
 

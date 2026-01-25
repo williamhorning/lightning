@@ -154,14 +154,12 @@ func (p *discordPlugin) EditMessage(
 
 		msg.Content = string(chunk)
 
-		var res *message
-
 		var err error
 
 		if opts.ChannelData == nil {
-			res, err = p.bot.editMessage(original.ChannelID, ids[idx], msg.toEdit())
+			_, err = p.bot.editMessage(original.ChannelID, ids[idx], msg.toEdit())
 		} else {
-			res, err = p.bot.editWebhook(
+			_, err = p.bot.editWebhook(
 				opts.ChannelData["id"], opts.ChannelData["token"], ids[idx],
 				msg.toWebhookEdit(),
 			)
@@ -170,8 +168,6 @@ func (p *discordPlugin) EditMessage(
 		if err != nil {
 			return ids, err
 		}
-
-		ids = append(ids, string(res.ID))
 	}
 
 	return ids, nil

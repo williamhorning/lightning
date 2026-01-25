@@ -1,9 +1,5 @@
 version = "2"
 
-[issues]
-max-issues-per-linter = 0
-max-same-issues = 0
-
 [run]
 build-tags = ["goolm"]
 
@@ -24,6 +20,7 @@ settings.revive.rules = [
     { name = "var-naming", disabled = true }
 ]
 settings.tagliatelle.case.rules = { json = "snake", toml = "snake"}
+settings.varnamelen.ignore-names = ["err", "ok"]
 
 [formatters]
 enable = ["gci", "gofmt", "gofumpt", "goimports", "golines", "swaggo"]

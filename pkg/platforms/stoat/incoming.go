@@ -59,7 +59,7 @@ func stoatToLightningAuthor(session *session, msg *stMessage) *lightning.Message
 		}
 	}
 
-	if mem := getStoatMember(session, msg); mem != nil {
+	if mem := getStoatMember(session, msg.Channel, msg.Author); mem != nil {
 		if mem.Nickname != nil {
 			author.Username = *mem.Nickname
 		}
@@ -84,16 +84,16 @@ func stoatToLightningAuthor(session *session, msg *stMessage) *lightning.Message
 	return author
 }
 
-func getStoatMember(session *session, msg *stMessage) *stMember {
-	channel, err := get(session, "/channels/"+msg.Channel, msg.Channel, &session.channelCache)
+func getStoatMember(session *session, chID, author string) *stMember {
+	channel, err := get(session, "/channels/"+chID, chID, &session.channelCache)
 	if err != nil || channel.Server == nil {
 		return nil
 	}
 
 	mem, err := get(
 		session,
-		"/servers/"+*channel.Server+"/members/"+msg.Author,
-		*channel.Server+"-"+msg.Author,
+		"/servers/"+*channel.Server+"/members/"+author,
+		*channel.Server+"-"+author,
 		&session.memberCache,
 	)
 	if err != nil {
@@ -148,7 +148,7 @@ func stoatToLightningContent(session *session, message *stMessage) string {
 			return "@" + userID
 		}
 
-		if member := getStoatMember(session, message); member != nil && member.Nickname != nil {
+		if member := getStoatMember(session, message.Channel, user.ID); member != nil && member.Nickname != nil {
 			return "@" + *member.Nickname
 		}
 

@@ -253,7 +253,7 @@ func (p *database) setupDatabase() error {
 		return fmt.Errorf("failed to get database version: %w", err)
 	case version == "0.8.3":
 		return nil
-	case version == "0.8.1" || version == "0.8.3":
+	case version == "0.8.1" || version == "0.8.2":
 		if err := p.exec(`UPDATE bridge_channels SET data = CASE WHEN jsonb_typeof(data) = 'object' THEN
 			(SELECT jsonb_object_agg(key, value) FROM jsonb_each_text(data)) ELSE NULL END;`); err != nil {
 			return fmt.Errorf("failed to migrate database version d0.8.2 → d0.8.3: %w", err)

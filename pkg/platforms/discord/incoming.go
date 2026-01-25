@@ -33,7 +33,7 @@ func discordToLightning(
 		BaseMessage: lightning.BaseMessage{
 			EventID: string(msg.ID), ChannelID: string(msg.ChannelID), Time: msg.Timestamp,
 		},
-		Author: discordToLightningAuthor(bot, msg),
+		Author: discordToLightningAuthor(bot, &msg.Author, msg.Member, msg.GuildID),
 		Content: discordToLightningForward(bot, msg) +
 			discordToLightningContent(bot, msg.Content, msg.GuildID),
 		Embeds:      discordToLightningEmbeds(msg.Embeds),
@@ -46,30 +46,29 @@ func discordToLightning(
 	return message
 }
 
-func discordToLightningAuthor(bot *client, msg *message) *lightning.MessageAuthor {
+func discordToLightningAuthor(bot *client, original *user, member *member, guild *snowflake) *lightning.MessageAuthor {
 	author := &lightning.MessageAuthor{
-		ID:             string(msg.Author.ID),
-		Username:       msg.Author.displayName(),
-		ProfilePicture: msg.Author.avatarURL(bot),
+		ID:             string(original.ID),
+		Username:       original.displayName(),
+		ProfilePicture: original.avatarURL(bot),
 		Color:          "#5865F2",
 	}
 
-	if msg.GuildID == nil {
+	if guild == nil {
 		return author
 	}
 
-	member := msg.Member
 	if member == nil {
-		member, _ = bot.getMember(msg.GuildID, msg.Author.ID)
+		member, _ = bot.getMember(guild, original.ID)
 	}
 
 	if member == nil {
 		return author
 	}
 
-	member.User = &msg.Author
+	member.User = original
 	author.Username = member.displayName()
-	author.ProfilePicture = member.avatarURL(bot, *msg.GuildID)
+	author.ProfilePicture = member.avatarURL(bot, *guild)
 
 	return author
 }

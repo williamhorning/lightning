@@ -29,6 +29,8 @@ func main() {
 
 	setupLogging(config.ErrorURL)
 
+	log.Println("bridge: bot started")
+
 	bot := lightning.NewBot(config.Prefix)
 
 	database, err := newDatabase(config.Database)

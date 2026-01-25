@@ -2,6 +2,7 @@ package discord
 
 import (
 	"log"
+	"strconv"
 	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -75,11 +76,18 @@ func discordToLightningCommand(
 		}
 	}
 
+	timestamp := time.Now()
+	if id, err := strconv.ParseInt(string(interaction.ID), 10, 64); err == nil {
+		timestamp = time.UnixMilli((id >> 22) + 1420070400000)
+	}
+
 	return &lightning.CommandEvent{
 		CommandOptions: &lightning.CommandOptions{
-			Arguments: args, BaseMessage: lightning.BaseMessage{
+			Arguments: args, Author: discordToLightningAuthor(
+				client, interaction.getUser(), interaction.Member, interaction.GuildID,
+			), BaseMessage: lightning.BaseMessage{
 				EventID:   string(interaction.ID),
-				ChannelID: string(*interaction.ChannelID), Time: time.Now(),
+				ChannelID: string(*interaction.ChannelID), Time: timestamp,
 			}, Prefix: "/",
 			Reply: func(message *lightning.Message, sensitive bool) {
 				message.BaseMessage = lightning.BaseMessage{Time: time.Now(), ChannelID: string(*interaction.ChannelID)}
