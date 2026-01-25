@@ -35,6 +35,7 @@ func (e *stError) Error() string {
 type stoatPermissionsError struct {
 	have stPermission
 	want stPermission
+	who  string
 }
 
 func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
@@ -42,7 +43,7 @@ func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stoatPermissionsError) Error() string {
-	err := "Missing the following permissions: "
+	err := e.who + " is missing the following permissions: "
 
 	for permission, name := range stPermissionNames {
 		if e.want&permission == permission && e.have&permission != permission {

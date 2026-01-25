@@ -88,7 +88,7 @@ func prepareChannelForBridge(db *database, opts *lightning.CommandOptions) (*bri
 			opts.Prefix + "bridge status` or `" + opts.Prefix + "bridge help`."
 	}
 
-	channelData, err := opts.Bot.SetupChannel(opts.ChannelID)
+	channelData, err := opts.Bot.SetupChannel(opts.Author.ID, opts.ChannelID)
 	if err != nil {
 		return nil, getErr(opts.Prefix, "setup the channel `"+opts.ChannelID+"`", err)
 	}
@@ -208,7 +208,7 @@ func getReset(database *database) lightning.Command {
 					continue
 				}
 
-				data, err := opts.Bot.SetupChannel(channel.ID)
+				data, err := opts.Bot.SetupChannel(opts.Author.ID, channel.ID)
 				if err != nil {
 					errors = append(errors, getErr(channel.ID, "setup the channel `"+channel.ID+"`", err))
 

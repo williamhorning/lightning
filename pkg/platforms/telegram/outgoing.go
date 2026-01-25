@@ -19,6 +19,12 @@ func (e channelIDError) Error() string {
 	return "invalid channel ID: " + e.channelID
 }
 
+type notAdminError struct{}
+
+func (notAdminError) Error() string {
+	return "to setup a channel, you must be an administrator or owner"
+}
+
 type entityContentPair struct {
 	content  string
 	entities []gotgbot.MessageEntity

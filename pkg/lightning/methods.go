@@ -5,13 +5,13 @@ import "strings"
 // SetupChannel allows you to create the platform-specific equivalent of
 // a webhook and allows you to send messages with a different author, when
 // then return value is passed as ChannelData in [*SendOptions].
-func (b *Bot) SetupChannel(channelID string) (map[string]string, error) {
+func (b *Bot) SetupChannel(userID, channelID string) (map[string]string, error) {
 	plugin, channel, err := b.getPluginFromChannel(channelID)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := plugin.SetupChannel(channel)
+	result, err := plugin.SetupChannel(userID, channel)
 	if err == nil {
 		return result, nil
 	}

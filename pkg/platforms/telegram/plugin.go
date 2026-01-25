@@ -109,8 +109,28 @@ type telegramPlugin struct {
 	updater        *ext.Updater
 }
 
-func (*telegramPlugin) SetupChannel(_ string) (map[string]string, error) {
-	return nil, nil //nolint:nilnil
+func (p *telegramPlugin) SetupChannel(user, channel string) (map[string]string, error) {
+	chID, err := strconv.ParseInt(channel, 10, 64)
+	if err != nil {
+		return nil, &channelIDError{channel}
+	}
+
+	userID, err := strconv.ParseInt(user, 10, 64)
+	if err != nil {
+		return nil, &channelIDError{channel}
+	}
+
+	member, err := p.telegram.GetChatMember(chID, userID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	switch member.GetStatus() {
+	case "creator", "administrator":
+		return nil, nil //nolint:nilnil
+	default:
+		return nil, &notAdminError{}
+	}
 }
 
 func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {

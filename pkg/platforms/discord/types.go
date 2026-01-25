@@ -462,6 +462,14 @@ const (
 	messageTypeContextMenuCommand messageType = 23
 )
 
+type permissionCheckError struct {
+	text string
+}
+
+func (p *permissionCheckError) Error() string {
+	return "failed to " + p.text
+}
+
 type premiumTier int
 
 const (
