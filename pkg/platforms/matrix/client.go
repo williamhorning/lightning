@@ -43,7 +43,7 @@ func getBot(config map[string]string) (lightning.Plugin, error) {
 		}
 	}()
 
-	log.Println("matrix: ready at https://matrix.to/#/" + config["mxid"])
+	log.Println("matrix: bot ready at https://matrix.to/#/" + config["mxid"])
 
 	return &matrixPlugin{
 		client: client, msgChannel: msgChannel, editChannel: editChannel, deleteChannel: deleteChannel,
@@ -86,6 +86,8 @@ func getAppsvc(config map[string]string) (lightning.Plugin, error) {
 		}, appsvc.BotClient().JoinRoomByID, appsvc.BotClient(), `^@_lightning_.*:`+config["homeserver"],
 		msgChannel, editChannel, deleteChannel,
 	)
+
+	log.Println("matrix: appservice ready at https://matrix.to/#/" + config["mxid"])
 
 	return &matrixPlugin{
 		appsvc: appsvc, client: appsvc.BotClient(), msgChannel: msgChannel,
