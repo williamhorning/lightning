@@ -62,27 +62,36 @@ type stoatPlugin struct {
 	session *session
 }
 
+func (p *stoatPlugin) IsAdmin(user, channel string) (bool, error) {
+	requestingUser, err := get(p.session, "/users/"+user, user, &p.session.userCache)
+	if err != nil {
+		return false, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	channelData, err := get(p.session, "/channels/"+channel, channel, &p.session.channelCache)
+	if err != nil {
+		return false, fmt.Errorf("failed to get current channel: %w", err)
+	}
+
+	permissions := p.session.getPermissions(requestingUser, channelData)
+
+	if permissions&stPermissionManageServer != stPermissionManageServer {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 const correctPermissionValue = stPermissionManageCustomization | stPermissionManageRole |
 	stPermissionChangeNickname | stPermissionChangeAvatar | stPermissionViewChannel |
 	stPermissionReadMessageHistory | stPermissionSendMessage | stPermissionManageMessages |
 	stPermissionInviteOthers | stPermissionSendEmbeds | stPermissionUploadFiles |
 	stPermissionMasquerade | stPermissionReact
 
-func (p *stoatPlugin) SetupChannel(user, channel string) (map[string]string, error) {
-	requestingUser, err := get(p.session, "/users/"+user, user, &p.session.userCache)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
+func (p *stoatPlugin) SetupChannel(channel string) (map[string]string, error) {
 	channelData, err := get(p.session, "/channels/"+channel, channel, &p.session.channelCache)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current channel: %w", err)
-	}
-
-	permissions := p.session.getPermissions(requestingUser, channelData)
-
-	if permissions&stPermissionManageServer != stPermissionManageServer {
-		return nil, &stoatPermissionsError{permissions, stPermissionManageServer, requestingUser.Username}
 	}
 
 	needed := correctPermissionValue
@@ -94,13 +103,13 @@ func (p *stoatPlugin) SetupChannel(user, channel string) (map[string]string, err
 		needed &= ^stPermissionChangeAvatar
 	}
 
-	permissions = p.session.getPermissions(p.self, channelData)
+	permissions := p.session.getPermissions(p.self, channelData)
 
 	if permissions&needed == needed {
 		return nil, nil //nolint:nilnil
 	}
 
-	return nil, &stoatPermissionsError{permissions, needed, p.self.Username}
+	return nil, &stoatPermissionsError{permissions, needed}
 }
 
 func (p *stoatPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {

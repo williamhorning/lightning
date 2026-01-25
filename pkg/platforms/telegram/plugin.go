@@ -109,28 +109,32 @@ type telegramPlugin struct {
 	updater        *ext.Updater
 }
 
-func (p *telegramPlugin) SetupChannel(user, channel string) (map[string]string, error) {
+func (p *telegramPlugin) IsAdmin(user, channel string) (bool, error) {
 	chID, err := strconv.ParseInt(channel, 10, 64)
 	if err != nil {
-		return nil, &channelIDError{channel}
+		return false, &channelIDError{channel}
 	}
 
 	userID, err := strconv.ParseInt(user, 10, 64)
 	if err != nil {
-		return nil, &channelIDError{channel}
+		return false, &channelIDError{channel}
 	}
 
 	member, err := p.telegram.GetChatMember(chID, userID, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return false, fmt.Errorf("failed to get user: %w", err)
 	}
 
 	switch member.GetStatus() {
 	case "creator", "administrator":
-		return nil, nil //nolint:nilnil
+		return true, nil
 	default:
-		return nil, &notAdminError{}
+		return false, nil
 	}
+}
+
+func (*telegramPlugin) SetupChannel(_ string) (map[string]string, error) {
+	return nil, nil //nolint:nilnil
 }
 
 func (p *telegramPlugin) SendMessage(message *lightning.Message, opts *lightning.SendOptions) ([]string, error) {

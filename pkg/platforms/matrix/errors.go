@@ -22,12 +22,6 @@ func (e matrixError) Error() string {
 	return "failed to " + e.method + " message: " + e.err.Error()
 }
 
-type permissionsError struct{}
-
-func (*permissionsError) Error() string {
-	return "your permissions need to be above the power level 60"
-}
-
 func handleError(err error, method string) error {
 	var httpErr *mautrix.HTTPError
 	if !errors.As(err, &httpErr) || httpErr.RespError == nil {

@@ -70,20 +70,20 @@ type discordPlugin struct {
 	bot *client
 }
 
-func (p *discordPlugin) SetupChannel(user, channel string) (map[string]string, error) {
+func (p *discordPlugin) IsAdmin(user, channel string) (bool, error) {
 	setup, ok := p.bot.getChannel(channel)
 	if !ok {
-		return nil, &permissionCheckError{"get channel on permissions check"}
+		return false, &permissionCheckError{"get channel on permissions check"}
 	}
 
 	guild, ok := p.bot.getGuild(setup.GuildID)
 	if !ok {
-		return nil, &permissionCheckError{"get guild on permissions check"}
+		return false, &permissionCheckError{"get guild on permissions check"}
 	}
 
 	member, ok := p.bot.getMember(setup.GuildID, snowflake(user))
 	if !ok {
-		return nil, &permissionCheckError{"get member on permissions check"}
+		return false, &permissionCheckError{"get member on permissions check"}
 	}
 
 	for _, id := range member.Roles {
@@ -91,24 +91,26 @@ func (p *discordPlugin) SetupChannel(user, channel string) (map[string]string, e
 			if id == string(role.ID) {
 				perms, err := strconv.ParseInt(role.Permissions, 10, 64)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse role permissions for %q: %w", id, err)
+					return false, fmt.Errorf("failed to parse role permissions for %q: %w", id, err)
 				}
 
 				if perms&8 == 8 {
-					wh, err := p.bot.createWebhook(channel, channel)
-					if err != nil {
-						return nil, fmt.Errorf("failed to create webhook for channel: %w", err)
-					}
-
-					return map[string]string{"id": string(wh.ID), "token": wh.Token}, nil
+					return true, nil
 				}
 			}
 		}
 	}
 
-	return nil, &permissionCheckError{
-		"find any administrative permissions you had. you may need to wait a minute or two for permissions to update",
+	return false, nil
+}
+
+func (p *discordPlugin) SetupChannel(channel string) (map[string]string, error) {
+	wh, err := p.bot.createWebhook(channel, channel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create webhook for channel: %w", err)
 	}
+
+	return map[string]string{"id": string(wh.ID), "token": wh.Token}, nil
 }
 
 func (p *discordPlugin) SendMessage(original *lightning.Message, opts *lightning.SendOptions) ([]string, error) {

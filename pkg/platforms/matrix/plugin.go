@@ -54,16 +54,20 @@ type matrixPlugin struct {
 	mxcCache      cache.Expiring[string, id.ContentURIString]
 }
 
-func (p *matrixPlugin) SetupChannel(user, channel string) (map[string]string, error) {
+func (p *matrixPlugin) IsAdmin(user, channel string) (bool, error) {
 	levels, err := p.client.StateStore.GetPowerLevels(context.Background(), id.RoomID(channel))
 	if err != nil {
-		return nil, fmt.Errorf("matrix state not synced yet, failed to get power levels: %w", err)
+		return false, fmt.Errorf("matrix state not synced yet, failed to get power levels: %w", err)
 	}
 
 	if levels.GetUserLevel(id.UserID(user)) < 60 {
-		return nil, &permissionsError{}
+		return false, nil
 	}
 
+	return true, nil
+}
+
+func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
 	return nil, nil //nolint:nilnil // we don't need a value for ChannelData later
 }
 
