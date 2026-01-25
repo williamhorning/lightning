@@ -37,7 +37,7 @@ func registerCommands(bot *lightning.Bot, database *database, username string) {
 		Description: "get help with the bot",
 		Executor: getExecutor(
 			"help for "+username, "https://williamhorning.dev/lightning", false,
-			"Hi, I'm "+username+" v0.8.4!\n\n"+
+			"Hi, I'm "+username+" v0.8.5!\n\n"+
 				"Available commands are: \n"+
 				"- `bridge`: manage bridges between channels\n"+
 				"- `help`: returns this help message\n"+
