@@ -88,6 +88,11 @@ func prepareChannelForBridge(db *database, opts *lightning.CommandOptions) (*bri
 			opts.Prefix + "bridge status` or `" + opts.Prefix + "bridge help`."
 	}
 
+	if admin, err := opts.Bot.IsAdmin(opts.Author.ID, opts.ChannelID); err != nil || !admin {
+		return nil, "You're not an admin, or something went wrong. If you didn't expect this, wait a little, try `" +
+			opts.Prefix + "bridge status` or `" + opts.Prefix + "bridge help`."
+	}
+
 	channelData, err := opts.Bot.SetupChannel(opts.ChannelID)
 	if err != nil {
 		return nil, getErr(opts.Prefix, "setup the channel `"+opts.ChannelID+"`", err)

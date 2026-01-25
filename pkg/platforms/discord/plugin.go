@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strconv"
 	"time"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -67,6 +68,40 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 
 type discordPlugin struct {
 	bot *client
+}
+
+func (p *discordPlugin) IsAdmin(user, channel string) (bool, error) {
+	setup, ok := p.bot.getChannel(channel)
+	if !ok {
+		return false, &permissionCheckError{"get channel on permissions check"}
+	}
+
+	guild, ok := p.bot.getGuild(setup.GuildID)
+	if !ok {
+		return false, &permissionCheckError{"get guild on permissions check"}
+	}
+
+	member, ok := p.bot.getMember(setup.GuildID, snowflake(user))
+	if !ok {
+		return false, &permissionCheckError{"get member on permissions check"}
+	}
+
+	for _, id := range member.Roles {
+		for _, role := range guild.Roles {
+			if id == string(role.ID) {
+				perms, err := strconv.ParseInt(role.Permissions, 10, 64)
+				if err != nil {
+					return false, fmt.Errorf("failed to parse role permissions for %q: %w", id, err)
+				}
+
+				if perms&8 == 8 {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func (p *discordPlugin) SetupChannel(channel string) (map[string]string, error) {

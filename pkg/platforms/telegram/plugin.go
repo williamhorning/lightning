@@ -109,6 +109,30 @@ type telegramPlugin struct {
 	updater        *ext.Updater
 }
 
+func (p *telegramPlugin) IsAdmin(user, channel string) (bool, error) {
+	chID, err := strconv.ParseInt(channel, 10, 64)
+	if err != nil {
+		return false, &channelIDError{channel}
+	}
+
+	userID, err := strconv.ParseInt(user, 10, 64)
+	if err != nil {
+		return false, &channelIDError{channel}
+	}
+
+	member, err := p.telegram.GetChatMember(chID, userID, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	switch member.GetStatus() {
+	case "creator", "administrator":
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
 func (*telegramPlugin) SetupChannel(_ string) (map[string]string, error) {
 	return nil, nil //nolint:nilnil
 }

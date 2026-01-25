@@ -15,6 +15,7 @@ package matrix
 
 import (
 	"context"
+	"fmt"
 
 	"codeberg.org/jersey/lightning/internal/cache"
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -52,6 +53,19 @@ type matrixPlugin struct {
 	editChannel   chan *lightning.EditedMessage
 	deleteChannel chan *lightning.BaseMessage
 	mxcCache      cache.Expiring[string, id.ContentURIString]
+}
+
+func (p *matrixPlugin) IsAdmin(user, channel string) (bool, error) {
+	levels, err := p.client.StateStore.GetPowerLevels(context.Background(), id.RoomID(channel))
+	if err != nil {
+		return false, fmt.Errorf("matrix state not synced yet, failed to get power levels: %w", err)
+	}
+
+	if levels.GetUserLevel(id.UserID(user)) < 60 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {

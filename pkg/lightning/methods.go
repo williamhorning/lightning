@@ -2,6 +2,22 @@ package lightning
 
 import "strings"
 
+// IsAdmin allows you to check if a user can do an action that requires an
+// administrative role, such as SetupChannel.
+func (b *Bot) IsAdmin(user, channelID string) (bool, error) {
+	plugin, channel, err := b.getPluginFromChannel(channelID)
+	if err != nil {
+		return false, err
+	}
+
+	result, err := plugin.IsAdmin(user, channel)
+	if err == nil {
+		return result, nil
+	}
+
+	return false, &PluginMethodError{channelID, "IsAdmin", err}
+}
+
 // SetupChannel allows you to create the platform-specific equivalent of
 // a webhook and allows you to send messages with a different author, when
 // then return value is passed as ChannelData in [*SendOptions].
