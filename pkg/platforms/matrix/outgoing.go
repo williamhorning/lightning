@@ -15,7 +15,7 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-func (p *matrixPlugin) lightningToMatrixMessage(
+func (p *matrixPlugin) lightningToMatrixMessage( //nolint:revive
 	client *mautrix.Client, msg *lightning.Message, opts *lightning.SendOptions, fallback bool,
 ) []*event.MessageEventContent {
 	for idx := range msg.Embeds {

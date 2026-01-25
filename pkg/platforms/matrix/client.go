@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
+	"github.com/rs/zerolog"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/event"
@@ -70,6 +72,8 @@ func getAppsvc(config map[string]string) (lightning.Plugin, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create appservice: %w", err)
 	}
+
+	appsvc.Log = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
 	handler := appservice.NewEventProcessor(appsvc)
 
