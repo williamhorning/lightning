@@ -12,7 +12,7 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-func listenForEvents(
+func (p *matrixPlugin) listenForEvents(
 	onEvent func(eventType event.Type, callback mautrix.EventHandler),
 	joinRoom func(ctx context.Context, roomID id.RoomID) (resp *mautrix.RespJoinRoom, err error),
 	client *mautrix.Client,
@@ -30,7 +30,7 @@ func listenForEvents(
 	})
 
 	onEvent(event.EventMessage, func(ctx context.Context, evt *event.Event) {
-		msg := matrixToLightningMessage(ctx, evt, client, regex)
+		msg := p.matrixToLightningMessage(ctx, evt, client, regex)
 		if msg == nil {
 			return
 		}

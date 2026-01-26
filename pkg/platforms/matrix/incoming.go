@@ -2,7 +2,6 @@ package matrix
 
 import (
 	"context"
-	"log"
 	"regexp"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 	"maunium.net/go/mautrix/format"
 )
 
-func matrixToLightningMessage(
+func (p *matrixPlugin) matrixToLightningMessage(
 	ctx context.Context,
 	evt *event.Event,
 	client *mautrix.Client,
@@ -36,7 +35,7 @@ func matrixToLightningMessage(
 	content := ""
 
 	if msg.FileName == msg.Body {
-		url := getFile(client, string(msg.URL))
+		url := p.getFile(string(msg.URL))
 
 		attachments = append(attachments, lightning.Attachment{
 			Name: msg.FileName,
@@ -56,13 +55,13 @@ func matrixToLightningMessage(
 			ChannelID: string(evt.RoomID),
 		},
 		Attachments: attachments,
-		Author:      matrixToLightningAuthor(ctx, client, evt, msg),
+		Author:      p.matrixToLightningAuthor(ctx, client, evt, msg),
 		Content:     content,
 		RepliedTo:   matrixToLightningReplies(msg),
 	}
 }
 
-func matrixToLightningAuthor(
+func (p *matrixPlugin) matrixToLightningAuthor(
 	ctx context.Context,
 	client *mautrix.Client,
 	evt *event.Event,
@@ -79,7 +78,7 @@ func matrixToLightningAuthor(
 	if err == nil && globalProfile != nil {
 		author.Username = globalProfile.DisplayName
 		if !globalProfile.AvatarURL.IsEmpty() {
-			author.ProfilePicture = getFile(client, globalProfile.AvatarURL.String())
+			author.ProfilePicture = p.getFile(globalProfile.AvatarURL.String())
 		}
 	}
 
@@ -89,7 +88,7 @@ func matrixToLightningAuthor(
 		}
 
 		if msg.BeeperPerMessageProfile.AvatarURL != nil && *msg.BeeperPerMessageProfile.AvatarURL != "" {
-			author.ProfilePicture = getFile(client, string(*msg.BeeperPerMessageProfile.AvatarURL))
+			author.ProfilePicture = p.getFile(string(*msg.BeeperPerMessageProfile.AvatarURL))
 		}
 	}
 
@@ -106,15 +105,6 @@ func matrixToLightningReplies(msg *event.MessageEventContent) []string {
 	return replyIDs
 }
 
-func getFile(client *mautrix.Client, file string) string {
-	if len(file) < 6 || file[:6] != "mxc://" {
-		log.Printf("matrix: invalid MXC URL: %q\n", file)
-
-		return ""
-	}
-
-	return client.HomeserverURL.JoinPath(
-		"_matrix/client/v1/media/download/",
-		file[6:],
-	).String()
+func (p *matrixPlugin) getFile(file string) string {
+	return p.proxy + "/" + file
 }

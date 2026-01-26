@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
-	"github.com/rs/zerolog"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/event"
@@ -32,11 +30,6 @@ func getBot(config map[string]string) (lightning.Plugin, error) {
 
 	syncer.OnSync(client.DontProcessOldEvents)
 
-	listenForEvents(
-		syncer.OnEventType, client.JoinRoomByID, client, string(client.UserID),
-		msgChannel, editChannel, deleteChannel,
-	)
-
 	go func() {
 		for {
 			if err := client.Sync(); err != nil {
@@ -45,11 +38,21 @@ func getBot(config map[string]string) (lightning.Plugin, error) {
 		}
 	}()
 
+	go startProxy(client, config["proxy_url"], config["proxy_port"])
+
+	plugin := &matrixPlugin{
+		proxy: config["proxy_url"], client: client, msgChannel: msgChannel,
+		editChannel: editChannel, deleteChannel: deleteChannel,
+	}
+
+	plugin.listenForEvents(
+		syncer.OnEventType, client.JoinRoomByID, client, string(client.UserID),
+		msgChannel, editChannel, deleteChannel,
+	)
+
 	log.Println("matrix: bot ready at https://matrix.to/#/" + config["mxid"])
 
-	return &matrixPlugin{
-		client: client, msgChannel: msgChannel, editChannel: editChannel, deleteChannel: deleteChannel,
-	}, nil
+	return plugin, nil
 }
 
 func getAppsvc(config map[string]string) (lightning.Plugin, error) {
@@ -73,30 +76,31 @@ func getAppsvc(config map[string]string) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("failed to create appservice: %w", err)
 	}
 
-	appsvc.Log = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-
 	handler := appservice.NewEventProcessor(appsvc)
 
 	go appsvc.Start()
 	go handler.Start(context.Background())
+	go startProxy(appsvc.BotClient(), config["proxy_url"], config["proxy_port"])
 
 	msgChannel := make(chan *lightning.Message, 1000)
 	editChannel := make(chan *lightning.EditedMessage, 1000)
 	deleteChannel := make(chan *lightning.BaseMessage, 1000)
 
-	listenForEvents(
+	plugin := &matrixPlugin{
+		proxy: config["proxy_url"], appsvc: appsvc, client: appsvc.BotClient(),
+		msgChannel: msgChannel, editChannel: editChannel, deleteChannel: deleteChannel,
+	}
+
+	plugin.listenForEvents(
 		func(eventType event.Type, callback mautrix.EventHandler) {
 			handler.On(eventType, callback)
 		}, appsvc.BotClient().JoinRoomByID, appsvc.BotClient(), `^@_lightning_.*:`+config["homeserver"],
 		msgChannel, editChannel, deleteChannel,
 	)
 
-	log.Println("matrix: appservice ready at https://matrix.to/#/" + config["mxid"])
+	log.Println("matrix: appservice ready at https://matrix.to/#/" + appsvc.BotMXID())
 
-	return &matrixPlugin{
-		appsvc: appsvc, client: appsvc.BotClient(), msgChannel: msgChannel,
-		editChannel: editChannel, deleteChannel: deleteChannel,
-	}, nil
+	return plugin, nil
 }
 
 func (p *matrixPlugin) getClient(msg *lightning.Message) (*mautrix.Client, bool) {

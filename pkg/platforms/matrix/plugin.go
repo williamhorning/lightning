@@ -16,6 +16,7 @@ package matrix
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"codeberg.org/jersey/lightning/internal/cache"
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -35,7 +36,9 @@ import (
 //	 		"as_token": "",     // a string with the random token your appservice will use
 //	 		"as_local": "",     // a string with the localpart your appservice will use
 //	 		"hs_token": "",     // a string with the random token your homeserver will use
-//			"homeserver": "",   // a string with your Matrix homeserver URL
+//			"homeserver": "",   // a string with your Matrix homeserver URL (always required)
+//			"proxy_port": "",   // a string with your proxy port for files (always required)
+//	 		"proxy_url": "",    // a string with your proxy url for files (always required)
 //			"mxid": "",         // a string with your Matrix bot ID
 //		}
 func New(config map[string]string) (lightning.Plugin, error) {
@@ -47,6 +50,7 @@ func New(config map[string]string) (lightning.Plugin, error) {
 }
 
 type matrixPlugin struct {
+	proxy         string
 	appsvc        *appservice.AppService
 	client        *mautrix.Client
 	msgChannel    chan *lightning.Message
@@ -56,16 +60,20 @@ type matrixPlugin struct {
 }
 
 func (p *matrixPlugin) IsAdmin(user, channel string) (bool, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("matrix: panic on IsAdmin: %v", r)
+		}
+	}()
+
 	levels, err := p.client.StateStore.GetPowerLevels(context.Background(), id.RoomID(channel))
-	if err != nil {
-		return false, fmt.Errorf("matrix state not synced yet, failed to get power levels: %w", err)
+	if err != nil || levels == nil || levels.CreateEvent == nil {
+		return false, fmt.Errorf("state not synced yet, failed to get power levels: %w", err)
+	} else if levels.GetUserLevel(id.UserID(user)) >= 60 {
+		return true, nil
 	}
 
-	if levels.GetUserLevel(id.UserID(user)) < 60 {
-		return false, nil
-	}
-
-	return true, nil
+	return false, nil
 }
 
 func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {
