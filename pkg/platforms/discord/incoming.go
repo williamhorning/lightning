@@ -109,11 +109,11 @@ func discordToLightningContent(
 	})
 
 	content = userMention.ReplaceAllStringFunc(content, func(match string) string {
-		if member, ok := bot.getMember(guildID, snowflake(match)); ok {
+		if member, ok := bot.getMember(guildID, snowflake(userMention.FindStringSubmatch(match)[1])); ok {
 			return "@" + member.displayName()
 		}
 
-		if u, ok := bot.getUser(match); ok {
+		if u, ok := bot.getUser(userMention.FindStringSubmatch(match)[1]); ok {
 			return "@" + u.displayName()
 		}
 
@@ -121,7 +121,7 @@ func discordToLightningContent(
 	})
 
 	content = channelMention.ReplaceAllStringFunc(content, func(match string) string {
-		if ch, ok := bot.getChannel(match); ok {
+		if ch, ok := bot.getChannel(channelMention.FindStringSubmatch(match)[1]); ok {
 			return "#" + ch.Name
 		}
 
@@ -129,7 +129,7 @@ func discordToLightningContent(
 	})
 
 	content = roleMention.ReplaceAllStringFunc(content, func(match string) string {
-		if r, ok := bot.getRole(guildID, match); ok {
+		if r, ok := bot.getRole(guildID, roleMention.FindStringSubmatch(match)[1]); ok {
 			return "@" + r.Name
 		}
 
