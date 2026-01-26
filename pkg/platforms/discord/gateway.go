@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -58,9 +59,12 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 		seq          int64
 		sessionID    string
 		reconnectURL string
+		activeSocket atomic.Pointer[websocket.Conn]
 	)
 
-	go startListener(messages, socket)
+	activeSocket.Store(socket)
+
+	go startListener(messages, socket, &activeSocket)
 
 	for {
 		switch state {
@@ -74,7 +78,9 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 				continue
 			}
 
-			go startListener(messages, socket)
+			activeSocket.Store(socket)
+ 
+			go startListener(messages, socket, &activeSocket)
 
 			backoff = 0
 			nextBeat = time.After(1 * time.Second)
@@ -121,19 +127,23 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 func startListener(messages chan struct {
 	data []byte
 	err  error
-}, socket *websocket.Conn,
+}, socket *websocket.Conn, active *atomic.Pointer[websocket.Conn],
 ) {
-	var data []byte
+	for {
+		if active.Load() != socket {
+			return
+		}
 
-	var err error
-
-	for err == nil {
-		_, data, err = socket.ReadMessage()
+		_, data, err := socket.ReadMessage()
 
 		messages <- struct {
 			data []byte
 			err  error
 		}{data, err}
+
+		if err != nil {
+			return
+		}
 	}
 }
 
