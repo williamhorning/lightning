@@ -79,7 +79,7 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 			}
 
 			activeSocket.Store(socket)
- 
+
 			go startListener(messages, socket, &activeSocket)
 
 			backoff = 0
