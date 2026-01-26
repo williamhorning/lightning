@@ -52,8 +52,9 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 		nextBeat    <-chan time.Time
 		requestBeat = make(chan struct{}, 1)
 		messages    = make(chan struct {
-			data []byte
-			err  error
+			socket *websocket.Conn
+			data   []byte
+			err    error
 		}, 16)
 		backoff      int
 		seq          int64
@@ -104,6 +105,10 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 			case msg := <-messages:
 				_ = socket.SetReadDeadline(time.Now().Add(heartbeat * 2))
 
+				if msg.socket != activeSocket.Load() {
+					continue
+				}
+
 				if msg.err != nil {
 					state = bot.closeAndTransition(socket, &seq, &sessionID, &reconnectURL, msg.err)
 
@@ -125,8 +130,9 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 }
 
 func startListener(messages chan struct {
-	data []byte
-	err  error
+	socket *websocket.Conn
+	data   []byte
+	err    error
 }, socket *websocket.Conn, active *atomic.Pointer[websocket.Conn],
 ) {
 	for {
@@ -137,9 +143,10 @@ func startListener(messages chan struct {
 		_, data, err := socket.ReadMessage()
 
 		messages <- struct {
-			data []byte
-			err  error
-		}{data, err}
+			socket *websocket.Conn
+			data   []byte
+			err    error
+		}{socket, data, err}
 
 		if err != nil {
 			return
