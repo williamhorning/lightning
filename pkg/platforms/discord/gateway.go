@@ -146,7 +146,7 @@ func (bot *client) connectOnce( //nolint:revive,cyclop
 	}
 
 	socket, resp, err := websocket.DefaultDialer.Dial(url+"?v="+bot.version+"&encoding=json", http.Header{
-		"User-Agent": []string{"DiscordBot (https://williamhorn.ing/lightning, 0.8.5)"},
+		"User-Agent": []string{"DiscordBot (https://williamhorn.ing/lightning, 0.8.6)"},
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to dial websocket: %w", err)
