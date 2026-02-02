@@ -164,6 +164,10 @@ func (p *discordPlugin) SendMessage(original *lightning.Message, opts *lightning
 func (p *discordPlugin) EditMessage(
 	original *lightning.Message, ids []string, opts *lightning.SendOptions,
 ) ([]string, error) {
+	if len(ids) == 0 {
+		return ids, nil
+	}
+
 	if opts.CommandResponse {
 		channel, err := p.bot.startDM(opts.CommandUser)
 		if err != nil {
@@ -192,9 +196,9 @@ func (p *discordPlugin) EditMessage(
 		var err error
 
 		if opts.ChannelData == nil {
-			_, err = p.bot.editMessage(original.ChannelID, ids[idx], msg.toEdit())
+			err = p.bot.editMessage(original.ChannelID, ids[idx], msg.toEdit())
 		} else {
-			_, err = p.bot.editWebhook(
+			err = p.bot.editWebhook(
 				opts.ChannelData["id"], opts.ChannelData["token"], ids[idx],
 				msg.toWebhookEdit(),
 			)

@@ -70,32 +70,46 @@ func (bot *client) deleteMessage(channel, id string) error {
 	return err
 }
 
-func (bot *client) editMessage(channel, id string, msg *messageEdit) (*message, error) {
+func (bot *client) editMessage(channel, id string, msg *messageEdit) error {
 	var res message
 
 	err := bot.do("PATCH", "/channels/"+channel+"/messages/"+id, msg, &res)
 	if err != nil {
-		return nil, err
+		var aerr apiError
+		if errors.As(err, &aerr) {
+			if aerr.Code == 10008 {
+				return nil
+			}
+		}
+
+		return err
 	}
 
 	bot.messages.Set(string(res.ID), &res)
 
-	return &res, nil
+	return nil
 }
 
 func (bot *client) editWebhook(
 	webhook string, token string, id string, msg *webhookEditMessagePayload,
-) (*message, error) {
+) error {
 	var res message
 
 	err := bot.do("PATCH", "/webhooks/"+webhook+"/"+token+"/messages/"+id, msg, &res)
 	if err != nil {
-		return nil, err
+		var aerr apiError
+		if errors.As(err, &aerr) {
+			if aerr.Code == 10008 {
+				return nil
+			}
+		}
+
+		return err
 	}
 
 	bot.messages.Set(string(res.ID), &res)
 
-	return &res, nil
+	return nil
 }
 
 func (bot *client) getChannel(channel string) (*channel, bool) {
