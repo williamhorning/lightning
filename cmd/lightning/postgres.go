@@ -31,7 +31,7 @@ func newDatabase(conn string) (*database, error) {
 }
 
 func (p *database) createBridge(bridge bridge) error {
-	return p.exec(`INSERT INTO bridges (id, settings) VALUES ($1, $2)
+	return p.exec(`INSERT INTO bridges (id, allow_everyone) VALUES ($1, $2)
 		ON CONFLICT (id) DO UPDATE SET allow_everyone = EXCLUDED.allow_everyone
 		WHERE bridges.allow_everyone IS DISTINCT FROM EXCLUDED.allow_everyone;`,
 		bridge.ID, bridge.AllowEveryone)
