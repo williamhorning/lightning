@@ -105,11 +105,12 @@ func (p *matrixPlugin) EditMessage(
 	client, fallback := p.getClient(message)
 
 	for idx, msg := range p.lightningToMatrixMessage(client, message, opts, fallback) {
-		msg.RelatesTo = &event.RelatesTo{Type: "m.replace", EventID: id.EventID(ids[idx])}
-		msg.NewContent = msg
+		sendable := event.MessageEventContent{MsgType: event.MsgText}
+		sendable.RelatesTo = &event.RelatesTo{Type: "m.replace", EventID: id.EventID(ids[idx])}
+		sendable.NewContent = msg
 
 		_, err := client.SendMessageEvent(
-			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, msg, mautrix.ReqSendEvent{},
+			context.Background(), id.RoomID(message.ChannelID), event.EventMessage, sendable, mautrix.ReqSendEvent{},
 		)
 		if err != nil {
 			return nil, handleError(err, "edit")
