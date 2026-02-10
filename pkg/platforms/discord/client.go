@@ -182,7 +182,7 @@ func (bot *client) overwriteCommands(commands []applicationCommand) error {
 }
 
 func (bot *client) respondInteraction(id snowflake, token string, msg *interactionResponse) error {
-	return bot.doMultipart("POST", "/interactions/"+string(id)+"/"+token+"/callback", msg, msg.Data.Files, nil)
+	return bot.do("POST", "/interactions/"+string(id)+"/"+token+"/callback", msg, nil)
 }
 
 func (bot *client) sendMessage(channel string, msg *messageSend) (*message, error) {

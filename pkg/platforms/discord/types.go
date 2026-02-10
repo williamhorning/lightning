@@ -327,17 +327,7 @@ type interactionOption struct {
 }
 
 type interactionResponse struct {
-	Data *interactionResponseData `json:"data,omitempty"`
-	Type interactionResponseType  `json:"type,omitempty"`
-}
-
-type interactionResponseData struct {
-	AllowedMentions *allowedMentions `json:"allowed_mentions,omitempty"`
-	Components      []component      `json:"components,omitempty"`
-	Content         string           `json:"content,omitempty"`
-	Embeds          []embed          `json:"embeds,omitempty"`
-	Files           []file           `json:"-"`
-	Flags           messageFlags     `json:"flags,omitempty"`
+	Type interactionResponseType `json:"type,omitempty"`
 }
 
 type interactionResponseType int
