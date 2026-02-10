@@ -100,7 +100,9 @@ func discordToLightningCommand(
 					msg.Flags = messageFlagsEphemeral
 				}
 
-				if err := client.editWebhook(string(interaction.ID), interaction.Token, "@original",
+				time.Sleep(150 * time.Millisecond)
+
+				if err := client.editWebhook(string(client.application.ID), interaction.Token, "@original",
 					msg.toInteraction()); err != nil {
 					log.Printf("%s: failed responding to command: %v\n", client.product, err)
 				}
