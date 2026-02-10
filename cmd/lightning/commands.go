@@ -1,7 +1,6 @@
 package main
 
 import (
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -111,18 +110,18 @@ func getCreate(database *database) lightning.Command {
 				return msg
 			}
 
-			bridge := bridge{
-				ID:       ulid.Make().String(),
-				Channels: []bridgeChannel{*channel},
-				Settings: bridgeSettings{},
+			bridgeID := ulid.Make().String()
+
+			if err := database.createBridge(bridge{ID: bridgeID}); err != nil {
+				return getErr(opts.Prefix, "insert a bridge", err)
 			}
 
-			if err := database.createBridge(bridge); err != nil {
-				return getErr(opts.Prefix, "update the database", err)
+			if err := database.insertChannel(bridgeID, *channel); err != nil {
+				return getErr(opts.Prefix, "insert a channel", err)
 			}
 
 			return "Bridge created successfully! You can now join it with the following command: ||`" +
-				opts.Prefix + "bridge join " + bridge.ID + "`||. Keep that command secret, or else anyone could join!"
+				opts.Prefix + "bridge join " + bridgeID + "`||. Keep that command secret, or else anyone could join!"
 		}),
 	}
 }
@@ -146,12 +145,10 @@ func getJoin(database *database, name string) lightning.Command {
 			}
 
 			if name == "subscribe" {
-				channel.Disabled.Read = true
+				channel.DisabledRead = true
 			}
 
-			bridge.Channels = append(bridge.Channels, *channel)
-
-			if err := database.createBridge(bridge); err != nil {
+			if err := database.insertChannel(bridge.ID, *channel); err != nil {
 				return getErr(opts.Prefix, "update the database", err)
 			}
 
@@ -178,15 +175,7 @@ func getLeave(database *database) lightning.Command {
 					"Try `" + opts.Prefix + "bridge join` or `" + opts.Prefix + "bridge help`."
 			}
 
-			for idx, channel := range bridge.Channels {
-				if channel.ID == opts.ChannelID {
-					bridge.Channels = slices.Delete(bridge.Channels, idx, idx+1)
-
-					break
-				}
-			}
-
-			if err := database.createBridge(bridge); err != nil {
+			if err := database.deleteChannel(opts.ChannelID); err != nil {
 				return getErr(opts.Prefix, "update the database", err)
 			}
 
@@ -208,8 +197,8 @@ func getReset(database *database) lightning.Command {
 
 			errors := make([]string, 0, len(bridge.Channels))
 
-			for idx, channel := range bridge.Channels {
-				if !channel.Disabled.Read && !channel.Disabled.Write {
+			for _, channel := range bridge.Channels {
+				if !channel.DisabledRead && !channel.DisabledWrite {
 					continue
 				}
 
@@ -220,13 +209,11 @@ func getReset(database *database) lightning.Command {
 					continue
 				}
 
-				bridge.Channels[idx].Data = data
-				bridge.Channels[idx].Disabled.Read = false
-				bridge.Channels[idx].Disabled.Write = false
-			}
+				if err := database.disableChannel(channel.ID, false, false, data); err != nil {
+					errors = append(errors, getErr(channel.ID, "update the row `"+channel.ID+"`", err))
 
-			if err := database.createBridge(bridge); err != nil {
-				return getErr(opts.Prefix, "update the database", err)
+					continue
+				}
 			}
 
 			errStr := ""
@@ -257,11 +244,11 @@ func getStatus(database *database) lightning.Command {
 				status += "- `" + channel.ID + "`"
 
 				switch {
-				case channel.Disabled.Read && channel.Disabled.Write:
+				case channel.DisabledRead && channel.DisabledWrite:
 					status += " (disabled - try `" + opts.Prefix + "bridge reset` to fix this)"
-				case channel.Disabled.Read:
+				case channel.DisabledRead:
 					status += " (subscribed - to enable this channel, try `" + opts.Prefix + "bridge reset`)"
-				case channel.Disabled.Write:
+				case channel.DisabledWrite:
 					status += " (read-only - try `" + opts.Prefix + "bridge reset` to fix this)"
 				default:
 				}
@@ -269,7 +256,7 @@ func getStatus(database *database) lightning.Command {
 				status += "\n"
 			}
 
-			return status + "\n**Settings:**\n- AllowEveryone: " + strconv.FormatBool(bridge.Settings.AllowEveryone)
+			return status + "\n**Settings:**\n- AllowEveryone: " + strconv.FormatBool(bridge.AllowEveryone)
 		}),
 	}
 }
@@ -288,7 +275,7 @@ func getToggle(database *database) lightning.Command {
 
 			switch strings.ToLower(opts.Arguments["setting"]) {
 			case "alloweveryone", "allow_everyone":
-				bridge.Settings.AllowEveryone = !bridge.Settings.AllowEveryone
+				bridge.AllowEveryone = !bridge.AllowEveryone
 			default:
 				return "`" + opts.Arguments["setting"] + "` is not a known setting! Try `" +
 					opts.Prefix + "bridge help` for valid options."

@@ -49,9 +49,9 @@ func (msg *discordSendable) toWebhook() *webhookExecutePayload {
 	}
 }
 
-func (msg *discordSendable) toInteraction() *interactionResponseData {
-	return &interactionResponseData{
-		Content: msg.Content, Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions,
+func (msg *discordSendable) toInteraction() *webhookEditMessagePayload {
+	return &webhookEditMessagePayload{
+		Content: &msg.Content, Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions,
 		Flags: msg.Flags,
 	}
 }

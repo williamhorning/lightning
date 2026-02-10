@@ -161,7 +161,7 @@ func (p *stoatPlugin) EditMessage(
 		if _, err := fetch[any](p.session, "PATCH", "https://api.stoat.chat/0.8/channels/"+message.ChannelID+
 			"/messages/"+ids[idx], "application/json",
 			stDataEditMessage{Content: chunk.Content, Embeds: chunk.Embeds}); err != nil {
-			return ids, fmt.Errorf("failed to edit message: %w", err)
+			return nil, fmt.Errorf("failed to edit message: %w", err)
 		}
 	}
 

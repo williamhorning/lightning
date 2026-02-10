@@ -1,41 +1,28 @@
 package main
 
-import "codeberg.org/jersey/lightning/pkg/lightning"
-
-type bridgeSettings struct {
-	AllowEveryone bool `json:"allow_everyone"`
-}
-
 type bridgeChannel struct {
-	Data     map[string]string         `json:"data,omitempty"`
-	ID       string                    `json:"id"`
-	Disabled lightning.ChannelDisabled `json:"disabled"`
+	ID            string            `db:"channel_id"`
+	Data          map[string]string `db:"data"`
+	DisabledRead  bool              `db:"disabled_read"`
+	DisabledWrite bool              `db:"disabled_write"`
 }
 
 type bridge struct {
-	ID       string          `json:"id"`
-	Channels []bridgeChannel `json:"channels"`
-	Settings bridgeSettings  `json:"settings"`
+	ID            string
+	AllowEveryone bool
+	Channels      []bridgeChannel
 }
 
 type channelMessage struct {
-	ChannelID  string   `json:"channel_id"`
-	MessageIDs []string `json:"message_ids"`
+	ChannelID  string   `db:"channel_id"`
+	MessageIDs []string `db:"ids"`
 }
 
-type bridgeMessageCollection struct {
-	ID       string           `json:"id"`
-	BridgeID string           `json:"bridge_id"`
-	Messages []channelMessage `json:"messages"`
-}
+type channelMessageSet []channelMessage
 
-func (m *bridgeMessageCollection) getChannelMessageIDs(channelID string) []string {
-	if m == nil {
-		return nil
-	}
-
-	for _, msg := range m.Messages {
-		if msg.ChannelID == channelID {
+func (m channelMessageSet) getChannel(id string) []string {
+	for _, msg := range m {
+		if msg.ChannelID == id {
 			return msg.MessageIDs
 		}
 	}
@@ -43,18 +30,18 @@ func (m *bridgeMessageCollection) getChannelMessageIDs(channelID string) []strin
 	return nil
 }
 
-func (b *bridge) getChannelDisabled(channelID string) lightning.ChannelDisabled {
+func (b *bridge) getChannel(channelID string) bridgeChannel {
 	for _, channel := range b.Channels {
 		if channel.ID == channelID {
-			return channel.Disabled
+			return channel
 		}
 	}
 
-	return lightning.ChannelDisabled{Read: false, Write: false}
+	return bridgeChannel{}
 }
 
 type unsupportedDatabaseVersionError struct{}
 
 func (unsupportedDatabaseVersionError) Error() string {
-	return "unsupported database version, must be from a lightning version greater than v0.8.0-beta.9"
+	return "database version must be d0.8.3 or higher. try running v0.8.6 to migrate your data."
 }

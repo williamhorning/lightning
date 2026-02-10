@@ -187,7 +187,7 @@ func (p *telegramPlugin) EditMessage(
 	for idx, data := range lightningToTelegramMessage(message) {
 		telegramID, err := strconv.ParseInt(ids[idx], 10, 64)
 		if err != nil {
-			return ids, fmt.Errorf("failed to parse message ID on edit: %w", err)
+			return nil, fmt.Errorf("failed to parse message ID on edit: %w", err)
 		}
 
 		_, _, err = p.telegram.EditMessageText(
@@ -200,7 +200,7 @@ func (p *telegramPlugin) EditMessage(
 		)
 		if err != nil && !strings.Contains(err.Error(),
 			"specified new message content and reply markup are exactly the same") {
-			return ids, fmt.Errorf("failed to edit message: %w", err)
+			return nil, fmt.Errorf("failed to edit message: %w", err)
 		}
 	}
 

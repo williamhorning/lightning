@@ -81,6 +81,10 @@ func (p *discordPlugin) IsAdmin(user, channel string) (bool, error) {
 		return false, &permissionCheckError{"get guild on permissions check"}
 	}
 
+	if user == guild.OwnerID {
+		return true, nil
+	}
+
 	member, ok := p.bot.getMember(setup.GuildID, snowflake(user))
 	if !ok {
 		return false, &permissionCheckError{"get member on permissions check"}
@@ -205,7 +209,7 @@ func (p *discordPlugin) EditMessage(
 		}
 
 		if err != nil {
-			return ids, err
+			return nil, err
 		}
 	}
 
@@ -213,7 +217,7 @@ func (p *discordPlugin) EditMessage(
 }
 
 func (p *discordPlugin) DeleteMessage(channel string, ids []string) error {
-	if len(ids) == 1 {
+	if len(ids) < 2 {
 		return p.bot.deleteMessage(channel, ids[0])
 	}
 

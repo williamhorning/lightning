@@ -11,7 +11,7 @@ import (
 	"codeberg.org/jersey/lightning/pkg/lightning"
 )
 
-func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) { //nolint:cyclop,revive,nolintlint
+func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) { //nolint:cyclop,revive
 	return func(bot *lightning.Bot, message *lightning.Message) {
 		bridge, err := database.getBridgeByChannel(message.ChannelID)
 		if err != nil {
@@ -20,7 +20,7 @@ func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) {
 			return
 		}
 
-		if bridge.ID == "" || bridge.getChannelDisabled(message.ChannelID).Read {
+		if bridge.ID == "" || bridge.getChannel(message.ChannelID).DisabledRead {
 			return
 		}
 
@@ -30,7 +30,7 @@ func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) {
 		wait := sync.WaitGroup{}
 
 		for _, channel := range bridge.Channels {
-			if channel.ID == message.ChannelID || channel.Disabled.Write {
+			if channel.ID == message.ChannelID || channel.DisabledWrite {
 				continue
 			}
 
@@ -44,15 +44,15 @@ func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) {
 				}()
 
 				msg.ChannelID = channel.ID
-				msg.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID)
+				msg.RepliedTo = repliedTo.getChannel(channel.ID)
 
 				resultIDs, err := bot.SendMessage(&msg, &lightning.SendOptions{
-					AllowEveryonePings: bridge.Settings.AllowEveryone, ChannelData: channel.Data,
+					AllowEveryonePings: bridge.AllowEveryone, ChannelData: channel.Data,
 				})
 				if err == nil {
 					results <- channelMessage{ChannelID: channel.ID, MessageIDs: resultIDs}
 				} else {
-					handleError(database, &bridge, channel.ID, "create", err)
+					handleError(database, channel.ID, "create", err)
 				}
 			})
 		}
@@ -64,9 +64,7 @@ func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) {
 			messages = append(messages, msg)
 		}
 
-		if err = database.createMessage(bridgeMessageCollection{
-			ID: message.EventID, BridgeID: bridge.ID, Messages: messages,
-		}); err != nil {
+		if err = database.insertMessage(message.EventID, bridge.ID, messages); err != nil {
 			log.Printf("bridge: failed to create message collection: %v\n", err)
 		}
 	}
@@ -74,86 +72,98 @@ func bridgeCreate(database *database) func(*lightning.Bot, *lightning.Message) {
 
 func bridgeEdit(database *database) func(*lightning.Bot, *lightning.EditedMessage) {
 	return func(bot *lightning.Bot, message *lightning.EditedMessage) {
-		bridge, prior, found := getPriorMessage(database, &message.BaseMessage)
-		if !found {
+		time.Sleep(150 * time.Millisecond)
+
+		prior, err := database.getOriginalMessage(message.EventID)
+		if err != nil {
+			log.Printf("bridge: failed to get message collection for previously sent message: %v\n", err)
+
+			return
+		}
+
+		if prior == nil {
+			return
+		}
+
+		bridge, err := database.getBridgeByChannel(message.ChannelID)
+		if err != nil {
+			log.Printf("bridge: failed to get bridge from database on edit: %v\n", err)
+
+			return
+		}
+
+		if bridge.ID == "" || bridge.getChannel(message.ChannelID).DisabledRead {
 			return
 		}
 
 		repliedTo := getRepliedToMessage(database, message.Message)
-		messages := []channelMessage{{ChannelID: message.ChannelID, MessageIDs: []string{message.EventID}}}
-		results := make(chan channelMessage, len(bridge.Channels))
 		wait := sync.WaitGroup{}
 
-		for _, channel := range bridge.Channels {
-			if channel.ID == message.ChannelID || channel.Disabled.Write ||
-				slices.Contains(prior.getChannelMessageIDs(channel.ID), message.EventID) {
+		for _, prior := range prior {
+			if bridge.getChannel(prior.ChannelID).DisabledWrite {
 				continue
 			}
 
 			wait.Go(func() {
-				channel := channel
-				msg := *message.Message
-
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("bridge: panic on edit in %q: %v %s\n", channel.ID, r, debug.Stack())
+						log.Printf("bridge: panic on edit in %q: %v %s\n", prior.ChannelID, r, debug.Stack())
 					}
 				}()
 
-				msg.ChannelID = channel.ID
-				msg.RepliedTo = repliedTo.getChannelMessageIDs(channel.ID)
+				channel := bridge.getChannel(prior.ChannelID)
+				msg := *message.Message
+				msg.ChannelID = prior.ChannelID
+				msg.RepliedTo = repliedTo.getChannel(prior.ChannelID)
 
-				ids, err := bot.EditMessage(&msg, prior.getChannelMessageIDs(channel.ID), &lightning.SendOptions{
-					AllowEveryonePings: bridge.Settings.AllowEveryone, ChannelData: channel.Data,
-				})
-				if err == nil {
-					results <- channelMessage{ChannelID: channel.ID, MessageIDs: ids}
-				} else {
-					handleError(database, bridge, channel.ID, "edit", err)
+				if _, err := bot.EditMessage(&msg, prior.MessageIDs, &lightning.SendOptions{
+					AllowEveryonePings: bridge.AllowEveryone, ChannelData: channel.Data,
+				}); err != nil {
+					handleError(database, prior.ChannelID, "edit", err)
 				}
 			})
 		}
 
 		wait.Wait()
-		close(results)
-
-		for msg := range results {
-			messages = append(messages, msg)
-		}
-
-		if err := database.createMessage(bridgeMessageCollection{
-			ID: message.EventID, BridgeID: bridge.ID, Messages: messages,
-		}); err != nil {
-			log.Printf("bridge: failed to update message collection: %v\n", err)
-		}
 	}
 }
 
 func bridgeDelete(database *database) func(*lightning.Bot, *lightning.BaseMessage) {
 	return func(bot *lightning.Bot, message *lightning.BaseMessage) {
-		bridge, prior, found := getPriorMessage(database, message)
-		if !found {
+		time.Sleep(150 * time.Millisecond)
+
+		prior, err := database.getMessage(message.EventID)
+		if err != nil {
+			log.Printf("bridge: failed to get message collection for previously sent message: %v\n", err)
+
+			return
+		}
+
+		if prior == nil {
 			return
 		}
 
 		wait := sync.WaitGroup{}
 
-		for _, channel := range prior.Messages {
-			if bridge.getChannelDisabled(channel.ChannelID).Write || len(channel.MessageIDs) == 0 {
+		for _, prior := range prior {
+			if prior.ChannelID == message.ChannelID {
+				prior.MessageIDs = slices.DeleteFunc(prior.MessageIDs,
+					func(id string) bool { return id == message.EventID })
+			}
+
+			if len(prior.MessageIDs) == 0 {
 				continue
 			}
 
 			wait.Go(func() {
-				channel := channel
-
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("bridge: panic on delete in %q: %v %s\n", channel.ChannelID, r, debug.Stack())
+						log.Printf("bridge: panic on delete in %q: %v %s\n", prior.ChannelID, r, debug.Stack())
 					}
 				}()
 
-				if err := bot.DeleteMessages(channel.ChannelID, channel.MessageIDs); err != nil {
-					handleError(database, bridge, channel.ChannelID, "delete", err)
+				if err := bot.DeleteMessages(prior.ChannelID, prior.MessageIDs); err != nil {
+					handleError(database, prior.ChannelID, "delete", err)
 				}
 			})
 		}
@@ -166,35 +176,7 @@ func bridgeDelete(database *database) func(*lightning.Bot, *lightning.BaseMessag
 	}
 }
 
-func getPriorMessage(database *database, base *lightning.BaseMessage) (*bridge, *bridgeMessageCollection, bool) {
-	time.Sleep(150 * time.Millisecond)
-
-	bridge, err := database.getBridgeByChannel(base.ChannelID)
-	if err != nil {
-		log.Printf("bridge: failed to get bridge for previously sent message: %v\n", err)
-
-		return nil, nil, false
-	}
-
-	if bridge.ID == "" || bridge.getChannelDisabled(base.ChannelID).Read {
-		return nil, nil, false
-	}
-
-	prior, err := database.getMessage(base.EventID)
-	if err != nil {
-		log.Printf("bridge: failed to get message collection for previously sent message: %v\n", err)
-
-		return nil, nil, false
-	}
-
-	if prior.ID == "" {
-		return nil, nil, false
-	}
-
-	return &bridge, &prior, true
-}
-
-func getRepliedToMessage(database *database, msg *lightning.Message) *bridgeMessageCollection {
+func getRepliedToMessage(database *database, msg *lightning.Message) channelMessageSet {
 	if msg == nil || len(msg.RepliedTo) == 0 {
 		return nil
 	}
@@ -206,10 +188,10 @@ func getRepliedToMessage(database *database, msg *lightning.Message) *bridgeMess
 		return nil
 	}
 
-	return &repliedTo
+	return repliedTo
 }
 
-func handleError(database *database, bridge *bridge, channelID, event string, err error) {
+func handleError(database *database, channelID, event string, err error) {
 	var disabled lightning.ChannelDisabled
 
 	disabler := new(lightning.ChannelDisabler)
@@ -219,7 +201,7 @@ func handleError(database *database, bridge *bridge, channelID, event string, er
 		}
 	}
 
-	log.Printf("bridge: failed to %s in channel %q (in %q): %v\n", event, channelID, bridge.ID, err)
+	log.Printf("bridge: failed to %s in channel %q: %v\n", event, channelID, err)
 
 	if !disabled.Read && !disabled.Write {
 		return
@@ -227,15 +209,7 @@ func handleError(database *database, bridge *bridge, channelID, event string, er
 
 	log.Printf("bridge: disabling channel %q: read %t write %t\n", channelID, disabled.Read, disabled.Write)
 
-	for i, ch := range bridge.Channels {
-		if ch.ID == channelID {
-			bridge.Channels[i].Disabled = disabled
-
-			break
-		}
-	}
-
-	if err := database.createBridge(*bridge); err != nil {
+	if err := database.disableChannel(channelID, disabled.Read, disabled.Write, map[string]string{}); err != nil {
 		log.Printf("bridge: failed disabling channel %q: %v\n", channelID, err)
 	}
 }

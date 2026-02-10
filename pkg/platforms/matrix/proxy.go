@@ -6,14 +6,15 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/id"
 )
 
 func startProxy(client *mautrix.Client, url, port string) {
-	if err := http.ListenAndServe( //nolint:gosec
-		":"+port, http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+	server := &http.Server{
+		Addr: ":" + port, Handler: http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 			curl, err := id.ParseContentURI("mxc://" + strings.TrimPrefix(req.URL.Path, "/matrix"))
 			if err != nil {
 				writer.WriteHeader(http.StatusBadRequest)
@@ -38,9 +39,14 @@ func startProxy(client *mautrix.Client, url, port string) {
 
 			writer.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
 			writer.WriteHeader(http.StatusOK)
-		})); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Printf("matrix: error in file proxy serve: %v\n", err)
+		}), ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
 	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("matrix: error in file proxy serve: %v\n", err)
+		}
+	}()
 
 	log.Printf("matrix: file proxy listening at :%s and %s\n", port, url)
 }

@@ -220,21 +220,25 @@ func discordToLightningAttachments(
 
 	for _, sticker := range stickers {
 		url := "https://" + bot.cdnHost + "/stickers/" + sticker.ID
+		ext := ""
 
 		switch sticker.FormatType {
 		case stickerPNG, stickerAPNG:
 			url += ".png"
+			ext += ".png"
 		case stickerGIF:
 			url += ".gif"
+			ext += ".gif"
 			url = strings.ReplaceAll(url, "cdn.discordapp.com", "media.discordapp.net")
 		case stickerLottie:
 			url += ".json"
+			ext += ".json"
 		default:
 		}
 
 		result = append(result, lightning.Attachment{
 			URL:  url + "?size=160",
-			Name: sticker.Name,
+			Name: sticker.Name + ext,
 		})
 	}
 
@@ -256,7 +260,7 @@ func discordToLightningEmoji(bot *client, msg *lightning.Message) string {
 			return match
 		}
 
-		emojiID := parts[2]
+		emojiID := strings.TrimSuffix(parts[2], ">")
 		emojiName := parts[1]
 
 		url := "https://" + bot.cdnHost + "/emojis/" + emojiID

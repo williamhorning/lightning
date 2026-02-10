@@ -2,6 +2,7 @@ package stoat
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,7 @@ type stError struct {
 	Location  string `json:"location"`
 	ErrorInfo string `json:"error"`
 	data      any
+	response  *http.Response
 }
 
 func (e *stError) Disable() *lightning.ChannelDisabled {
@@ -28,6 +30,10 @@ func (e *stError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stError) Error() string {
+	if e.ErrorType == "" {
+		return strconv.FormatInt(int64(e.response.StatusCode), 10) + " error: " + fmt.Sprintf("%#v", e.data)
+	}
+
 	return e.ErrorType + " ( https://github.com/stoatchat/stoatchat/blob/main/" +
 		(strings.Replace(e.Location, ":", "#L", 1)) + " ) with info: " + e.ErrorInfo + ":" + fmt.Sprintf("%#v", e.data)
 }

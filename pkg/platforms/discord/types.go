@@ -255,6 +255,7 @@ type guild struct {
 	Unavailable bool        `json:"unavailable,omitempty"`
 	PremiumTier premiumTier `json:"premium_tier,omitempty"`
 	Roles       []role      `json:"roles,omitempty"`
+	OwnerID     string      `json:"owner_id"`
 }
 
 type intent int
@@ -340,8 +341,6 @@ type interactionResponseData struct {
 }
 
 type interactionResponseType int
-
-const respChannelMessageWithSource interactionResponseType = 4
 
 type interactionType int
 
@@ -611,6 +610,7 @@ type webhookEditMessagePayload struct {
 	Components      []component      `json:"components,omitempty"`
 	Content         *string          `json:"content,omitempty"`
 	Embeds          []embed          `json:"embeds,omitempty"`
+	Flags           messageFlags     `json:"flags,omitempty"`
 }
 
 type webhookExecutePayload struct {

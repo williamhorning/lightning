@@ -100,6 +100,7 @@ func requestLoop[T any](
 			return nil, fmt.Errorf("failed to decode error response: %w", err)
 		}
 
+		stoatError.response = resp
 		stoatError.data = data
 
 		return nil, &stoatError

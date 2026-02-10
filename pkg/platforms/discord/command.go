@@ -62,7 +62,7 @@ func discordToLightningCommand(
 	var subcommand *string
 
 	for _, option := range interaction.Data.Options {
-		switch option.Type {
+		switch option.Type { //nolint:revive
 		case optString:
 			args[option.Name] = option.Value
 		case optSubCommand:
@@ -72,13 +72,16 @@ func discordToLightningCommand(
 			for _, subopt := range option.Options {
 				args[subopt.Name] = subopt.Value
 			}
-		default:
 		}
 	}
 
 	timestamp := time.Now()
 	if id, err := strconv.ParseInt(string(interaction.ID), 10, 64); err == nil {
 		timestamp = time.UnixMilli((id >> 22) + 1420070400000)
+	}
+
+	if err := client.respondInteraction(interaction.ID, interaction.Token, &interactionResponse{Type: 5}); err != nil {
+		log.Printf("%s: failed to defer response: %v\n", client.product, err)
 	}
 
 	return &lightning.CommandEvent{
@@ -97,9 +100,8 @@ func discordToLightningCommand(
 					msg.Flags = messageFlagsEphemeral
 				}
 
-				if err := client.respondInteraction(interaction.ID, interaction.Token, &interactionResponse{
-					Type: respChannelMessageWithSource, Data: msg.toInteraction(),
-				}); err != nil {
+				if err := client.editWebhook(string(interaction.ID), interaction.Token, "@original",
+					msg.toInteraction()); err != nil {
 					log.Printf("%s: failed responding to command: %v\n", client.product, err)
 				}
 			},
