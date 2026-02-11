@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"sync"
@@ -97,7 +98,7 @@ func requestLoop[T any](
 	default:
 		var stoatError stError
 		if err := json.NewDecoder(resp.Body).Decode(&stoatError); err != nil {
-			return nil, fmt.Errorf("failed to decode error response: %w", err)
+			log.Printf("stoat: failed to decode error response: %v", err)
 		}
 
 		stoatError.response = resp
