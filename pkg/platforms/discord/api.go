@@ -99,7 +99,7 @@ func (bot *client) makeRequest(
 
 	req.Header.Add("Authorization", "Bot "+bot.token)
 	req.Header.Add("Content-Type", contentType)
-	req.Header.Add("User-Agent", "DiscordBot (https://williamhorn.ing/lightning, 0.8.7)")
+	req.Header.Add("User-Agent", "DiscordBot (https://williamhorn.ing/lightning, 0.8.8)")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

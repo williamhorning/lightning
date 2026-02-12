@@ -57,7 +57,7 @@ func fetch[T any](session *session, method, endpoint, content string, data any) 
 	req.Header = map[string][]string{
 		"Accept":      {"application/json"},
 		"X-Bot-Token": {session.token},
-		"User-Agent":  {"rvapi/0.8.7"},
+		"User-Agent":  {"rvapi/0.8.8"},
 	}
 
 	if content != "" {
