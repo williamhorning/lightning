@@ -468,6 +468,12 @@ const (
 	premium3    premiumTier = 3
 )
 
+type ratelimitResponse struct {
+	Message    string  `json:"message"`
+	RetryAfter float64 `json:"retry_after"`
+	Global     bool    `json:"global"`
+}
+
 type readyEvent struct {
 	Guilds      []guild     `json:"guilds"`
 	SessionID   string      `json:"session_id"`

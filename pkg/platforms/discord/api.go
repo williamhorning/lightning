@@ -90,6 +90,8 @@ func (bot *client) doMultipart(method, endpoint string, body any, files []file, 
 func (bot *client) makeRequest(
 	method, endpoint string, body io.ReadSeeker, contentType string, out any, retry int,
 ) error {
+	bot.waitIfRateLimited(method + endpoint)
+
 	req, err := http.NewRequest(method, "https://"+bot.apiHost+"/api/v"+bot.version+endpoint, body)
 	if err != nil {
 		return fmt.Errorf("failed to make %s %s request: %w", method, endpoint, err)
@@ -103,7 +105,6 @@ func (bot *client) makeRequest(
 	if err != nil {
 		return &apiError{Message: err.Error(), Request: req, Response: resp}
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 300 {
@@ -116,28 +117,55 @@ func (bot *client) makeRequest(
 		return nil
 	}
 
-	if resp.StatusCode != http.StatusTooManyRequests || retry >= 4 {
-		aerr := apiError{Request: req, Response: resp}
-
-		if err = json.NewDecoder(resp.Body).Decode(&aerr); err != nil {
-			aerr.Code = apiErrorCode(resp.StatusCode)
-			aerr.Message = err.Error()
-		}
-
-		return aerr
+	if resp.StatusCode == http.StatusTooManyRequests && retry < 4 {
+		return handleRetry(resp, bot, method, endpoint, body, contentType, out, retry)
 	}
 
-	return bot.handleRetry(resp, method, endpoint, body, contentType, out, retry)
+	aerr := apiError{Request: req, Response: resp}
+	if err = json.NewDecoder(resp.Body).Decode(&aerr); err != nil {
+		aerr.Code = apiErrorCode(resp.StatusCode)
+		aerr.Message = err.Error()
+	}
+
+	return aerr
 }
 
-func (bot *client) handleRetry(
-	resp *http.Response, method, endpoint string, body io.ReadSeeker, contentType string, out any, retry int,
+func handleRetry(
+	resp *http.Response, bot *client, method string, endpoint string, body io.ReadSeeker,
+	contentType string, out any, retry int,
 ) error {
-	interval := resp.Header.Get("X-Ratelimit-Reset-After")
+	var res ratelimitResponse
 
-	duration, err := time.ParseDuration(interval + "s")
-	if err != nil {
-		duration = time.Second
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	delay := func() time.Duration {
+		if res.RetryAfter > 0 {
+			return time.Duration(res.RetryAfter * float64(time.Second))
+		}
+
+		if h := resp.Header.Get("Retry-After"); h != "" {
+			if v, err := strconv.ParseFloat(h, 64); err == nil {
+				return time.Duration(v * float64(time.Second))
+			}
+		}
+
+		if h := resp.Header.Get("X-Ratelimit-Reset-After"); h != "" {
+			if v, err := strconv.ParseFloat(h, 64); err == nil {
+				return time.Duration(v * float64(time.Second))
+			}
+		}
+
+		return 1 * time.Second
+	}()
+
+	reset := time.Now().Add(delay)
+
+	if res.Global || resp.Header.Get("X-Ratelimit-Scope") == "global" {
+		bot.rateMu.RLock()
+		bot.rate = reset
+		bot.rateMu.RUnlock()
+	} else {
+		bot.routeResets.Set(method+endpoint, reset)
 	}
 
 	if body != nil {
@@ -146,7 +174,35 @@ func (bot *client) handleRetry(
 		}
 	}
 
-	time.Sleep(duration)
+	time.Sleep(delay)
 
 	return bot.makeRequest(method, endpoint, body, contentType, out, retry+1)
+}
+
+func (bot *client) waitIfRateLimited(bucket string) {
+	for {
+		now := time.Now()
+
+		bot.rateMu.Lock()
+		globalReset := bot.rate
+		bot.rateMu.Unlock()
+
+		var sleep time.Duration
+
+		if globalReset.After(now) {
+			sleep = time.Until(globalReset)
+		}
+
+		if reset, ok := bot.routeResets.Get(bucket); ok && reset.After(now) {
+			if d := time.Until(reset); d > sleep {
+				sleep = d
+			}
+		}
+
+		if sleep <= 0 {
+			return
+		}
+
+		time.Sleep(sleep)
+	}
 }
