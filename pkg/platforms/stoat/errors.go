@@ -12,7 +12,6 @@ import (
 type stError struct {
 	ErrorType string `json:"type"`
 	Location  string `json:"location"`
-	ErrorInfo string `json:"error"`
 	data      any
 	response  *http.Response
 }
@@ -35,7 +34,7 @@ func (e *stError) Error() string {
 	}
 
 	return e.ErrorType + " ( https://github.com/stoatchat/stoatchat/blob/main/" +
-		(strings.Replace(e.Location, ":", "#L", 1)) + " ) with info: " + e.ErrorInfo + ":" + fmt.Sprintf("%#v", e.data)
+		(strings.Replace(e.Location, ":", "#L", 1)) + " ) with data: " + fmt.Sprintf("%#v", e.data)
 }
 
 type stoatPermissionsError struct {
