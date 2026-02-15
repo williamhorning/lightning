@@ -8,7 +8,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
-	"time"
 
 	"codeberg.org/jersey/lightning/internal/buffer"
 	"codeberg.org/jersey/lightning/internal/cache"
@@ -87,10 +86,10 @@ func (bot *client) doMultipart(method, endpoint string, body any, files []file, 
 	return bot.makeRequest(method, endpoint, buf, writer.FormDataContentType(), out, 0)
 }
 
-func (bot *client) makeRequest(
+func (bot *client) makeRequest( //nolint:revive,cyclop
 	method, endpoint string, body io.ReadSeeker, contentType string, out any, retry int,
 ) error {
-	bot.waitIfRateLimited(method + endpoint)
+	bucket := bot.rlimit.waitUntil(endpoint)
 
 	req, err := http.NewRequest(method, "https://"+bot.apiHost+"/api/v"+bot.version+endpoint, body)
 	if err != nil {
@@ -107,6 +106,8 @@ func (bot *client) makeRequest(
 	}
 	defer resp.Body.Close()
 
+	bucket.release(resp.Header)
+
 	if resp.StatusCode < 300 {
 		if out != nil {
 			if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
@@ -118,7 +119,13 @@ func (bot *client) makeRequest(
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests && retry < 4 {
-		return handleRetry(resp, bot, method, endpoint, body, contentType, out, retry)
+		if body != nil {
+			if _, err := body.Seek(0, io.SeekStart); err != nil {
+				return fmt.Errorf("failed to rewind request body on retry %s %s: %w", method, endpoint, err)
+			}
+		}
+
+		return bot.makeRequest(method, endpoint, body, contentType, out, retry+1)
 	}
 
 	aerr := apiError{Request: req, Response: resp}
@@ -128,81 +135,4 @@ func (bot *client) makeRequest(
 	}
 
 	return aerr
-}
-
-func handleRetry(
-	resp *http.Response, bot *client, method string, endpoint string, body io.ReadSeeker,
-	contentType string, out any, retry int,
-) error {
-	var res ratelimitResponse
-
-	_ = json.NewDecoder(resp.Body).Decode(&res)
-
-	delay := func() time.Duration {
-		if res.RetryAfter > 0 {
-			return time.Duration(res.RetryAfter * float64(time.Second))
-		}
-
-		if h := resp.Header.Get("Retry-After"); h != "" {
-			if v, err := strconv.ParseFloat(h, 64); err == nil {
-				return time.Duration(v * float64(time.Second))
-			}
-		}
-
-		if h := resp.Header.Get("X-Ratelimit-Reset-After"); h != "" {
-			if v, err := strconv.ParseFloat(h, 64); err == nil {
-				return time.Duration(v * float64(time.Second))
-			}
-		}
-
-		return 1 * time.Second
-	}()
-
-	reset := time.Now().Add(delay)
-
-	if res.Global || resp.Header.Get("X-Ratelimit-Scope") == "global" {
-		bot.rateMu.RLock()
-		bot.rate = reset
-		bot.rateMu.RUnlock()
-	} else {
-		bot.routeResets.Set(method+endpoint, reset)
-	}
-
-	if body != nil {
-		if _, err := body.Seek(0, io.SeekStart); err != nil {
-			return fmt.Errorf("failed to rewind request body on retry %s %s: %w", method, endpoint, err)
-		}
-	}
-
-	time.Sleep(delay)
-
-	return bot.makeRequest(method, endpoint, body, contentType, out, retry+1)
-}
-
-func (bot *client) waitIfRateLimited(bucket string) {
-	for {
-		now := time.Now()
-
-		bot.rateMu.Lock()
-		globalReset := bot.rate
-		bot.rateMu.Unlock()
-
-		var sleep time.Duration
-
-		if globalReset.After(now) {
-			sleep = time.Until(globalReset)
-		}
-
-		if reset, ok := bot.routeResets.Get(bucket); ok && reset.After(now) {
-			if d := time.Until(reset); d > sleep {
-				sleep = d
-			}
-		}
-
-		if sleep <= 0 {
-			return
-		}
-
-		time.Sleep(sleep)
-	}
 }

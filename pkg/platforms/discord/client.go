@@ -3,7 +3,6 @@ package discord
 import (
 	"errors"
 	"sync"
-	"time"
 
 	"codeberg.org/jersey/lightning/internal/cache"
 )
@@ -32,9 +31,7 @@ type client struct {
 	messages cache.Expiring[string, *message]
 	webhooks cache.Expiring[snowflake, *webhook]
 
-	rateMu      sync.RWMutex
-	rate        time.Time
-	routeResets cache.Expiring[string, time.Time]
+	rlimit ratelimiter
 }
 
 func (bot *client) bulkDelete(channel string, ids []string) error {

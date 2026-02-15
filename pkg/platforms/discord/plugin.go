@@ -45,8 +45,10 @@ func New(cfg map[string]string) (lightning.Plugin, error) {
 	session := &client{
 		apiHost: cfg["api_host"], cdnHost: cfg["cdn_host"], frontend: "discord.com", version: "10",
 		spacebar: cfg["api_host"] != "discord.com", token: cfg["token"], product: "discord",
-		intents: intentsNotPrivileged | intentMessageContent,
+		intents: intentsNotPrivileged | intentMessageContent, rlimit: ratelimiter{buckets: make(map[string]*bucket)},
 	}
+
+	session.rlimit.global.Store(&time.Time{})
 
 	if session.spacebar {
 		session.frontend = "fermi.chat"
