@@ -15,7 +15,7 @@ import (
 func startProxy(client *mautrix.Client, url, port string) {
 	server := &http.Server{
 		Addr: ":" + port, Handler: http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-			curl, err := id.ParseContentURI("mxc://" + strings.TrimPrefix(req.URL.Path, "/matrix"))
+			curl, err := id.ParseContentURI(strings.TrimPrefix(req.URL.Path, "/matrix/"))
 			if err != nil {
 				writer.WriteHeader(http.StatusBadRequest)
 
