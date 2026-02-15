@@ -24,9 +24,9 @@ func getBot(config map[string]string) (lightning.Plugin, error) {
 		client.Syncer = syncer
 	}
 
-	msgChannel := make(chan *lightning.Message, 1000)
-	editChannel := make(chan *lightning.EditedMessage, 1000)
-	deleteChannel := make(chan *lightning.BaseMessage, 1000)
+	msgChannel := make(chan *lightning.Message, 2048)
+	editChannel := make(chan *lightning.EditedMessage, 2048)
+	deleteChannel := make(chan *lightning.BaseMessage, 2048)
 
 	syncer.OnSync(client.DontProcessOldEvents)
 
@@ -82,9 +82,9 @@ func getAppsvc(config map[string]string) (lightning.Plugin, error) {
 	go handler.Start(context.Background())
 	go startProxy(appsvc.BotClient(), config["proxy_url"], config["proxy_port"])
 
-	msgChannel := make(chan *lightning.Message, 1000)
-	editChannel := make(chan *lightning.EditedMessage, 1000)
-	deleteChannel := make(chan *lightning.BaseMessage, 1000)
+	msgChannel := make(chan *lightning.Message, 2048)
+	editChannel := make(chan *lightning.EditedMessage, 2048)
+	deleteChannel := make(chan *lightning.BaseMessage, 2048)
 
 	plugin := &matrixPlugin{
 		proxy: config["proxy_url"], appsvc: appsvc, client: appsvc.BotClient(),

@@ -29,10 +29,10 @@ import (
 //	}
 func New(cfg map[string]string) (lightning.Plugin, error) {
 	plugin := &stoatPlugin{session: &session{
-		messageDeleted: make(chan *stMessageDeleteEvent, 1000),
-		messageCreated: make(chan *stMessage, 1000),
-		messageUpdated: make(chan *stMessageUpdateEvent, 1000),
-		ready:          make(chan *stReadyEvent, 100),
+		messageDeleted: make(chan *stMessageDeleteEvent, 2048),
+		messageCreated: make(chan *stMessage, 2048),
+		messageUpdated: make(chan *stMessageUpdateEvent, 2048),
+		ready:          make(chan *stReadyEvent, 128),
 		token:          cfg["token"],
 	}}
 
@@ -180,7 +180,7 @@ func (p *stoatPlugin) DeleteMessage(channel string, ids []string) error {
 func (*stoatPlugin) SetupCommands(_ map[string]lightning.Command) {}
 
 func (p *stoatPlugin) ListenMessages() <-chan *lightning.Message {
-	channel := make(chan *lightning.Message, 1000)
+	channel := make(chan *lightning.Message, 2048)
 
 	go func() {
 		for m := range p.session.messageCreated {
@@ -194,7 +194,7 @@ func (p *stoatPlugin) ListenMessages() <-chan *lightning.Message {
 }
 
 func (p *stoatPlugin) ListenEdits() <-chan *lightning.EditedMessage {
-	channel := make(chan *lightning.EditedMessage, 1000)
+	channel := make(chan *lightning.EditedMessage, 2048)
 
 	go func() {
 		for m := range p.session.messageUpdated {
@@ -208,7 +208,7 @@ func (p *stoatPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 }
 
 func (p *stoatPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
-	channel := make(chan *lightning.BaseMessage, 1000)
+	channel := make(chan *lightning.BaseMessage, 2048)
 
 	go func() {
 		for m := range p.session.messageDeleted {

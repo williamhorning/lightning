@@ -56,7 +56,7 @@ func readMessages(session *session) {
 			break
 		}
 
-		handleEvent(session, message)
+		go handleEvent(session, message)
 	}
 
 	if session.conn != nil {

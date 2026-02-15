@@ -234,7 +234,7 @@ func (p *discordPlugin) SetupCommands(command map[string]lightning.Command) {
 }
 
 func (p *discordPlugin) ListenMessages() <-chan *lightning.Message {
-	channel := make(chan *lightning.Message, 1000)
+	channel := make(chan *lightning.Message, 2048)
 
 	addHandler(p.bot, eventMessageCreate, func(m *message) {
 		if msg := discordToLightning(p.bot, m); msg != nil {
@@ -246,7 +246,7 @@ func (p *discordPlugin) ListenMessages() <-chan *lightning.Message {
 }
 
 func (p *discordPlugin) ListenEdits() <-chan *lightning.EditedMessage {
-	channel := make(chan *lightning.EditedMessage, 1000)
+	channel := make(chan *lightning.EditedMessage, 2048)
 
 	addHandler(p.bot, eventMessageEdit, func(evt *message) {
 		if msg := discordToLightning(p.bot, evt); msg != nil {
@@ -263,7 +263,7 @@ func (p *discordPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 }
 
 func (p *discordPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
-	channel := make(chan *lightning.BaseMessage, 1000)
+	channel := make(chan *lightning.BaseMessage, 2048)
 
 	addHandler(p.bot, eventMessageDelete, func(m *messageDelete) {
 		channel <- &lightning.BaseMessage{
@@ -275,7 +275,7 @@ func (p *discordPlugin) ListenDeletes() <-chan *lightning.BaseMessage {
 }
 
 func (p *discordPlugin) ListenCommands() <-chan *lightning.CommandEvent {
-	channel := make(chan *lightning.CommandEvent, 1000)
+	channel := make(chan *lightning.CommandEvent, 2048)
 
 	addHandler(p.bot, eventInteractionCreate, func(m *interactionCreateEvent) {
 		if cmd := discordToLightningCommand(p.bot, m); cmd != nil {

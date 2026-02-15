@@ -49,8 +49,8 @@ func New(config map[string]string) (lightning.Plugin, error) {
 		return nil, fmt.Errorf("failed to create bot: %w", err)
 	}
 
-	messages := make(chan *lightning.Message, 1000)
-	edits := make(chan *lightning.EditedMessage, 1000)
+	messages := make(chan *lightning.Message, 2048)
+	edits := make(chan *lightning.EditedMessage, 2048)
 
 	dispatch := ext.NewDispatcher(nil)
 

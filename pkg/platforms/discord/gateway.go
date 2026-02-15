@@ -55,7 +55,7 @@ func (bot *client) run(socket *websocket.Conn, heartbeat time.Duration, gateway 
 			socket *websocket.Conn
 			data   []byte
 			err    error
-		}, 16)
+		}, 64)
 		backoff      int
 		seq          int64
 		sessionID    string
