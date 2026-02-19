@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"strconv"
+	"strings"
 
 	"codeberg.org/jersey/lightning/pkg/lightning"
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -25,19 +26,19 @@ type entityContentPair struct {
 }
 
 func lightningToTelegramMessage(message *lightning.Message) []entityContentPair {
-	content := ""
+	var content strings.Builder
 
 	if message.Author != nil {
-		content += message.Author.Username + " » "
+		content.WriteString(message.Author.Username + " » ")
 	}
 
-	content += message.Content + "\n"
+	content.WriteString(message.Content + "\n")
 
 	for idx := range message.Embeds {
-		content += "\n\n" + message.Embeds[idx].ToMarkdown()
+		content.WriteString("\n\n" + message.Embeds[idx].ToMarkdown())
 	}
 
-	return markdownToTelegram(content)
+	return markdownToTelegram(content.String())
 }
 
 func getSendOptions(message *lightning.Message, entities []gotgbot.MessageEntity) *gotgbot.SendMessageOpts {

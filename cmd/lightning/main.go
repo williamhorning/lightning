@@ -27,7 +27,8 @@ func main() {
 		log.Fatalf("bridge: %v\n", err)
 	}
 
-	setupLogging(config.ErrorURL)
+	log.SetFlags(log.Ltime | log.Lshortfile)
+	log.SetPrefix("")
 
 	log.Println("bridge: bot started")
 

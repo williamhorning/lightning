@@ -38,7 +38,6 @@ func startProxy(client *mautrix.Client, url, port string) {
 			}
 
 			writer.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-			writer.WriteHeader(http.StatusOK)
 		}), ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
 	}
 

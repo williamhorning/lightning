@@ -28,7 +28,7 @@ func handleTextCommand(bot *Bot, event *Message) {
 
 	args := strings.Fields(event.Content[len(bot.prefix):])
 	if len(args) == 0 {
-		args = []string{"help"}
+		args = append(args, "help")
 	}
 
 	reply := func(msg *Message, sensitive bool) {
@@ -60,8 +60,8 @@ func handleTextCommand(bot *Bot, event *Message) {
 func handleCommandEvent(bot *Bot, event *CommandEvent) {
 	event.Bot = bot
 
-	command, exists := bot.commands[event.Command]
-	if !exists {
+	command := bot.commands[event.Command]
+	if command.Executor == nil {
 		command = bot.commands["help"]
 	}
 

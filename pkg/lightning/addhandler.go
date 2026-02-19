@@ -25,22 +25,19 @@ func (b *Bot) AddHandler(listener any) {
 }
 
 type handler[T any] struct {
+	mu       sync.Mutex
 	handlers []func(*Bot, T)
-	mu       sync.RWMutex
 }
 
-func (h *handler[T]) add(handler func(*Bot, T)) {
+func (h *handler[T]) add(fn func(*Bot, T)) {
 	h.mu.Lock()
-	h.handlers = append(h.handlers, handler)
+	h.handlers = append(h.handlers, fn)
 	h.mu.Unlock()
 }
 
 func (h *handler[T]) dispatch(bot *Bot, evt T) {
-	h.mu.RLock()
-
-	for _, handlerfunc := range h.handlers {
-		go handlerfunc(bot, evt)
+	handlers := h.handlers
+	for _, fn := range handlers {
+		go fn(bot, evt)
 	}
-
-	h.mu.RUnlock()
 }

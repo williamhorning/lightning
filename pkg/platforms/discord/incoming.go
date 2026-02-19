@@ -79,14 +79,14 @@ func discordToLightningForward(bot *client, msg *message) string {
 		return ""
 	}
 
-	out := ""
+	var out strings.Builder
 
 	for idx := range msg.MessageSnapshots {
 		content := discordToLightningContent(bot, msg.MessageSnapshots[idx].Content, nil)
-		out += "> " + strings.ReplaceAll(content, "\n", "\n> ")
+		out.WriteString("> " + strings.ReplaceAll(content, "\n", "\n> "))
 	}
 
-	return out
+	return out.String()
 }
 
 var (

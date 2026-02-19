@@ -8,7 +8,6 @@ import (
 
 type config struct {
 	Database string         `toml:"database"`
-	ErrorURL string         `toml:"error_url"`
 	Prefix   string         `toml:"prefix"`
 	Username string         `toml:"username"`
 	Plugins  []pluginConfig `toml:"plugins"`

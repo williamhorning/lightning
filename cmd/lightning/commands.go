@@ -238,25 +238,26 @@ func getStatus(database *database) lightning.Command {
 					opts.Prefix + "bridge join` or `" + opts.Prefix + "bridge help`."
 			}
 
-			status := "**Channels:**\n"
+			var status strings.Builder
+			status.WriteString("**Channels:**\n")
 
 			for _, channel := range bridge.Channels {
-				status += "- `" + channel.ID + "`"
+				status.WriteString("- `" + channel.ID + "`")
 
 				switch {
 				case channel.DisabledRead && channel.DisabledWrite:
-					status += " (disabled - try `" + opts.Prefix + "bridge reset` to fix this)"
+					status.WriteString(" (disabled - try `" + opts.Prefix + "bridge reset` to fix this)")
 				case channel.DisabledRead:
-					status += " (subscribed - to enable this channel, try `" + opts.Prefix + "bridge reset`)"
+					status.WriteString(" (subscribed - to enable this channel, try `" + opts.Prefix + "bridge reset`)")
 				case channel.DisabledWrite:
-					status += " (read-only - try `" + opts.Prefix + "bridge reset` to fix this)"
+					status.WriteString(" (read-only - try `" + opts.Prefix + "bridge reset` to fix this)")
 				default:
 				}
 
-				status += "\n"
+				status.WriteString("\n")
 			}
 
-			return status + "\n**Settings:**\n- AllowEveryone: " + strconv.FormatBool(bridge.AllowEveryone)
+			return status.String() + "\n**Settings:**\n- AllowEveryone: " + strconv.FormatBool(bridge.AllowEveryone)
 		}),
 	}
 }

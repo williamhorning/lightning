@@ -62,8 +62,7 @@ func (bot *client) createWebhook(channel, name string) (*webhook, error) {
 func (bot *client) deleteMessage(channel, id string) error {
 	err := bot.do("DELETE", "/channels/"+channel+"/messages/"+id, nil, nil)
 
-	var aerr apiError
-	if errors.As(err, &aerr) {
+	if aerr, ok := errors.AsType[apiError](err); ok {
 		if aerr.Code == 10008 {
 			return nil
 		}
@@ -99,8 +98,7 @@ func (bot *client) editWebhook(
 
 	err := bot.do("PATCH", "/webhooks/"+webhook+"/"+token+"/messages/"+id, msg, &res)
 	if err != nil {
-		var aerr apiError
-		if errors.As(err, &aerr) {
+		if aerr, ok := errors.AsType[apiError](err); ok {
 			if aerr.Code == 10008 {
 				return nil
 			}

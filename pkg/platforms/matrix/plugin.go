@@ -16,7 +16,6 @@ package matrix
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"codeberg.org/jersey/lightning/internal/cache"
 	"codeberg.org/jersey/lightning/pkg/lightning"
@@ -60,20 +59,14 @@ type matrixPlugin struct {
 }
 
 func (p *matrixPlugin) IsAdmin(user, channel string) (bool, error) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("matrix: panic on IsAdmin: %v", r)
-		}
-	}()
+	var levels event.PowerLevelsEventContent
 
-	levels, err := p.client.StateStore.GetPowerLevels(context.Background(), id.RoomID(channel))
-	if err != nil || levels == nil || levels.CreateEvent == nil {
-		return false, fmt.Errorf("state not synced yet, failed to get power levels: %w", err)
-	} else if levels.GetUserLevel(id.UserID(user)) >= 60 {
-		return true, nil
+	err := p.client.StateEvent(context.Background(), id.RoomID(channel), event.StatePowerLevels, "", &levels)
+	if err != nil {
+		return false, fmt.Errorf("failed to get power levels: %w", err)
 	}
 
-	return false, nil
+	return levels.GetUserLevel(id.UserID(user)) >= 60, nil
 }
 
 func (*matrixPlugin) SetupChannel(_ string) (map[string]string, error) {

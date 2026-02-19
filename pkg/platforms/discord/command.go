@@ -66,8 +66,7 @@ func discordToLightningCommand(
 		case optString:
 			args[option.Name] = option.Value
 		case optSubCommand:
-			val := option.Name
-			subcommand = &val
+			subcommand = &option.Name
 
 			for _, subopt := range option.Options {
 				args[subopt.Name] = subopt.Value

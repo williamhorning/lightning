@@ -1,54 +1,71 @@
 package lightning
 
+import "strings"
+
 // ToMarkdown transforms a Discord-style embed to markdown.
 func (embed *Embed) ToMarkdown() string {
 	if embed == nil {
 		return ""
 	}
 
-	str := ""
+	var str strings.Builder
 
 	if embed.Title != "" && embed.URL != "" {
-		str += "[" + embed.Title + "](" + embed.URL + ")"
+		str.WriteString("[")
+		str.WriteString(embed.Title)
+		str.WriteString("](")
+		str.WriteString(embed.URL)
+		str.WriteString(")")
 	} else if embed.Title != "" {
-		str += embed.Title
+		str.WriteString(embed.Title)
 	}
 
 	if embed.Timestamp != "" {
-		str += " (" + embed.Timestamp + ")"
+		str.WriteString(" (")
+		str.WriteString(embed.Timestamp)
+		str.WriteString(")")
 	}
 
-	str += "\n\n"
+	str.WriteString("\n\n")
 
 	if embed.Author != nil && embed.Author.URL != "" {
-		str += "[" + embed.Author.Name + "](" + embed.Author.URL + ")\n\n"
+		str.WriteString("[")
+		str.WriteString(embed.Author.Name)
+		str.WriteString("](")
+		str.WriteString(embed.Author.URL)
+		str.WriteString(")\n\n")
 	} else if embed.Author != nil {
-		str += embed.Author.Name + "\n\n"
+		str.WriteString(embed.Author.Name)
+		str.WriteString("\n\n")
 	}
 
 	if embed.Description != "" {
-		str += embed.Description + "\n\n"
+		str.WriteString(embed.Description)
+		str.WriteString("\n\n")
 	}
 
-	str += formatMedia(embed.Image) + formatMedia(embed.Thumbnail) + formatMedia(embed.Video) + formatFooter(embed)
+	str.WriteString(formatMedia(embed.Image))
+	str.WriteString(formatMedia(embed.Thumbnail))
+	str.WriteString(formatMedia(embed.Video))
+	str.WriteString(formatFooter(embed))
 
-	return str
+	return str.String()
 }
 
 func formatFooter(embed *Embed) string {
-	str := ""
+	var str strings.Builder
 
 	for _, field := range embed.Fields {
-		str += "**" + field.Name + "**\n" + field.Value + "\n\n"
+		str.WriteString("**" + field.Name + "**\n" + field.Value + "\n\n")
 	}
 
 	if embed.Footer != nil && embed.Footer.IconURL != "" {
-		str += "[" + embed.Footer.Text + "](" + embed.Footer.IconURL + ")\n"
+		str.WriteString("[" + embed.Footer.Text + "](" + embed.Footer.IconURL + ")\n")
 	} else if embed.Footer != nil {
-		str += embed.Footer.Text + "\n"
+		str.WriteString(embed.Footer.Text + "\n")
 	}
 
-	return str
+	return str.String()
 }
 
 func formatMedia(media *Media) string {

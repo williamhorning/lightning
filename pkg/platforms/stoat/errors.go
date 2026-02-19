@@ -47,13 +47,15 @@ func (*stoatPermissionsError) Disable() *lightning.ChannelDisabled {
 }
 
 func (e *stoatPermissionsError) Error() string {
-	err := "I'm missing the following permissions: "
+	var err strings.Builder
+	err.WriteString("I'm missing the following permissions: ")
 
 	for permission, name := range stPermissionNames {
 		if e.want&permission == permission && e.have&permission != permission {
-			err += "`" + name + "` "
+			err.WriteString("`" + name + "` ")
 		}
 	}
 
-	return err + "`" + strconv.FormatUint(uint64(e.have), 10) + "&" + strconv.FormatUint(uint64(e.want), 10) + "`"
+	return err.String() + "`" +
+		strconv.FormatUint(uint64(e.have), 10) + "&" + strconv.FormatUint(uint64(e.want), 10) + "`"
 }

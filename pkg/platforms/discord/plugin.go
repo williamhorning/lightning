@@ -251,8 +251,7 @@ func (p *discordPlugin) ListenEdits() <-chan *lightning.EditedMessage {
 	addHandler(p.bot, eventMessageEdit, func(evt *message) {
 		if msg := discordToLightning(p.bot, evt); msg != nil {
 			if evt.EditedTimestamp == nil {
-				now := time.Now()
-				evt.EditedTimestamp = &now
+				evt.EditedTimestamp = new(time.Now())
 			}
 
 			channel <- &lightning.EditedMessage{Message: msg, Edited: *evt.EditedTimestamp}

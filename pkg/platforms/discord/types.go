@@ -36,16 +36,17 @@ func (a apiError) Disable() *lightning.ChannelDisabled {
 }
 
 func (a apiError) Error() string {
-	str := "Discord API Error: " + a.Request.Method + " " + a.Request.URL.Path + " status " +
-		strconv.FormatInt(int64(a.Response.StatusCode), 10) + " code " + strconv.FormatInt(int64(a.Code), 10) + ";"
+	var str strings.Builder
+	str.WriteString("Discord API Error: " + a.Request.Method + " " + a.Request.URL.Path + " status " +
+		strconv.FormatInt(int64(a.Response.StatusCode), 10) + " code " + strconv.FormatInt(int64(a.Code), 10) + ";")
 
 	for field, detail := range a.Errors {
 		for _, e := range detail.Errors {
-			str += " " + field + ": [" + e.Code + "] " + e.Message + ";"
+			str.WriteString(" " + field + ": [" + e.Code + "] " + e.Message + ";")
 		}
 	}
 
-	return str
+	return str.String()
 }
 
 type apiErrorCode int

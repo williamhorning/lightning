@@ -86,7 +86,7 @@ func (p *matrixPlugin) uploadFile(client *mautrix.Client, url string) *id.Conten
 		return nil
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec
 	if err != nil {
 		return nil
 	}

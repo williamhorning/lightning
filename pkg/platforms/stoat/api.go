@@ -49,7 +49,7 @@ func fetch[T any](session *session, method, endpoint, content string, data any) 
 		}
 	}
 
-	req, err := http.NewRequest(method, endpoint, body)
+	req, err := http.NewRequest(method, endpoint, body) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -70,7 +70,7 @@ func fetch[T any](session *session, method, endpoint, content string, data any) 
 func requestLoop[T any](
 	session *session, req *http.Request, content string, data any, retry int,
 ) (*T, error) {
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
@@ -146,7 +146,7 @@ func (session *session) uploadFile(srcURL, filename string) (string, error) {
 		return "", fmt.Errorf("failed to create download request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}

@@ -2,7 +2,7 @@
 package emoji
 
 // Emoji is a map of Discord-like emoji syntax (`:100:`) to Unicode emoji.
-var Emoji = map[string]string{ //nolint:gochecknoglobals
+var Emoji = map[string]string{ //nolint:gochecknoglobals,gosec
 	":100:": "💯", ":1234:": "🔢", ":hash:": "#️⃣", ":keycap_star:": "*️⃣", ":zero:": "0️⃣", ":one:": "1️⃣",
 	":two:": "2️⃣", ":three:": "3️⃣", ":four:": "4️⃣", ":five:": "5️⃣", ":six:": "6️⃣", ":seven:": "7️⃣",
 	":eight:": "8️⃣", ":nine:": "9️⃣", ":copyright:": "©️", ":registered:": "®️", ":mahjong:": "🀄",

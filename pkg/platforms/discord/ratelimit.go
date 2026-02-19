@@ -3,6 +3,7 @@ package discord
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,7 +31,9 @@ func (r *ratelimiter) getBucket(key string) *bucket {
 }
 
 func (r *ratelimiter) waitUntil(key string) *bucket {
-	bkt := r.getBucket(key)
+	parts := strings.Split(key, "/")
+
+	bkt := r.getBucket(strings.Join(parts[:min(len(parts), 2)], ""))
 
 	bkt.mu.Lock()
 

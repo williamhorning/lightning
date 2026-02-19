@@ -45,7 +45,7 @@ func lightningToDiscordFiles(client *client, msg *lightning.Message) []file {
 			continue
 		}
 
-		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose
+		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose,gosec
 		if err != nil {
 			cancel()
 

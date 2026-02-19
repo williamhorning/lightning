@@ -9,7 +9,6 @@ disable = ["depguard", "exhaustruct", "noctx", "noinlineerr", "mnd", "perfsprint
 exclusions = { presets = ["std-error-handling"] }
 settings.ireturn = { allow = ["error", "stdlib", "Plugin"] }
 settings.lll = { tab-width = 4 }
-settings.modernize.disable = ["stringsbuilder"]
 settings.revive.enable-all-rules = true
 settings.revive.rules = [
     { name = "add-constant", disabled = true },

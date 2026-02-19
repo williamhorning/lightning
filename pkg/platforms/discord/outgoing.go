@@ -183,8 +183,7 @@ func lightningToDiscordComponents(
 		if ch, ok := bot.getChannel(string(replyMessage.ChannelID)); ok && ch.GuildID != nil {
 			replyMessage.GuildID = ch.GuildID
 		} else {
-			me := snowflake("@me")
-			replyMessage.GuildID = &me
+			replyMessage.GuildID = new(snowflake("@me"))
 		}
 	}
 
